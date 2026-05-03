@@ -16,6 +16,5 @@
     ibm-plex
     nerd-fonts.jetbrains-mono
     nerd-fonts.fira-code
-    noto-fonts-thai
   ];
 }

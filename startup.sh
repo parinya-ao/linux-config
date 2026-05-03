@@ -67,19 +67,19 @@ OS_PRETTY="${PRETTY_NAME:-$OS_ID}"
 pick_distro_script() {
   case "$OS_ID" in
     ubuntu|debian|linuxmint|pop|elementary|neon|zorin|kali|parrot)
-      printf '%s/.distro/ubuntu/ubuntu.sh\n' "$SELF_DIR"; return 0 ;;
+      printf '%s/distro/ubuntu/ubuntu.sh\n' "$SELF_DIR"; return 0 ;;
     fedora)
-      printf '%s/.distro/fedora/fedora.sh\n' "$SELF_DIR"; return 0 ;;
+      printf '%s/distro/fedora/fedora.sh\n' "$SELF_DIR"; return 0 ;;
     opensuse-tumbleweed|opensuse-leap|opensuse-slowroll|opensuse)
-      printf '%s/.distro/opensuse/opensuse.sh\n' "$SELF_DIR"; return 0 ;;
+      printf '%s/distro/opensuse/opensuse.sh\n' "$SELF_DIR"; return 0 ;;
   esac
   case " $OS_LIKE " in
     *" debian "*)
-      printf '%s/.distro/ubuntu/ubuntu.sh\n' "$SELF_DIR"; return 0 ;;
+      printf '%s/distro/ubuntu/ubuntu.sh\n' "$SELF_DIR"; return 0 ;;
     *" fedora "*|*" rhel "*|*" centos "*)
-      printf '%s/.distro/fedora/fedora.sh\n' "$SELF_DIR"; return 0 ;;
+      printf '%s/distro/fedora/fedora.sh\n' "$SELF_DIR"; return 0 ;;
     *" suse "*|*" opensuse "*)
-      printf '%s/.distro/opensuse/opensuse.sh\n' "$SELF_DIR"; return 0 ;;
+      printf '%s/distro/opensuse/opensuse.sh\n' "$SELF_DIR"; return 0 ;;
   esac
   return 1
 }
