@@ -13,6 +13,7 @@
     ./modules/programs/bash.nix
     ./modules/programs/fish.nix
     ./modules/packages/gui.nix
+    ./modules/programs/cli-tools.nix
   ];
 
   programs.home-manager.enable = true;
