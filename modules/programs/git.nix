@@ -1,31 +1,65 @@
-{ ... }:
+{ pkgs, ... }:
 
 {
+  programs.delta = {
+    enable = true;
+    options = {
+      navigate      = true;
+      light         = false;
+      side-by-side  = true;
+      line-numbers  = true;
+      syntax-theme  = "TwoDark";
+      minus-style   = "syntax \"#450a15\"";
+      plus-style    = "syntax \"#0d2a12\"";
+    };
+  };
+
   programs.git = {
     enable = true;
-    signing.format = null; 
-    
+    signing.format = null;
+
+    # ใช้ settings แทน extraConfig
     settings = {
-    alias= {
-      amend = "commit --amend --no-edit";
-    };
+      alias = {
+        amend     = "commit --amend --no-edit";
+        wip       = "!git add -A && git commit -m 'wip: checkpoint'";
+        unwip     = "!git log -n 1 --pretty=%B | grep -q 'wip' && git reset HEAD~";
+        undo      = "reset --soft HEAD~1";
+        unstage   = "restore --staged";
+        lg        = "log --oneline --graph --decorate --all";
+        stash-all = "stash push --include-untracked";
+        recent    = "branch --sort=-committerdate --format='%(committerdate:relative)%09%(refname:short)'";
+      };
+
       user = {
-        name = "parinya-ao";
+        name  = "parinya-ao";
         email = "flim.parinya.ao@gmail.com";
       };
+
       init.defaultBranch = "main";
-      
-      push.autoSetupRemote = true;
-      color.ui = "auto";
-      pull.rebase = true;
-      rebase.autoStash = true;
-      merge.ff = "only";
-      
-      pack.threads = 0;
-      maintenance.auto = true;
+
+      pack.threads     = 0;
       checkout.workers = 0;
-      rerere.enabled = true;
+      feature.manyFiles = true;
+
+      push.autoSetupRemote = true;
+      push.default = "current";
+      pull.rebase  = true;
+      rebase = {
+        autoStash  = true;
+        updateRefs = true;
+      };
+      merge.ff = "only";
+
+      color.ui         = "auto";
+      rerere.enabled   = true;
       rerere.autoUpdate = true;
+      maintenance.auto = true;
+      help.autocorrect = 10;
+
+      diff.algorithm    = "histogram";
+      diff.colorMoved   = "default";
+      diff.colorMovedWS = "allow-indentation-change";
     };
   };
 }
