@@ -14,6 +14,7 @@
     ./modules/programs/fish.nix
     ./modules/packages/gui.nix
     ./modules/programs/cli-tools.nix
+    ./modules/programs/gnome.nix
   ];
 
   programs.home-manager.enable = true;
