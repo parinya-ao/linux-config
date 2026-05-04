@@ -6,18 +6,20 @@
 #  Purpose : Minimal, macOS-philosophy GNOME — clean, fast, predictable
 #
 # ───────────────────────────────────────────────────────────────────────────────
-#  BUG ROOT CAUSE (กด Super แล้ว windows หาย):
-#    เดิม num-workspaces = 6  →  Activities Overview แสดง 6 workspace thumbnails
-#    กด Super แล้ว window ดูเหมือนหาย เพราะ window อยู่ ws1 แต่เห็น overview
-#    FIX: num-workspaces = 1 + dynamic-workspaces = false
-#         ทุก window อยู่ workspace เดียว ไม่มีทางหายไปไหนแน่นอน
+#  BUG ROOT CAUSE (Windows seemingly disappear on Super key press):
+#    Previously, num-workspaces = 6 caused the Activities Overview to display
+#    6 workspace thumbnails. Pressing Super made windows appear lost because
+#    they remained on workspace 1 while the overview showed all workspaces.
+#    FIX: Set num-workspaces = 1 and dynamic-workspaces = false.
+#         All windows are constrained to a single workspace, preventing
+#         them from being misplaced.
 #
 #  DESIGN PHILOSOPHY:
-#    • Pure Adwaita — ไม่มี extension แม้แต่ตัวเดียว
-#    • Single workspace — เหมือน macOS (ไม่มี Space ถ้าไม่ใช้ Mission Control)
-#    • Wayland-native — ใช้ portal/compositor APIs ไม่ใช้ X11 workaround
-#    • Windows-compatible shortcuts — muscle memory ไม่สะดุด
-#    • 3 window buttons right — minimize, maximize, close (appmenu:min,max,close)
+#    • Pure Adwaita: Zero extensions.
+#    • Single workspace: macOS-like behavior (no Spaces unless Mission Control is used).
+#    • Wayland-native: Utilizes portal/compositor APIs, avoiding X11 workarounds.
+#    • Windows-compatible shortcuts: Preserves muscle memory.
+#    • Right-aligned window controls: appmenu, minimize, maximize, close.
 #
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -32,16 +34,16 @@ with lib.hm.gvariant;
     #  §0  GNOME SHELL — Pure, Zero Extension
     # ════════════════════════════════════════════════════════════════════════════
     #
-    #  disable-user-extensions = true   → block ALL extensions ไม่ว่าจะติดตั้งไว้
-    #  enabled-extensions = []          → list ว่างเพิ่มความชัดเจน
-    #  welcome-dialog-last-shown-version → suppress first-run dialog (รำคาญมาก)
+    #  disable-user-extensions = true  → Blocks ALL extensions, regardless of installation status.
+    #  enabled-extensions = []         → Explicitly empty list for clarity.
+    #  welcome-dialog-last-shown-version → Suppresses the first-run welcome dialog.
     #
     "org/gnome/shell" = {
       disable-user-extensions           = true;
       enabled-extensions                = [];
       welcome-dialog-last-shown-version = "9999.0";
 
-      # App picker / Favorites — apps ที่ pin บน dock (ปรับตามต้องการ)
+      # App picker / Favorites: Apps pinned to the dock (adjust as needed).
       favorite-apps = [
         "org.gnome.Nautilus.desktop"
         "firefox.desktop"
@@ -55,38 +57,39 @@ with lib.hm.gvariant;
     #  §1  INTERFACE & THEMING — Adwaita Pure Dark
     # ════════════════════════════════════════════════════════════════════════════
     #
-    #  ทำไมไม่เปลี่ยน theme:
-    #    • Custom GTK themes มักทำให้ crash เมื่อ GNOME อัปเดต
-    #    • Adwaita ได้รับการ test ทุก release
-    #    • Dark mode + teal accent = ดูดีพอแล้วโดยไม่ต้องพึ่ง extension
+    #  Theming Rationale:
+    #    • Custom GTK themes often cause instability during GNOME updates.
+    #    • Adwaita is rigorously tested every release.
+    #    • Dark mode combined with a teal accent provides a polished aesthetic
+    #      without requiring extensions.
     #
     "org/gnome/desktop/interface" = {
-      color-scheme            = "prefer-dark";       # Adwaita Dark
-      accent-color            = "teal";              # GNOME 47+ accent
-      gtk-theme               = "Adwaita";           # ห้าม custom (ทำให้ crash)
+      color-scheme            = "prefer-dark";       # Adwaita Dark.
+      accent-color            = "teal";              # GNOME 47+ accent color.
+      gtk-theme               = "Adwaita";           # Strictly Adwaita to prevent UI crashes.
       icon-theme              = "Adwaita";
       cursor-theme            = "Adwaita";
       cursor-size             = 24;
 
-      # Top bar clock
+      # Top bar clock configuration.
       clock-show-date         = true;
       clock-show-weekday      = true;
-      clock-format            = "24h";               # เปลี่ยนเป็น "12h" ถ้าต้องการ
+      clock-format            = "24h";               # Change to "12h" if preferred.
 
-      # Battery
+      # Battery display.
       show-battery-percentage = true;
 
-      # Font rendering — optimized for 2880×1800 HiDPI (Swift SFG14-71)
-      font-antialiasing       = "rgba";              # subpixel antialiasing
-      font-hinting            = "slight";            # ดีที่สุดสำหรับ HiDPI
+      # Font rendering: Optimized for 2880x1800 HiDPI displays (e.g., Acer Swift SFG14-71).
+      font-antialiasing       = "rgba";              # Subpixel antialiasing.
+      font-hinting            = "slight";            # Optimal for HiDPI displays.
       text-scaling-factor     = 1.0;
 
-      # Animations — เปิดไว้ช่วย orientation awareness
+      # Animations: Enabled to improve spatial awareness.
       enable-animations       = true;
 
-      # Toolkit backend
-      gtk-enable-primary-paste = false;              # ปิด middle-click paste (accident-prone)
-      enable-hot-corners = true; # enable hot conner
+      # Toolkit backend behavior.
+      gtk-enable-primary-paste = false;              # Disables middle-click paste to prevent accidental inputs.
+      enable-hot-corners      = true;                # Enables the top-left hot corner for the Activities Overview.
     };
 
 
@@ -94,25 +97,25 @@ with lib.hm.gvariant;
     #  §2  WINDOW MANAGER PREFERENCES
     # ════════════════════════════════════════════════════════════════════════════
     #
-    #  KEY FIX: num-workspaces = 1
-    #    ทุก window อยู่ workspace เดียว → กด Super → เห็น windows ทั้งหมดใน Overview
-    #    ไม่มีทาง "หาย" ไปอีก workspace
+    #  KEY FIX: num-workspaces = 1 constrains all windows to a single workspace.
+    #    Pressing Super displays all active windows in the Overview, eliminating
+    #    the risk of losing track of windows across multiple workspaces.
     #
-    #  button-layout = "appmenu:minimize,maximize,close"
-    #    appmenu (left) : application menu icon ซ้ายสุด
-    #    minimize        : ปุ่มที่ 1 ขวา
-    #    maximize        : ปุ่มที่ 2 ขวา
-    #    close           : ปุ่มที่ 3 ขวา  ← 3 buttons on right ตามที่ต้องการ
+    #  Button layout configuration:
+    #    appmenu (left)  : Application menu icon on the far left.
+    #    minimize        : 1st button on the right.
+    #    maximize        : 2nd button on the right.
+    #    close           : 3rd button on the right.
     #
     "org/gnome/desktop/wm/preferences" = {
       button-layout                = "appmenu:minimize,maximize,close";
-      focus-mode                   = "click";        # click to focus เหมือน Windows/macOS
+      focus-mode                   = "click";        # Windows/macOS-style click-to-focus behavior.
       auto-raise                   = false;
       num-workspaces               = 1;              # ★ SINGLE WORKSPACE FIX
       action-double-click-titlebar = "toggle-maximize";
       action-middle-click-titlebar = "lower";
       action-right-click-titlebar  = "menu";
-      resize-with-right-button     = false;          # ปิด meta+right-click resize
+      resize-with-right-button     = false;          # Disables meta+right-click window resizing.
     };
 
 
@@ -120,22 +123,22 @@ with lib.hm.gvariant;
     #  §3  MUTTER — Wayland Compositor
     # ════════════════════════════════════════════════════════════════════════════
     #
-    #  dynamic-workspaces = false
-    #    → ห้าม GNOME สร้าง/ลบ workspace อัตโนมัติ
-    #    → ยืนยัน 1 workspace ตลอดกาล (ทำงานร่วมกับ num-workspaces = 1)
+    #  dynamic-workspaces = false:
+    #    → Prevents GNOME from automatically creating or removing workspaces.
+    #    → Enforces a strict single-workspace environment.
     #
-    #  scale-monitor-framebuffer
-    #    → Fractional scaling สำหรับ 2880×1800 display
-    #    → Wayland-native (ไม่ต้องใช้ Xwayland scaling ที่ blur)
-    #    → เป็น "experimental" แต่ stable ใน GNOME 45+ บน Intel Xe
+    #  scale-monitor-framebuffer:
+    #    → Enables fractional scaling for high-resolution displays (e.g., 2880x1800).
+    #    → Provides Wayland-native scaling, avoiding blurry Xwayland upscaling.
+    #    → Marked as experimental but stable on GNOME 45+ with Intel Xe graphics.
     #
     "org/gnome/mutter" = {
-      dynamic-workspaces         = false;            # ★ ห้าม dynamic (lock 1 ws)
+      dynamic-workspaces         = false;            # ★ Disables dynamic workspaces (locks to 1).
       workspaces-only-on-primary = true;
-      edge-tiling                = true;             # snap to screen edges
+      edge-tiling                = true;             # Snaps windows to screen edges.
       experimental-features      = [ "scale-monitor-framebuffer" ];
 
-      # Center new windows (macOS-like behavior)
+      # Centered new windows (macOS-like behavior).
       center-new-windows         = true;
     };
 
@@ -145,22 +148,22 @@ with lib.hm.gvariant;
     # ════════════════════════════════════════════════════════════════════════════
 
     "org/gnome/desktop/peripherals/keyboard" = {
-      delay           = mkUint32 180;  # 180ms before key repeat starts
-      repeat-interval = mkUint32 25;   # 25ms between repeats = ~40 chars/sec
+      delay           = mkUint32 180;  # 180ms delay before key repeat initiates.
+      repeat-interval = mkUint32 25;   # 25ms interval between repeats (~40 chars/sec).
     };
 
     "org/gnome/desktop/input-sources" = {
       sources     = [
-        (mkTuple [ "xkb" "us" ])       # EN กด CapsLock → switch
-        (mkTuple [ "xkb" "th" ])       # TH
+        (mkTuple [ "xkb" "us" ])       # English (US).
+        (mkTuple [ "xkb" "th" ])       # Thai.
       ];
       mru-sources = [
         (mkTuple [ "xkb" "us" ])
         (mkTuple [ "xkb" "th" ])
       ];
       xkb-options = [
-        "grp:caps_toggle"              # CapsLock = EN/TH toggle
-        "terminate:ctrl_alt_bksp"      # Ctrl+Alt+Backspace = kill session
+        "grp:caps_toggle"              # Toggles layout using CapsLock.
+        "terminate:ctrl_alt_bksp"      # Kills the X/Wayland session with Ctrl+Alt+Backspace.
       ];
     };
 
@@ -170,18 +173,18 @@ with lib.hm.gvariant;
     # ════════════════════════════════════════════════════════════════════════════
 
     "org/gnome/desktop/peripherals/touchpad" = {
-      click-method                 = "areas";        # physical L/R click zones
+      click-method                 = "areas";        # Physical Left/Right click zones.
       two-finger-scrolling-enabled = true;
       tap-to-click                 = true;
-      natural-scroll               = true;           # macOS-style (content follows finger)
+      natural-scroll               = true;           # macOS-style natural scrolling (content follows finger).
       speed                        = 0.3;
-      disable-while-typing         = true;           # ป้องกัน accidental tap ขณะพิมพ์
-      tap-and-drag                 = true;           # tap once then drag
+      disable-while-typing         = true;           # Prevents accidental taps while typing.
+      tap-and-drag                 = true;           # Tap once, then drag to select/move.
       tap-and-drag-lock            = false;
     };
 
     "org/gnome/desktop/peripherals/mouse" = {
-      natural-scroll = false;                        # traditional mouse (scroll up = content up)
+      natural-scroll = false;                        # Traditional mouse scrolling (scroll wheel up = content moves up).
       speed          = 0.0;
       accel-profile  = "default";
     };
@@ -191,14 +194,14 @@ with lib.hm.gvariant;
     #  §6  KEYBINDINGS
     # ════════════════════════════════════════════════════════════════════════════
     #
-    #  PHILOSOPHY:
-    #    • ใช้ Wayland-native mechanisms ทั้งหมด (ไม่ใช้ X11 tools)
-    #    • Windows-compatible muscle memory (Alt+F4, Super+D, Super+Shift+S)
-    #    • macOS-compatible alternatives (Super+Q, Super+H)
-    #    • ลบ workspace shortcuts ทิ้งทั้งหมด (single workspace ไม่ต้องการ)
+    #  KEYBINDING PHILOSOPHY:
+    #    • Exclusively use Wayland-native mechanisms (no X11 fallback tools).
+    #    • Retain Windows-compatible muscle memory (e.g., Alt+F4, Super+D, Super+Shift+S).
+    #    • Provide macOS-compatible alternatives (e.g., Super+Q, Super+H).
+    #    • Remove all workspace-switching shortcuts (irrelevant in a single-workspace setup).
     #
     # ─────────────────────────────────────────────────────────────────────────
-    #  §6.1  Custom keybindings (external commands)
+    #  §6.1  Custom Keybindings (External Commands)
     # ─────────────────────────────────────────────────────────────────────────
 
     "org/gnome/settings-daemon/plugins/media-keys" = {
@@ -207,22 +210,22 @@ with lib.hm.gvariant;
         "/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom1/"
       ];
 
-      # ★ Screenshot — ใช้ GNOME built-in portal แทน gnome-screenshot
-      #   GNOME 42+ มี screenshot UI built-in (Wayland-native, ดีกว่า gnome-screenshot)
-      #   เราจะ map ใน §6.3 ผ่าน org/gnome/shell/keybindings แทน
-      #   ดังนั้น clear key เหล่านี้ออกเพื่อป้องกัน conflict
+      # ★ Screenshot Portal: Utilizes the Wayland-native GNOME 42+ built-in
+      #   screenshot UI instead of the legacy 'gnome-screenshot' tool.
+      #   Mapping is handled in §6.3 via 'org/gnome/shell/keybindings'.
+      #   These legacy keys are cleared to prevent conflicts.
       screenshot      = [];
       area-screenshot = [];
     };
 
-    # Terminal — Ctrl+Alt+T (universal standard)
+    # Terminal: Ctrl+Alt+T (universal standard).
     "org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom0" = {
       name    = "Terminal (Ghostty)";
       command = "ghostty";
       binding = "<Control><Alt>t";
     };
 
-    # Files — Super+E (Windows Explorer style)
+    # Files: Super+E (Windows Explorer style).
     "org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom1" = {
       name    = "Files (Nautilus)";
       command = "nautilus --new-window";
@@ -230,42 +233,42 @@ with lib.hm.gvariant;
     };
 
     # ─────────────────────────────────────────────────────────────────────────
-    #  §6.2  Window Manager keybindings
+    #  §6.2  Window Manager Keybindings
     # ─────────────────────────────────────────────────────────────────────────
 
     "org/gnome/desktop/wm/keybindings" = {
 
-      # ── Window control ──────────────────────────────────────────────────────
-      close             = [ "<Super>q" "<Alt>F4" ];  # Super+Q (macOS) + Alt+F4 (Windows)
-      maximize          = [ "<Super>Up" ];            # Windows: snap top
-      unmaximize        = [ "<Super>Down" ];          # Windows: restore
-      toggle-fullscreen = [ "<Super>f" "F11" ];       # F11 universal + Super+F
-      minimize          = [ "<Super>h" ];             # macOS: Command+H = hide
+      # ── Window Control ──────────────────────────────────────────────────────
+      close             = [ "<Super>q" "<Alt>F4" ];  # Super+Q (macOS) and Alt+F4 (Windows).
+      maximize          = [ "<Super>Up" ];           # Windows-style: Snap top / Maximize.
+      unmaximize        = [ "<Super>Down" ];         # Windows-style: Restore down / Unmaximize.
+      toggle-fullscreen = [ "<Super>f" "F11" ];      # F11 (Universal) and Super+F.
+      minimize          = [ "<Super>h" ];            # macOS-style: Hide/Minimize.
 
-      # Tiling — Windows 11 snap style
+      # Window Tiling: Windows 11 snap style.
       tile-left  = [ "<Super>Left" ];
       tile-right = [ "<Super>Right" ];
 
-      # Show desktop — Windows: Super+D / macOS: F11
+      # Show Desktop: Super+D (Windows) / F11 (macOS).
       show-desktop = [ "<Super>d" ];
 
-      # Move window between monitors (useful for external display)
+      # Moves windows between active monitors.
       move-to-monitor-left  = [ "<Super><Shift>Left" ];
       move-to-monitor-right = [ "<Super><Shift>Right" ];
       move-to-monitor-up    = [ "<Super><Shift>Up" ];
       move-to-monitor-down  = [ "<Super><Shift>Down" ];
 
-      # App switching
+      # Application and Window Switching.
       switch-applications          = [ "<Super>Tab" ];
       switch-applications-backward = [ "<Super><Shift>Tab" ];
       switch-windows               = [ "<Alt>Tab" ];
       switch-windows-backward      = [ "<Alt><Shift>Tab" ];
 
-      # Same-class window cycling (เปิด Firefox หลายหน้าต่าง)
-      cycle-windows          = [ "<Super>grave" ];   # Super+` (backtick)
+      # Cycles through windows of the same application class (e.g., multiple Firefox instances).
+      cycle-windows          = [ "<Super>grave" ];   # Super+Grave (Backtick).
       cycle-windows-backward = [ "<Super><Shift>grave" ];
 
-      # ── Workspace switching — ลบทิ้งทั้งหมด (single workspace) ──────────────
+      # ── Workspace Switching (Cleared for single workspace setup) ────────────
       switch-to-workspace-1    = [];
       switch-to-workspace-2    = [];
       switch-to-workspace-3    = [];
@@ -273,57 +276,59 @@ with lib.hm.gvariant;
       switch-to-workspace-5    = [];
       switch-to-workspace-6    = [];
       switch-to-workspace-last = [];
-      switch-to-workspace-left  = [];
-      switch-to-workspace-right = [];
-      switch-to-workspace-up    = [];
-      switch-to-workspace-down  = [];
+      switch-to-workspace-left = [];
+      switch-to-workspace-right= [];
+      switch-to-workspace-up   = [];
+      switch-to-workspace-down = [];
 
-      move-to-workspace-1    = [];
-      move-to-workspace-2    = [];
-      move-to-workspace-3    = [];
-      move-to-workspace-4    = [];
-      move-to-workspace-5    = [];
-      move-to-workspace-6    = [];
-      move-to-workspace-last = [];
-      move-to-workspace-left  = [];
-      move-to-workspace-right = [];
-      move-to-workspace-up    = [];
-      move-to-workspace-down  = [];
+      move-to-workspace-1      = [];
+      move-to-workspace-2      = [];
+      move-to-workspace-3      = [];
+      move-to-workspace-4      = [];
+      move-to-workspace-5      = [];
+      move-to-workspace-6      = [];
+      move-to-workspace-last   = [];
+      move-to-workspace-left   = [];
+      move-to-workspace-right  = [];
+      move-to-workspace-up     = [];
+      move-to-workspace-down   = [];
 
-      # ── Misc ────────────────────────────────────────────────────────────────
-      panel-main-menu    = [];                       # ปิด Super+F1 (ซ้อนทับ)
-      panel-run-dialog   = [ "<Alt>F2" ];            # Alt+F2 = run command dialog
-      begin-move         = [ "<Alt>F7" ];            # move window with keyboard
-      begin-resize       = [ "<Alt>F8" ];            # resize with keyboard
+      # ── Miscellaneous ───────────────────────────────────────────────────────
+      panel-main-menu    = [];                       # Disables Super+F1 to prevent overlap.
+      panel-run-dialog   = [ "<Alt>F2" ];            # Alt+F2: Run command dialog.
+      begin-move         = [ "<Alt>F7" ];            # Initiates window movement via keyboard.
+      begin-resize       = [ "<Alt>F8" ];            # Initiates window resizing via keyboard.
     };
 
     # ─────────────────────────────────────────────────────────────────────────
-    #  §6.3  GNOME Shell keybindings
+    #  §6.3  GNOME Shell Keybindings
     #        (Overview, Screenshot Portal, App Grid)
     # ─────────────────────────────────────────────────────────────────────────
     #
     #  ★ SUPER KEY BEHAVIOR:
-    #    Super alone → Activities Overview (cannot remap without extension)
-    #    Overview ใน single workspace = เห็น windows ทั้งหมดอยู่ตรงหน้า
-    #    ไม่มีทาง "หาย" แล้ว เพราะมีแค่ workspace เดียว
+    #    Pressing Super triggers the Activities Overview (hardcoded in GNOME,
+    #    requires extensions to remap). In a single-workspace setup, this safely
+    #    displays all open windows at a glance without the risk of losing them
+    #    across virtual desktops.
     #
-    #  ★ SCREENSHOT — ใช้ show-screenshot-ui (GNOME 42+ built-in portal)
-    #    Wayland-native 100% ไม่ต้องใช้ gnome-screenshot ที่ X11-based
-    #    ทำงานกับ screen recording, region selection, window mode
+    #  ★ SCREENSHOT UI:
+    #    Triggers the GNOME 42+ interactive screenshot portal. Fully Wayland-native,
+    #    bypassing legacy X11-based tools. Supports screen recording, region
+    #    selection, and window capture.
     #
     "org/gnome/shell/keybindings" = {
-      # ★ Windows-style screenshot: Super+Shift+S → GNOME Screenshot UI
-      show-screenshot-ui     = [ "<Super><Shift>s" ];
+      # Windows-style screenshot trigger: Super+Shift+S.
+      show-screenshot-ui        = [ "<Super><Shift>s" ];
 
-      # App grid (ตารางแอป) — Super+A หรือกด Super สองครั้ง
-      toggle-application-view = [ "<Super>a" ];
+      # Application Grid: Super+A or double-tap Super.
+      toggle-application-view   = [ "<Super>a" ];
 
-      # Notification panel
+      # Notification panel focus.
       focus-active-notification = [ "<Super>n" ];
 
-      # ปิด shortcut ที่ไม่จำเป็น (ป้องกัน conflict)
-      toggle-message-tray = [];
-      open-new-window-shortcut-0 = [];
+      # Disables unnecessary shortcuts to prevent conflicts.
+      toggle-message-tray       = [];
+      open-new-window-shortcut-0= [];
     };
 
 
@@ -332,23 +337,23 @@ with lib.hm.gvariant;
     # ════════════════════════════════════════════════════════════════════════════
 
     "org/gnome/settings-daemon/plugins/power" = {
-      power-button-action            = "nothing";    # ป้องกัน suspend อุบัติเหตุ
-      sleep-inactive-ac-timeout      = 3600;         # 1 ชั่วโมง idle บน AC → suspend
+      power-button-action            = "nothing";    # Disables power button action to prevent accidental suspension.
+      sleep-inactive-ac-timeout      = 3600;         # Suspends after 1 hour of inactivity on AC power.
       sleep-inactive-ac-type         = "suspend";
-      sleep-inactive-battery-timeout = 900;          # 15 นาที idle บน battery
+      sleep-inactive-battery-timeout = 900;          # Suspends after 15 minutes of inactivity on battery power.
       sleep-inactive-battery-type    = "suspend";
-      ambient-enabled                = false;        # ปิด auto brightness (เสถียรกว่า)
+      ambient-enabled                = false;        # Disables ambient light sensor for consistent brightness.
     };
 
-    # Screen blank
+    # Screen blanking intervals.
     "org/gnome/desktop/session" = {
-      idle-delay = mkUint32 600;                     # 10 นาที → screen blank
+      idle-delay = mkUint32 600;                     # Blanks screen after 10 minutes of inactivity.
     };
 
-    # Screen lock
+    # Screen locking policies.
     "org/gnome/desktop/screensaver" = {
-      lock-enabled   = true;
-      lock-delay     = mkUint32 60;                  # blank 1 นาที → lock
+      lock-enabled        = true;
+      lock-delay          = mkUint32 60;             # Locks screen 1 minute after screen blanking.
       user-switch-enabled = true;
     };
 
@@ -359,8 +364,8 @@ with lib.hm.gvariant;
 
     "org/gnome/settings-daemon/plugins/color" = {
       night-light-enabled            = true;
-      night-light-temperature        = mkUint32 3700; # warm white (ปรับ 2700-6500)
-      night-light-schedule-automatic = true;          # ใช้ location-based sunset/sunrise
+      night-light-temperature        = mkUint32 3700; # Warm white color temperature (adjustable between 2700K and 6500K).
+      night-light-schedule-automatic = true;          # Automatically schedules based on local sunset/sunrise times.
     };
 
 
@@ -369,13 +374,13 @@ with lib.hm.gvariant;
     # ════════════════════════════════════════════════════════════════════════════
 
     "org/gnome/desktop/privacy" = {
-      report-technical-problems    = false;           # ไม่ส่ง crash report
-      send-software-usage-stats    = false;           # ไม่ส่ง usage stats
-      remove-old-temp-files        = true;
-      remove-old-trash-files       = true;
-      old-files-age                = mkUint32 7;      # ลบหลัง 7 วัน
-      remember-recent-files        = true;
-      recent-files-max-age         = 30;              # จำ recent files 30 วัน
+      report-technical-problems = false;             # Disables automatic crash reporting.
+      send-software-usage-stats = false;             # Disables telemetry and software usage statistics.
+      remove-old-temp-files     = true;
+      remove-old-trash-files    = true;
+      old-files-age             = mkUint32 7;        # Purges files older than 7 days.
+      remember-recent-files     = true;
+      recent-files-max-age      = 30;                # Retains recent files history for 30 days.
     };
 
 
@@ -384,8 +389,8 @@ with lib.hm.gvariant;
     # ════════════════════════════════════════════════════════════════════════════
 
     "org/gnome/desktop/notifications" = {
-      show-banners        = true;                    # แสดง popup (เปลี่ยนเป็น false = Do Not Disturb)
-      show-in-lock-screen = false;                   # ซ่อน notification บน lock screen
+      show-banners        = true;                    # Enables notification banners (set to false for persistent Do Not Disturb).
+      show-in-lock-screen = false;                   # Hides notifications on the lock screen for privacy.
     };
 
 
@@ -397,19 +402,15 @@ with lib.hm.gvariant;
       default-folder-viewer   = "list-view";
       show-hidden-files       = false;
       show-create-link        = true;
-      show-delete-permanently = true;                # shift+delete = permanent delete
+      show-delete-permanently = true;                # Enables permanent deletion via Shift+Delete.
       recursive-search        = "local-only";
     };
 
     "org/gnome/nautilus/list-view" = {
-      default-zoom-level = "small";
-      use-tree-view      = true;                     # expand folders inline
-      default-column-order = [
-        "name" "size" "type" "date_modified"
-      ];
-      default-visible-columns = [
-        "name" "size" "date_modified"
-      ];
+      default-zoom-level      = "small";
+      use-tree-view           = true;                # Enables inline folder expansion in list view.
+      default-column-order    = [ "name" "size" "type" "date_modified" ];
+      default-visible-columns = [ "name" "size" "date_modified" ];
     };
 
     "org/gnome/nautilus/icon-view" = {
@@ -434,7 +435,7 @@ with lib.hm.gvariant;
       indent-style           = "space";
       tab-width              = mkUint32 4;
       use-system-font        = true;
-      restore-session        = false;                # ไม่ restore เซสชันเก่า (เสถียรกว่า)
+      restore-session        = false;                # Disables session restoration for a clean slate on launch (improves stability).
     };
 
 
@@ -443,14 +444,16 @@ with lib.hm.gvariant;
     # ════════════════════════════════════════════════════════════════════════════
 
     "org/gnome/desktop/calendar" = {
-      show-weekdate = true;                          # แสดงเลขสัปดาห์
+      show-weekdate = true;                          # Displays week numbers in the calendar.
     };
 
 
     # ════════════════════════════════════════════════════════════════════════════
-    #  §14  LOCATION (จำเป็นสำหรับ Night Light auto-schedule)
+    #  §14  LOCATION
     # ════════════════════════════════════════════════════════════════════════════
-
+    #
+    #  Required for automatic Night Light scheduling.
+    #
     "org/gnome/system/location" = {
       enabled = true;
     };
@@ -470,8 +473,8 @@ with lib.hm.gvariant;
     # ════════════════════════════════════════════════════════════════════════════
 
     "org/gnome/desktop/break-reminders/movement" = {
-      duration-seconds = mkUint32 300;               # break 5 นาที
-      interval-seconds = mkUint32 1800;              # ทุก 30 นาที
+      duration-seconds = mkUint32 300;               # 5-minute break duration.
+      interval-seconds = mkUint32 1800;              # Triggers every 30 minutes.
       play-sound       = true;
     };
 
@@ -480,15 +483,14 @@ with lib.hm.gvariant;
     #  §17  DISPLAY & FRACTIONAL SCALING
     # ════════════════════════════════════════════════════════════════════════════
     #
-    #  NOTE: resolution/refresh/scaling จัดการผ่าน GNOME Settings UI แทน dconf
-    #  เพราะ monitor-specific config ขึ้นอยู่กับ EDID hash ที่ไม่ stable ใน nix
+    #  NOTE: Resolution, refresh rate, and display scaling are best managed via
+    #  the GNOME Settings UI rather than dconf. Monitor-specific configurations
+    #  rely on EDID hashes, which are historically volatile in declarative Nix setups.
     #
-    #  สำหรับ 2880×1800 Swift SFG14-71 แนะนำ: 200% scaling (2x) ผ่าน Settings
-    #  หรือถ้าต้องการ fractional เช่น 175%:
-    #    gsettings set org.gnome.mutter experimental-features "['scale-monitor-framebuffer']"
-    #    และ set ผ่าน Settings > Displays > Scale
-    #
-    #  Fractional scaling ถูก enable แล้วใน §3 ผ่าน experimental-features
+    #  For a 2880x1800 display (e.g., Swift SFG14-71), 200% integer scaling is
+    #  recommended via Settings. For fractional scaling (e.g., 175%), the
+    #  'scale-monitor-framebuffer' experimental feature is already enabled in §3,
+    #  allowing configuration directly through Settings > Displays > Scale.
 
   };
 }
