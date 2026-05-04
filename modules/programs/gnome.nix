@@ -86,6 +86,7 @@ with lib.hm.gvariant;
 
       # Toolkit backend
       gtk-enable-primary-paste = false;              # ปิด middle-click paste (accident-prone)
+      enable-hot-corners = true; # enable hot conner
     };
 
 
