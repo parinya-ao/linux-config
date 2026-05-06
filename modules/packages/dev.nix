@@ -2,8 +2,8 @@
 
 {
   home.packages = with pkgs; [
-    gcc
-    # clang
+    # gcc
+    clang
     go
     nodejs
     python3

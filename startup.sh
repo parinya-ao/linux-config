@@ -104,7 +104,8 @@ info "Script:    $DISTRO_SCRIPT"
 # ─────────────────────────────────────────────────────────────────────────────
 step "Running distro driver: $(basename "$DISTRO_SCRIPT")"
 # ✅ stdin already closed above — child script cannot block waiting for input
-/usr/bin/env bash "$DISTRO_SCRIPT" "$@"
+# Distro driver requires root for package installation, firmware, etc.
+sudo /usr/bin/env bash "$DISTRO_SCRIPT" "$@"
 ok "Distro driver finished."
 
 # ─────────────────────────────────────────────────────────────────────────────
