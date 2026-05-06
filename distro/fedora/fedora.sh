@@ -2,6 +2,7 @@
 # =============================================================================
 # 06-drivers-comprehensive.sh
 # Fedora Workstation (dnf) — Comprehensive Driver, Firmware & Codec Installer
+# Enhanced with Hardware Detection, GPU Architecture Awareness, Secure Boot Handling
 # Auto-detects install state and runs the correct phase automatically.
 # Usage: sudo bash 06-drivers-comprehensive.sh
 # =============================================================================
@@ -26,6 +27,197 @@ warn()  { echo -e "${YELLOW}[WARN]${RESET} $*"; }
 fail()  { echo -e "${RED}[FAIL]${RESET} $*"; exit 1; }
 info()  { echo -e "${YELLOW}[INFO]${RESET} $*"; }
 
+# ------------------------------------------
+# IDEMPOTENT PACKAGE CHECK
+# ------------------------------------------
+pkg_installed() {
+  # Check if package is installed (rpm)
+  rpm -q "$1" &>/dev/null
+}
+
+skip() {
+  # Skip message
+  info "⊘ Skipping: $*"
+}
+
+# ------------------------------------------
+# GPU DETECTION ENGINE (Deep Research Mode)
+# ------------------------------------------
+
+# NVIDIA GPU Series Detection (by Device ID hex)
+detect_nvidia_series() {
+  # Extract NVIDIA Device ID from lspci output: [10de:XXXX]
+  local device_id=$(lspci -nn 2>/dev/null | grep -i "10de:" | grep -i "vga\|3d\|display" | head -1 | grep -oP '\[10de:\K[0-9a-f]{4}' || echo "")
+
+  if [[ -z "$device_id" ]]; then
+    return 1
+  fi
+
+  # Convert hex to decimal for range comparison
+  local device_dec=$((16#$device_id))
+
+  # GPU Series mapping by Device ID ranges
+  if (( device_dec >= 0x2200 && device_dec <= 0x2FFFF )); then
+    echo "Ada RTX 40xx (0x2200+)"
+    echo "latest"
+    return 0
+  elif (( device_dec >= 0x1B80 && device_dec <= 0x1FFFF )); then
+    echo "Ampere RTX 30xx (0x1B80+)"
+    echo "latest"
+    return 0
+  elif (( device_dec >= 0x1600 && device_dec <= 0x1BFFF )); then
+    echo "Turing RTX 20xx / GTX 16xx (0x1600+)"
+    echo "latest"
+    return 0
+  elif (( device_dec >= 0x1380 && device_dec <= 0x15FF )); then
+    echo "Pascal GTX 10xx (0x1380+)"
+    echo "470"
+    return 0
+  elif (( device_dec >= 0x0FC0 && device_dec <= 0x137F )); then
+    echo "Maxwell GTX 9xx (0x0FC0+)"
+    echo "470"
+    return 0
+  elif (( device_dec >= 0x0DC0 && device_dec <= 0x0FBFF )); then
+    echo "Kepler GTX 7xx (0x0DC0+)"
+    echo "390"
+    return 0
+  else
+    echo "Unknown NVIDIA GPU (ID: 0x$device_id)"
+    echo "latest"
+    return 0
+  fi
+}
+
+# Intel GPU Generation Detection (by Device ID)
+detect_intel_generation() {
+  # Extract Intel Device ID: [8086:XXXX]
+  local device_id=$(lspci -nn 2>/dev/null | grep -i "8086:" | grep -i "vga\|3d\|display" | head -1 | grep -oP '\[8086:\K[0-9a-f]{4}' || echo "")
+
+  if [[ -z "$device_id" ]]; then
+    return 1
+  fi
+
+  local device_dec=$((16#$device_id))
+
+  # Intel GPU generation by Device ID
+  if (( device_dec >= 0x7600 && device_dec <= 0x7FFF )); then
+    echo "Arrow Lake 15th Gen+ (0x7600+)"
+    echo "iHD"
+    return 0
+  elif (( device_dec >= 0x7D00 && device_dec <= 0x7DFFF )); then
+    echo "Raptor Lake 13th Gen (0x7D00+)"
+    echo "iHD"
+    return 0
+  elif (( device_dec >= 0x4600 && device_dec <= 0x46FF )); then
+    echo "Alder Lake 12th Gen (0x4600+)"
+    echo "iHD"
+    return 0
+  elif (( device_dec >= 0x9A00 && device_dec <= 0x9AFF )); then
+    echo "Tiger Lake 11th Gen (0x9A00+)"
+    echo "iHD"
+    return 0
+  elif (( device_dec >= 0x8A00 && device_dec <= 0x8AFF )); then
+    echo "Ice Lake 10th Gen (0x8A00+)"
+    echo "iHD"
+    return 0
+  elif (( device_dec >= 0x5900 && device_dec <= 0x59FF )); then
+    echo "Coffee Lake 9th Gen (0x5900+)"
+    echo "iHD"
+    return 0
+  elif (( device_dec >= 0x3E00 && device_dec <= 0x3EFF )); then
+    echo "Coffee Lake 8th Gen (0x3E00+)"
+    echo "iHD"
+    return 0
+  elif (( device_dec >= 0x1900 && device_dec <= 0x19FF )); then
+    echo "Skylake 6th Gen (0x1900+)"
+    echo "i965"
+    return 0
+  elif (( device_dec >= 0x1600 && device_dec <= 0x16FF )); then
+    echo "Broadwell 5th Gen (0x1600+)"
+    echo "i965"
+    return 0
+  else
+    echo "Unknown Intel GPU (ID: 0x$device_id)"
+    echo "iHD"
+    return 0
+  fi
+}
+
+# AMD GPU Detection (RDNA awareness)
+detect_amd_gpu() {
+  local device_id=$(lspci -nn 2>/dev/null | grep -i "1002:" | grep -i "vga\|3d\|display" | head -1 | grep -oP '\[1002:\K[0-9a-f]{4}' || echo "")
+
+  if [[ -z "$device_id" ]]; then
+    return 1
+  fi
+
+  local device_dec=$((16#$device_id))
+
+  if (( device_dec >= 0x7300 )); then
+    echo "RDNA (RX 5000+) OpenCL capable"
+    return 0
+  else
+    echo "RDNA/RDNA2 or older"
+    return 0
+  fi
+}
+
+# Wi-Fi Adapter Detection
+detect_wifi_driver() {
+  local wifi_vendor=$(lspci 2>/dev/null | grep -i "network.*wireless\|wireless.*controller" | head -1)
+
+  if echo "$wifi_vendor" | grep -qi "broadcom\|bcm"; then
+    echo "broadcom"
+  elif echo "$wifi_vendor" | grep -qi "intel"; then
+    echo "intel-wifi"
+  elif echo "$wifi_vendor" | grep -qi "realtek\|rtl"; then
+    echo "realtek"
+  elif echo "$wifi_vendor" | grep -qi "atheros\|qualcomm\|qca"; then
+    echo "atheros"
+  else
+    echo "generic"
+  fi
+}
+
+# Main Hardware Detection
+detect_nvidia_gpu() {
+  # Detect NVIDIA GPU via Vendor ID 10de
+  local nvidia_devices=$(lspci -nn 2>/dev/null | grep -i "10de:" | grep -i "vga\|3d\|display" || echo "")
+  if [[ -n "$nvidia_devices" ]]; then
+    echo "$nvidia_devices"
+    return 0
+  fi
+  return 1
+}
+
+detect_intel_gpu() {
+  # Detect Intel GPU via Vendor ID 8086
+  local intel_devices=$(lspci -nn 2>/dev/null | grep -i "8086:" | grep -i "vga\|3d\|display" || echo "")
+  if [[ -n "$intel_devices" ]]; then
+    echo "$intel_devices"
+    return 0
+  fi
+  return 1
+}
+
+detect_amd_discrete_gpu() {
+  # Detect discrete AMD GPU (non-iGPU)
+  local amd_devices=$(lspci -nn 2>/dev/null | grep -i "1002:" | grep -i "vga\|3d" | grep -v "00:02" || echo "")
+  if [[ -n "$amd_devices" ]]; then
+    echo "$amd_devices"
+    return 0
+  fi
+  return 1
+}
+
+detect_hybrid_graphics() {
+  # Detect if system has both NVIDIA and Intel GPUs (hybrid mode like Optimus)
+  if detect_nvidia_gpu >/dev/null 2>&1 && detect_intel_gpu >/dev/null 2>&1; then
+    return 0
+  fi
+  return 1
+}
+
 dnf_install() {
   dnf install -y "$@" \
     && ok "Installed: $*" \
@@ -44,19 +236,120 @@ if command -v rpm-ostree &>/dev/null && rpm-ostree status &>/dev/null 2>&1; then
   fail "rpm-ostree system detected. This script targets Fedora Workstation (dnf) only."
 fi
 
+# Ensure lspci is available for hardware detection
+if ! command -v lspci &>/dev/null; then
+  info "Installing pciutils for hardware detection..."
+  dnf install -y pciutils || warn "Could not install pciutils"
+fi
+
 FEDORA_VER=$(rpm -E %fedora)
 info "Fedora ${BOLD}${FEDORA_VER}${RESET} detected (Workstation/Server, dnf)."
 
 # ------------------------------------------
-# AUTO-DETECT STATE
+# HARDWARE DETECTION OUTPUT (Deep Research)
 # ------------------------------------------
+step "[INIT] Deep hardware research scan..."
+
+NVIDIA_DETECTED=false
+NVIDIA_SERIES=""
+NVIDIA_DRIVER_BRANCH="latest"
+
+INTEL_DETECTED=false
+INTEL_GEN=""
+INTEL_DRIVER=""
+
+AMD_DETECTED=false
+AMD_SERIES=""
+
+WIFI_DRIVER="generic"
+
+HYBRID_MODE=false
+
+# NVIDIA Detection
+if detect_nvidia_gpu >/dev/null 2>&1; then
+  NVIDIA_DETECTED=true
+  read NVIDIA_SERIES NVIDIA_DRIVER_BRANCH < <(detect_nvidia_series)
+  info "✓ NVIDIA GPU: $NVIDIA_SERIES"
+  info "  → Driver branch: $NVIDIA_DRIVER_BRANCH"
+  detect_nvidia_gpu | sed 's/^/    /'
+fi
+
+# Intel Detection
+if detect_intel_gpu >/dev/null 2>&1; then
+  INTEL_DETECTED=true
+  read INTEL_GEN INTEL_DRIVER < <(detect_intel_generation)
+  info "✓ Intel iGPU: $INTEL_GEN"
+  info "  → Media Driver: $INTEL_DRIVER"
+  detect_intel_gpu | sed 's/^/    /'
+fi
+
+# AMD Discrete GPU Detection
+if detect_amd_discrete_gpu >/dev/null 2>&1; then
+  AMD_DETECTED=true
+  AMD_SERIES=$(detect_amd_gpu | head -1)
+  info "✓ AMD GPU: $AMD_SERIES"
+  detect_amd_discrete_gpu | sed 's/^/    /'
+fi
+
+# Hybrid Detection
+if detect_hybrid_graphics; then
+  HYBRID_MODE=true
+  info "✓ Hybrid Graphics: NVIDIA + Intel Optimus detected"
+fi
+
+# Wi-Fi Detection
+WIFI_DRIVER=$(detect_wifi_driver)
+if [[ "$WIFI_DRIVER" != "generic" ]]; then
+  info "✓ Wi-Fi Adapter: $WIFI_DRIVER"
+fi
+
+# Summary
+if [[ "$NVIDIA_DETECTED" == "false" && "$INTEL_DETECTED" == "false" && "$AMD_DETECTED" == "false" ]]; then
+  warn "⚠ No discrete GPU detected - will install base graphics support only"
+fi
+
+# ------------------------------------------
+# AUTO-DETECT STATE (Idempotent Checks)
+# ------------------------------------------
+step "[STATE] Checking current installation state..."
+
 RPM_FUSION_ACTIVE=false
 FFMPEG_ACTIVE=false
+NOUVEAU_BLACKLISTED=false
 
-rpm -q rpmfusion-free-release   &>/dev/null && RPM_FUSION_ACTIVE=true
-rpm -q ffmpeg                   &>/dev/null && FFMPEG_ACTIVE=true
+# Check repos
+rpm -q rpmfusion-free-release &>/dev/null && RPM_FUSION_ACTIVE=true
+rpm -q ffmpeg &>/dev/null && FFMPEG_ACTIVE=true
 
-info "State: RPM Fusion=${RPM_FUSION_ACTIVE} | ffmpeg=${FFMPEG_ACTIVE}"
+# Check NVIDIA driver state (any version)
+if rpm -q akmod-nvidia &>/dev/null || rpm -q akmod-nvidia-\* &>/dev/null 2>/dev/null; then
+  NVIDIA_DRIVER_ACTIVE=true
+  info "  ✓ NVIDIA driver already installed"
+else
+  NVIDIA_DRIVER_ACTIVE=false
+fi
+
+# Check if nouveau is blacklisted
+if [[ -f /etc/modprobe.d/nvidia-disable-nouveau.conf ]] || [[ -f /etc/modprobe.d/blacklist-nouveau.conf ]]; then
+  NOUVEAU_BLACKLISTED=true
+  info "  ✓ Nouveau already blacklisted"
+fi
+
+# Check Intel driver state
+INTEL_DRIVER_ACTIVE=false
+if pkg_installed "intel-media-driver" || pkg_installed "libva-intel-driver"; then
+  INTEL_DRIVER_ACTIVE=true
+  info "  ✓ Intel Media Driver already installed"
+fi
+
+# Check AMD driver state
+AMD_DRIVER_ACTIVE=false
+if pkg_installed "rocm-core" || pkg_installed "amdgpu-core"; then
+  AMD_DRIVER_ACTIVE=true
+  info "  ✓ AMD driver already installed"
+fi
+
+info "State: RPM_Fusion=${RPM_FUSION_ACTIVE} | ffmpeg=${FFMPEG_ACTIVE} | NVIDIA=${NVIDIA_DRIVER_ACTIVE}"
 
 # =============================================================================
 # PHASE 0 — System refresh (always runs)
@@ -108,6 +401,85 @@ if [[ "${RPM_FUSION_ACTIVE}" == "true" && "${FFMPEG_ACTIVE}" == "false" ]]; then
   ok "RPM Fusion confirmed active."
 
   # -----------------------------------------------------------------------
+  # PHASE 0.5 — NVIDIA Driver (Smart Branch Selection)
+  # -----------------------------------------------------------------------
+  if [[ "${NVIDIA_DETECTED}" == "true" ]]; then
+    if [[ "${NVIDIA_DRIVER_ACTIVE}" == "true" ]]; then
+      skip "NVIDIA driver already installed (akmod)"
+    else
+      step "[P0.5] Installing NVIDIA driver - $NVIDIA_SERIES"
+
+      # Ensure kernel-devel is present
+      if ! pkg_installed "kernel-devel"; then
+        info "Installing kernel-devel..."
+        dnf install -y kernel-devel || warn "kernel-devel install failed"
+      fi
+
+      # Blacklist nouveau ONLY if not already done
+      if [[ "${NOUVEAU_BLACKLISTED}" == "false" ]]; then
+        info "Blacklisting nouveau driver..."
+        echo "blacklist nouveau" | tee /etc/modprobe.d/nvidia-disable-nouveau.conf >/dev/null
+        echo "options nouveau modeset=0" >> /etc/modprobe.d/nvidia-disable-nouveau.conf
+      fi
+
+      # Install appropriate akmod-nvidia branch
+      case "${NVIDIA_DRIVER_BRANCH}" in
+        "390")
+          info "Installing NVIDIA Driver 390.xx (Kepler legacy)..."
+          dnf_install akmod-nvidia-390xx nvidia-driver-libs.i686 nvidia-driver-libs-390xx.i686
+          ;;
+        "470")
+          info "Installing NVIDIA Driver 470.xx (Maxwell/Pascal)..."
+          dnf_install akmod-nvidia-470xx nvidia-driver-libs.i686 nvidia-driver-libs-470xx.i686
+          ;;
+        "latest"|*)
+          info "Installing NVIDIA Driver latest (Turing+)..."
+          dnf_install akmod-nvidia nvidia-driver-libs.i686
+          ;;
+      esac
+
+      # Additional libraries
+      dnf_install nvidia-driver-libs nvidia-gpu-firmware nvidia-settings nvidia-utils || true
+
+      # CUDA Toolkit for RTX series (optional but recommended for compute)
+      if [[ "$NVIDIA_SERIES" == *"RTX"* ]] || [[ "$NVIDIA_SERIES" == *"Ada"* ]] || [[ "$NVIDIA_SERIES" == *"Ampere"* ]]; then
+        dnf_install cuda-toolkit || warn "CUDA unavailable (optional)"
+      fi
+
+      # Power management for Hybrid GPUs
+      if [[ "${HYBRID_MODE}" == "true" ]]; then
+        step "[P0.5-HYBRID] Configuring NVIDIA Prime for hybrid graphics..."
+        dnf_install nvidia-prime || warn "nvidia-prime unavailable"
+      fi
+
+      ok "NVIDIA driver (akmod) scheduled for compilation on first boot"
+      warn "⏱ First boot may take 5-10 minutes for kernel module compilation"
+    fi
+
+  # -----------------------------------------------------------------------
+  # PHASE 0.6 — AMD GPU Driver (if detected)
+  # -----------------------------------------------------------------------
+  if [[ "${AMD_DETECTED}" == "true" ]]; then
+    if [[ "${AMD_DRIVER_ACTIVE}" == "true" ]]; then
+      skip "AMD driver already installed (amdgpu)"
+    else
+      step "[P0.6] Configuring AMD GPU support - $AMD_SERIES"
+
+      # AMD GPU uses kernel driver (amdgpu) + Mesa (in-kernel, no separate driver needed)
+      # Just ensure libdrm-amd is installed for user-space
+      dnf_install libdrm-amd || true
+
+      # RDNA series → ROCm support
+      if [[ "$AMD_SERIES" == *"RDNA"* ]]; then
+        info "Installing ROCm compute stack for RDNA..."
+        dnf_install rocm-core rocm-dkms rocm-smi || warn "ROCm may not be available in repos"
+      fi
+
+      info "AMD GPU support configured (uses in-kernel amdgpu driver)"
+    fi
+  fi
+
+  # -----------------------------------------------------------------------
   # PHASE 1 — Base firmware (free)
   # -----------------------------------------------------------------------
   step "[P1] Base firmware (free)..."
@@ -134,16 +506,33 @@ if [[ "${RPM_FUSION_ACTIVE}" == "true" && "${FFMPEG_ACTIVE}" == "false" ]]; then
     || warn "Some tainted firmware skipped (may not apply to your hardware)"
 
   # -----------------------------------------------------------------------
-  # PHASE 3 — Intel Iris Xe GPU + VA-API
+  # PHASE 3 — Intel Iris Xe GPU + VA-API (Generation-Aware)
   # -----------------------------------------------------------------------
-  step "[P3] Intel Iris Xe GPU / VA-API..."
-  dnf_install \
-    intel-media-driver \
-    libva \
-    libva-utils \
-    libva-intel-driver \
-    mesa-dri-drivers \
-    mesa-vulkan-drivers
+  step "[P3] Intel Media Driver / VA-API..."
+
+  if [[ "${INTEL_DETECTED}" == "true" ]]; then
+    if [[ "${INTEL_DRIVER_ACTIVE}" == "true" ]]; then
+      skip "Intel Media Driver already installed"
+    else
+      step "  → $INTEL_GEN (Media Driver: $INTEL_DRIVER)"
+
+      case "${INTEL_DRIVER}" in
+        "iHD")
+          info "Installing intel-media-driver (iHD) for modern Intel GPUs..."
+          dnf_install intel-media-driver libva2 libva-utils libva-intel-driver || warn "iHD install failed"
+          ;;
+        "i965"|*)
+          info "Installing libva-intel-driver (i965) for legacy Intel GPUs..."
+          dnf_install libva-intel-driver libva2 libva-utils || warn "i965 install failed"
+          ;;
+      esac
+    fi
+  else
+    info "No Intel iGPU detected - skipping Intel Media Driver"
+  fi
+
+  # Always install generic VA-API + Mesa
+  dnf_install libva2 libva-utils mesa-dri-drivers mesa-vulkan-drivers || true
 
   # -----------------------------------------------------------------------
   # PHASE 4 — Audio (SOF / PipeWire)
