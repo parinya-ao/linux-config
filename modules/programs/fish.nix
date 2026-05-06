@@ -28,9 +28,9 @@
       # --- Navigation (with zoxide) ---
       cd    = "z";
       cdi   = "zi";          # interactive jump
-      ".."  = "cd ..";
-      "..." = "cd ../..";
-      ".4"  = "cd ../../..";
+      ".."  = "z ..";
+      "..." = "z ../..";
+      ".4"  = "z ../../..";
 
       # --- File tools ---
       ls    = "eza --icons=auto --group-directories-first";
@@ -41,13 +41,20 @@
       cat   = "bat --style=full";
       find  = "fd";
       grep  = "rg --smart-case";
+      sed   = "sd";
+      awk   = "choose";
+      cut   = "choose";
       diff  = "delta";       # git-delta for beautiful diffs
+      man   = "batman";
+      tree  = "eza --tree";
+      curl  = "xh";
 
       # --- System ---
       df    = "duf";
       du    = "dust";
       ps    = "procs";
       top   = "btm";
+      htop  = "btm";
       ping  = "gping";
       cp    = "cp -v";
       mv    = "mv -v";
@@ -75,8 +82,8 @@
       glog  = "git log --oneline --graph --decorate -20";
       gloga = "git log --oneline --graph --decorate --all";
       gwip  = "git add -A && git commit -m 'wip: checkpoint'";
-      gunwip = "git log -n 1 --pretty=%B | grep -q 'wip' && git reset HEAD~";
-      gclean = "git branch --merged | grep -v main | xargs git branch -d";
+      gunwip = "git log -n 1 --pretty=%B | rg -q 'wip' && git reset HEAD~";
+      gclean = "git branch --merged | rg -v main | xargs git branch -d";
 
       # --- Dev shortcuts ---
       nix-clean = "nix-collect-garbage -d && sudo nix-collect-garbage -d";
@@ -89,14 +96,14 @@
       # Create dir and cd into it
       mkcd = {
         description = "Create directory and enter it";
-        body = "mkdir -p $argv && cd $argv";
+        body = "mkdir -p $argv && z $argv";
       };
 
       # Quick git commit with ticket prefix
       gcmt = {
         description = "Commit with ticket prefix from branch name";
         body = ''
-          set ticket (git branch --show-current | grep -oP '[A-Z]+-\d+')
+          set ticket (git branch --show-current | rg -o -P '[A-Z]+-\d+')
           git commit -m "$ticket: $argv"
         '';
       };

@@ -23,7 +23,7 @@
       alias = {
         amend     = "commit --amend --no-edit";
         wip       = "!git add -A && git commit -m 'wip: checkpoint'";
-        unwip     = "!git log -n 1 --pretty=%B | grep -q 'wip' && git reset HEAD~";
+        unwip     = "!git log -n 1 --pretty=%B | rg -q 'wip' && git reset HEAD~";
         undo      = "reset --soft HEAD~1";
         unstage   = "restore --staged";
         lg        = "log --oneline --graph --decorate --all";

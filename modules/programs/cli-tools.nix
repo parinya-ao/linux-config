@@ -103,7 +103,7 @@
     enable               = true;
     enableFishIntegration = true;
     enableBashIntegration = true;
-    options              = [ "--cmd cd" ];  # override default cd
+    options              = [ "--cmd z" ];  # keep z command name
   };
 
   # gemini-cli
