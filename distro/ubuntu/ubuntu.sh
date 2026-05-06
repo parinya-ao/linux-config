@@ -823,6 +823,41 @@ if [[ "${RESTRICTED_ACTIVE}" == "true" \
   ok "Extra hardware support installed."
 
   # -----------------------------------------------------------------------
+  # PHASE 10.5 — Visual Studio Code (official repo)
+  # -----------------------------------------------------------------------
+  step "[P10.5] Visual Studio Code (official repo)..."
+
+  if pkg_installed "code"; then
+    skip "VS Code already installed"
+  else
+    if ! command -v gpg &>/dev/null; then
+      apt_install gnupg
+    fi
+    if ! command -v wget &>/dev/null; then
+      apt_install wget
+    fi
+
+    if [[ ! -f /usr/share/keyrings/microsoft.gpg ]]; then
+      wget -qO- https://packages.microsoft.com/keys/microsoft.asc \
+        | gpg --dearmor -o /usr/share/keyrings/microsoft.gpg
+    fi
+
+    if [[ ! -f /etc/apt/sources.list.d/vscode.sources && ! -f /etc/apt/sources.list.d/vscode.list ]]; then
+      cat > /etc/apt/sources.list.d/vscode.sources <<'EOF'
+Types: deb
+URIs: https://packages.microsoft.com/repos/code
+Suites: stable
+Components: main
+Architectures: amd64,arm64,armhf
+Signed-By: /usr/share/keyrings/microsoft.gpg
+EOF
+    fi
+
+    apt-get update -y
+    apt_install code
+  fi
+
+  # -----------------------------------------------------------------------
   # PHASE 11 — Final upgrade & cleanup
   # -----------------------------------------------------------------------
   step "[P11] Final upgrade & cleanup..."
@@ -853,6 +888,7 @@ if [[ "${RESTRICTED_ACTIVE}" == "true" \
   echo -e "| Power                     | thermald, ppd/tlp    |"
   echo -e "| Printer/Scanner           | cups, sane-utils     |"
   echo -e "| Firmware Updates          | fwupd LVFS           |"
+  echo -e "| VS Code                  | code (Microsoft repo) |"
   echo -e "${BOLD}+---------------------------+----------------------+${RESET}"
   echo ""
   warn "REBOOT required to load new firmware and kernel modules."

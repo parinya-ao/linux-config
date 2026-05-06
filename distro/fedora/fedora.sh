@@ -647,6 +647,32 @@ if [[ "${RPM_FUSION_ACTIVE}" == "true" && "${FFMPEG_ACTIVE}" == "false" ]]; then
     || warn "No firmware updates or fwupd issue — skipping."
 
   # -----------------------------------------------------------------------
+  # PHASE 8.5 — Visual Studio Code (official repo)
+  # -----------------------------------------------------------------------
+  step "[P8.5] Visual Studio Code (official repo)..."
+
+  if pkg_installed "code"; then
+    skip "VS Code already installed"
+  else
+    if [[ ! -f /etc/yum.repos.d/vscode.repo ]]; then
+      rpm --import https://packages.microsoft.com/keys/microsoft.asc
+      cat > /etc/yum.repos.d/vscode.repo <<'EOF'
+[code]
+name=Visual Studio Code
+baseurl=https://packages.microsoft.com/yumrepos/vscode
+enabled=1
+autorefresh=1
+type=rpm-md
+gpgcheck=1
+gpgkey=https://packages.microsoft.com/keys/microsoft.asc
+EOF
+    fi
+
+    dnf makecache -y || true
+    dnf_install code
+  fi
+
+  # -----------------------------------------------------------------------
   # PHASE 9 — Final upgrade & cleanup
   # -----------------------------------------------------------------------
   step "[P9] Final upgrade & cleanup..."
@@ -672,6 +698,7 @@ if [[ "${RPM_FUSION_ACTIVE}" == "true" && "${FFMPEG_ACTIVE}" == "false" ]]; then
   echo -e "| Bluetooth                 | bluez, bluez-firmware|"
   echo -e "| Power                     | thermald, ppd        |"
   echo -e "| Firmware Updates          | fwupd LVFS           |"
+  echo -e "| VS Code                  | code (Microsoft repo) |"
   echo -e "${BOLD}+---------------------------+----------------------+${RESET}"
   echo ""
   warn "REBOOT recommended to load new firmware and kernel modules."

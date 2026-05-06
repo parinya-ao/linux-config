@@ -792,6 +792,32 @@ if [[ "${PACKMAN_ACTIVE}" == "true" \
   ok "Extra hardware support installed."
 
   # -----------------------------------------------------------------------
+  # PHASE 9.5 — Visual Studio Code (official repo)
+  # -----------------------------------------------------------------------
+  step "[P9.5] Visual Studio Code (official repo)..."
+
+  if pkg_installed "code"; then
+    skip "VS Code already installed"
+  else
+    if [[ ! -f /etc/zypp/repos.d/vscode.repo ]]; then
+      rpm --import https://packages.microsoft.com/keys/microsoft.asc
+      cat > /etc/zypp/repos.d/vscode.repo <<'EOF'
+[code]
+name=Visual Studio Code
+baseurl=https://packages.microsoft.com/yumrepos/vscode
+enabled=1
+autorefresh=1
+type=rpm-md
+gpgcheck=1
+gpgkey=https://packages.microsoft.com/keys/microsoft.asc
+EOF
+    fi
+
+    zypper --non-interactive refresh
+    zypper_install code
+  fi
+
+  # -----------------------------------------------------------------------
   # PHASE 10 — Final upgrade & cleanup
   # -----------------------------------------------------------------------
   step "[P10] Final upgrade & cleanup..."
@@ -832,6 +858,7 @@ if [[ "${PACKMAN_ACTIVE}" == "true" \
   echo -e "| Power                     | thermald, ppd/tlp    |"
   echo -e "| Printer/Scanner           | cups, sane-backends  |"
   echo -e "| Firmware Updates          | fwupd LVFS           |"
+  echo -e "| VS Code                  | code (Microsoft repo) |"
   echo -e "${BOLD}+---------------------------+----------------------+${RESET}"
   echo ""
   warn "REBOOT required to load new firmware, Mesa, and kernel modules."

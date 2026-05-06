@@ -1,0 +1,9 @@
+programs=(
+  com.discordapp.Discord
+  com.obsproject.Studio
+  md.obsidian.Obsidian
+  com.rustdesk.RustDesk
+  org.signal.Signal
+  com.github.tchx84.Flatseal
+  org.vinegarhq.Sober
+)
