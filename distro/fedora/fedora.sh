@@ -57,27 +57,27 @@ detect_nvidia_series() {
   local device_dec=$((16#$device_id))
 
   # GPU Series mapping by Device ID ranges
-  if (( device_dec >= 0x2200 && device_dec <= 0x2FFFF )); then
+  if (( device_dec >= 0x2200 )); then
     echo "Ada RTX 40xx (0x2200+)"
     echo "latest"
     return 0
-  elif (( device_dec >= 0x1B80 && device_dec <= 0x1FFFF )); then
+  elif (( device_dec >= 0x1B80 )); then
     echo "Ampere RTX 30xx (0x1B80+)"
     echo "latest"
     return 0
-  elif (( device_dec >= 0x1600 && device_dec <= 0x1BFFF )); then
+  elif (( device_dec >= 0x1600 )); then
     echo "Turing RTX 20xx / GTX 16xx (0x1600+)"
     echo "latest"
     return 0
-  elif (( device_dec >= 0x1380 && device_dec <= 0x15FF )); then
+  elif (( device_dec >= 0x1380 )); then
     echo "Pascal GTX 10xx (0x1380+)"
-    echo "470"
+    echo "latest"
     return 0
-  elif (( device_dec >= 0x0FC0 && device_dec <= 0x137F )); then
+  elif (( device_dec >= 0x0FC0 )); then
     echo "Maxwell GTX 9xx (0x0FC0+)"
     echo "470"
     return 0
-  elif (( device_dec >= 0x0DC0 && device_dec <= 0x0FBFF )); then
+  elif (( device_dec >= 0x0DC0 )); then
     echo "Kepler GTX 7xx (0x0DC0+)"
     echo "390"
     return 0
@@ -104,7 +104,7 @@ detect_intel_generation() {
     echo "Arrow Lake 15th Gen+ (0x7600+)"
     echo "iHD"
     return 0
-  elif (( device_dec >= 0x7D00 && device_dec <= 0x7DFFF )); then
+  elif (( device_dec >= 0x7D00 && device_dec <= 0x7DFF )); then
     echo "Raptor Lake 13th Gen (0x7D00+)"
     echo "iHD"
     return 0
@@ -157,7 +157,7 @@ detect_amd_gpu() {
     echo "RDNA (RX 5000+) OpenCL capable"
     return 0
   else
-    echo "RDNA/RDNA2 or older"
+    echo "Legacy (GCN/Polaris)"
     return 0
   fi
 }
@@ -216,6 +216,23 @@ detect_hybrid_graphics() {
     return 0
   fi
   return 1
+}
+
+nvidia_smi_ok() {
+  command -v nvidia-smi &>/dev/null || return 1
+  nvidia-smi -L &>/dev/null 2>&1
+}
+
+get_vainfo_output() {
+  if command -v vainfo &>/dev/null; then
+    vainfo 2>/dev/null || true
+  fi
+  return 0
+}
+
+vainfo_has() {
+  local pattern="$1"
+  [[ -n "${VAINFO_OUTPUT:-}" ]] && echo "$VAINFO_OUTPUT" | grep -qiE "$pattern"
 }
 
 dnf_install() {
@@ -316,17 +333,21 @@ step "[STATE] Checking current installation state..."
 RPM_FUSION_ACTIVE=false
 FFMPEG_ACTIVE=false
 NOUVEAU_BLACKLISTED=false
+NVIDIA_DRIVER_ACTIVE=false
+
+VAINFO_OUTPUT=$(get_vainfo_output)
 
 # Check repos
 rpm -q rpmfusion-free-release &>/dev/null && RPM_FUSION_ACTIVE=true
 rpm -q ffmpeg &>/dev/null && FFMPEG_ACTIVE=true
 
 # Check NVIDIA driver state (any version)
-if rpm -q akmod-nvidia &>/dev/null || rpm -q akmod-nvidia-\* &>/dev/null 2>/dev/null; then
+if [[ "${NVIDIA_DETECTED}" == "true" ]] && nvidia_smi_ok; then
+  NVIDIA_DRIVER_ACTIVE=true
+  info "  ✓ NVIDIA driver active (nvidia-smi OK)"
+elif rpm -qa | grep -qE '^akmod-nvidia'; then
   NVIDIA_DRIVER_ACTIVE=true
   info "  ✓ NVIDIA driver already installed"
-else
-  NVIDIA_DRIVER_ACTIVE=false
 fi
 
 # Check if nouveau is blacklisted
@@ -337,14 +358,23 @@ fi
 
 # Check Intel driver state
 INTEL_DRIVER_ACTIVE=false
-if pkg_installed "intel-media-driver" || pkg_installed "libva-intel-driver"; then
+if [[ "${INTEL_DETECTED}" == "true" ]] && vainfo_has "iHD"; then
+  INTEL_DRIVER_ACTIVE=true
+  info "  ✓ Intel VA-API (iHD) already active"
+elif [[ "${INTEL_DETECTED}" == "true" ]] && vainfo_has "i965"; then
+  INTEL_DRIVER_ACTIVE=true
+  info "  ✓ Intel VA-API (i965) already active"
+elif pkg_installed "intel-media-driver" || pkg_installed "libva-intel-driver"; then
   INTEL_DRIVER_ACTIVE=true
   info "  ✓ Intel Media Driver already installed"
 fi
 
 # Check AMD driver state
 AMD_DRIVER_ACTIVE=false
-if pkg_installed "rocm-core" || pkg_installed "amdgpu-core"; then
+if [[ "${AMD_DETECTED}" == "true" ]] && vainfo_has "radeonsi"; then
+  AMD_DRIVER_ACTIVE=true
+  info "  ✓ AMD VA-API (radeonsi) already active"
+elif pkg_installed "rocm-core" || pkg_installed "amdgpu-core"; then
   AMD_DRIVER_ACTIVE=true
   info "  ✓ AMD driver already installed"
 fi
@@ -429,11 +459,11 @@ if [[ "${RPM_FUSION_ACTIVE}" == "true" && "${FFMPEG_ACTIVE}" == "false" ]]; then
           dnf_install akmod-nvidia-390xx nvidia-driver-libs.i686 nvidia-driver-libs-390xx.i686
           ;;
         "470")
-          info "Installing NVIDIA Driver 470.xx (Maxwell/Pascal)..."
+          info "Installing NVIDIA Driver 470.xx (Maxwell legacy)..."
           dnf_install akmod-nvidia-470xx nvidia-driver-libs.i686 nvidia-driver-libs-470xx.i686
           ;;
         "latest"|*)
-          info "Installing NVIDIA Driver latest (Turing+)..."
+          info "Installing NVIDIA Driver latest (Pascal+)..."
           dnf_install akmod-nvidia nvidia-driver-libs.i686
           ;;
       esac
@@ -455,6 +485,7 @@ if [[ "${RPM_FUSION_ACTIVE}" == "true" && "${FFMPEG_ACTIVE}" == "false" ]]; then
       ok "NVIDIA driver (akmod) scheduled for compilation on first boot"
       warn "⏱ First boot may take 5-10 minutes for kernel module compilation"
     fi
+  fi
 
   # -----------------------------------------------------------------------
   # PHASE 0.6 — AMD GPU Driver (if detected)
@@ -470,7 +501,7 @@ if [[ "${RPM_FUSION_ACTIVE}" == "true" && "${FFMPEG_ACTIVE}" == "false" ]]; then
       dnf_install libdrm-amd || true
 
       # RDNA series → ROCm support
-      if [[ "$AMD_SERIES" == *"RDNA"* ]]; then
+      if [[ "$AMD_SERIES" == RDNA* ]]; then
         info "Installing ROCm compute stack for RDNA..."
         dnf_install rocm-core rocm-dkms rocm-smi || warn "ROCm may not be available in repos"
       fi

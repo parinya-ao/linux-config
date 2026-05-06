@@ -64,27 +64,27 @@ detect_nvidia_series() {
   local device_dec=$((16#$device_id))
 
   # GPU Series mapping by Device ID ranges
-  if (( device_dec >= 0x2200 && device_dec <= 0x2FFFF )); then
+  if (( device_dec >= 0x2200 )); then
     echo "Ada RTX 40xx (0x2200+)"
     echo "latest"
     return 0
-  elif (( device_dec >= 0x1B80 && device_dec <= 0x1FFFF )); then
+  elif (( device_dec >= 0x1B80 )); then
     echo "Ampere RTX 30xx (0x1B80+)"
     echo "latest"
     return 0
-  elif (( device_dec >= 0x1600 && device_dec <= 0x1BFFF )); then
+  elif (( device_dec >= 0x1600 )); then
     echo "Turing RTX 20xx / GTX 16xx (0x1600+)"
     echo "latest"
     return 0
-  elif (( device_dec >= 0x1380 && device_dec <= 0x15FF )); then
+  elif (( device_dec >= 0x1380 )); then
     echo "Pascal GTX 10xx (0x1380+)"
-    echo "470"
+    echo "latest"
     return 0
-  elif (( device_dec >= 0x0FC0 && device_dec <= 0x137F )); then
+  elif (( device_dec >= 0x0FC0 )); then
     echo "Maxwell GTX 9xx (0x0FC0+)"
     echo "470"
     return 0
-  elif (( device_dec >= 0x0DC0 && device_dec <= 0x0FBFF )); then
+  elif (( device_dec >= 0x0DC0 )); then
     echo "Kepler GTX 7xx (0x0DC0+)"
     echo "390"
     return 0
@@ -111,7 +111,7 @@ detect_intel_generation() {
     echo "Arrow Lake 15th Gen+ (0x7600+)"
     echo "iHD"
     return 0
-  elif (( device_dec >= 0x7D00 && device_dec <= 0x7DFFF )); then
+  elif (( device_dec >= 0x7D00 && device_dec <= 0x7DFF )); then
     echo "Raptor Lake 13th Gen (0x7D00+)"
     echo "iHD"
     return 0
@@ -164,7 +164,7 @@ detect_amd_gpu() {
     echo "RDNA (RX 5000+) OpenCL capable"
     return 0
   else
-    echo "RDNA/RDNA2 or older"
+    echo "Legacy (GCN/Polaris)"
     return 0
   fi
 }
@@ -217,6 +217,23 @@ detect_secure_boot_status() {
     fi
   fi
   return 1  # Secure Boot is off or not available
+}
+
+nvidia_smi_ok() {
+  command -v nvidia-smi &>/dev/null || return 1
+  nvidia-smi -L &>/dev/null 2>&1
+}
+
+get_vainfo_output() {
+  if command -v vainfo &>/dev/null; then
+    vainfo 2>/dev/null || true
+  fi
+  return 0
+}
+
+vainfo_has() {
+  local pattern="$1"
+  [[ -n "${VAINFO_OUTPUT:-}" ]] && echo "$VAINFO_OUTPUT" | grep -qiE "$pattern"
 }
 
 # ------------------------------------------
@@ -321,8 +338,11 @@ RESTRICTED_ACTIVE=false
 FFMPEG_ACTIVE=false
 GSTREAMER_ACTIVE=false
 PPD_ACTIVE=false
+NVIDIA_DRIVER_ACTIVE=false
 INTEL_DRIVER_ACTIVE=false
 AMD_DRIVER_ACTIVE=false
+
+VAINFO_OUTPUT=$(get_vainfo_output)
 
 # Check PPA
 apt-cache policy 2>/dev/null | grep -q "ppa:oibaf/graphics-drivers" && GRAPHICS_PPA_ACTIVE=true
@@ -334,24 +354,30 @@ pkg_installed "gstreamer1.0-plugins-ugly" && GSTREAMER_ACTIVE=true
 pkg_installed "power-profiles-daemon" && PPD_ACTIVE=true
 
 # Check GPU drivers
-pkg_installed "nvidia-driver-" 2>/dev/null || pkg_installed "nvidia-driver-\*" 2>/dev/null
-((  $? == 0 )) && NVIDIA_DRIVER_ACTIVE=true || NVIDIA_DRIVER_ACTIVE=false
-
-pkg_installed "intel-media-driver" && INTEL_DRIVER_ACTIVE=true
-pkg_installed "libva-intel-driver" && INTEL_DRIVER_ACTIVE=true
-
-pkg_installed "rocm-core" && AMD_DRIVER_ACTIVE=true
-pkg_installed "amdgpu-core" && AMD_DRIVER_ACTIVE=true
-
-if [[ "${NVIDIA_DRIVER_ACTIVE}" == "true" ]]; then
+if [[ "${NVIDIA_DETECTED}" == "true" ]] && nvidia_smi_ok; then
+  NVIDIA_DRIVER_ACTIVE=true
+  info "  ✓ NVIDIA driver active (nvidia-smi OK)"
+elif dpkg -l 2>/dev/null | grep -qE '^ii\s+nvidia-driver-[0-9]+'; then
+  NVIDIA_DRIVER_ACTIVE=true
   info "  ✓ NVIDIA driver already installed"
 fi
 
-if [[ "${INTEL_DRIVER_ACTIVE}" == "true" ]]; then
+if [[ "${INTEL_DETECTED}" == "true" ]] && vainfo_has "iHD"; then
+  INTEL_DRIVER_ACTIVE=true
+  info "  ✓ Intel VA-API (iHD) already active"
+elif [[ "${INTEL_DETECTED}" == "true" ]] && vainfo_has "i965"; then
+  INTEL_DRIVER_ACTIVE=true
+  info "  ✓ Intel VA-API (i965) already active"
+elif pkg_installed "intel-media-driver" || pkg_installed "libva-intel-driver"; then
+  INTEL_DRIVER_ACTIVE=true
   info "  ✓ Intel Media Driver already installed"
 fi
 
-if [[ "${AMD_DRIVER_ACTIVE}" == "true" ]]; then
+if [[ "${AMD_DETECTED}" == "true" ]] && vainfo_has "radeonsi"; then
+  AMD_DRIVER_ACTIVE=true
+  info "  ✓ AMD VA-API (radeonsi) already active"
+elif pkg_installed "rocm-core" || pkg_installed "amdgpu-core"; then
+  AMD_DRIVER_ACTIVE=true
   info "  ✓ AMD driver already installed"
 fi
 
@@ -450,12 +476,13 @@ if [[ "${RESTRICTED_ACTIVE}" == "true" \
           DRIVER_VERSION="390"
           ;;
         "470")
-          info "Installing NVIDIA Driver 470.xx (Maxwell/Pascal)..."
+          info "Installing NVIDIA Driver 470.xx (Maxwell legacy)..."
           DRIVER_VERSION="470"
           ;;
         "latest"|*)
           # Auto-detect latest available version
-          DRIVER_VERSION=$(apt-cache search '^nvidia-driver-[0-9]+$' | grep -oP 'nvidia-driver-\K[0-9]+' | tail -1 || echo "550")
+          DRIVER_VERSION=$(apt-cache search '^nvidia-driver-[0-9]+$' | grep -oP 'nvidia-driver-\K[0-9]+' | sort -n | tail -1 || true)
+          [[ -z "$DRIVER_VERSION" ]] && DRIVER_VERSION="550"
           info "Installing NVIDIA Driver latest (detected: $DRIVER_VERSION)"
           ;;
       esac
@@ -469,9 +496,11 @@ if [[ "${RESTRICTED_ACTIVE}" == "true" \
         nvidia-compute-utils
 
       # Blacklist nouveau driver
-      echo "blacklist nouveau" | tee /etc/modprobe.d/nvidia-disable-nouveau.conf >/dev/null
-      echo "options nouveau modeset=0" >> /etc/modprobe.d/nvidia-disable-nouveau.conf
-      update-initramfs -u
+      if [[ ! -f /etc/modprobe.d/nvidia-disable-nouveau.conf && ! -f /etc/modprobe.d/blacklist-nouveau.conf ]]; then
+        echo "blacklist nouveau" | tee /etc/modprobe.d/nvidia-disable-nouveau.conf >/dev/null
+        echo "options nouveau modeset=0" >> /etc/modprobe.d/nvidia-disable-nouveau.conf
+        update-initramfs -u
+      fi
 
       # Install CUDA for RTX series (optional but recommended)
       if [[ "$NVIDIA_SERIES" == *"RTX"* ]] || [[ "$NVIDIA_SERIES" == *"Ada"* ]] || [[ "$NVIDIA_SERIES" == *"Ampere"* ]]; then
@@ -502,16 +531,6 @@ if [[ "${RESTRICTED_ACTIVE}" == "true" \
 
       ok "NVIDIA driver (${DRIVER_VERSION}) installed - reboot recommended"
     fi
-  fi
-
-    # Hybrid graphics support
-    if [[ "${HYBRID_MODE}" == "true" ]]; then
-      step "[P0.5-HYBRID] Configuring NVIDIA hybrid graphics..."
-      apt_install nvidia-prime \
-        || warn "nvidia-prime unavailable"
-    fi
-
-    ok "NVIDIA driver installation queued (will take effect after reboot)."
   fi
 
   # -----------------------------------------------------------------------
@@ -573,7 +592,7 @@ if [[ "${RESTRICTED_ACTIVE}" == "true" \
       apt_install libdrm-amd64 libdrm-amdgpu1 || true
 
       # RDNA series → ROCm support
-      if [[ "$AMD_SERIES" == *"RDNA"* ]]; then
+      if [[ "$AMD_SERIES" == RDNA* ]]; then
         info "Installing ROCm compute stack for RDNA..."
         # Add ROCm repo and install (version may vary)
         apt_install rocm-core rocm-dkms rocm-smi || warn "ROCm may not be available in repos"

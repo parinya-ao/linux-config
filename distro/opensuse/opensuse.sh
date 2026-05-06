@@ -71,27 +71,27 @@ detect_nvidia_series() {
   local device_dec=$((16#$device_id))
 
   # GPU Series mapping by Device ID ranges + openSUSE G-Series mapping
-  if (( device_dec >= 0x2200 && device_dec <= 0x2FFFF )); then
-    echo "Ada RTX 40xx (0x2200+) → G07"
-    echo "G07"
+  if (( device_dec >= 0x2200 )); then
+    echo "Ada RTX 40xx (0x2200+) → G06"
+    echo "G06"
     return 0
-  elif (( device_dec >= 0x1B80 && device_dec <= 0x1FFFF )); then
-    echo "Ampere RTX 30xx (0x1B80+) → G07"
-    echo "G07"
+  elif (( device_dec >= 0x1B80 )); then
+    echo "Ampere RTX 30xx (0x1B80+) → G06"
+    echo "G06"
     return 0
-  elif (( device_dec >= 0x1600 && device_dec <= 0x1BFFF )); then
+  elif (( device_dec >= 0x1600 )); then
     echo "Turing RTX 20xx / GTX 16xx (0x1600+) → G06"
     echo "G06"
     return 0
-  elif (( device_dec >= 0x1380 && device_dec <= 0x15FF )); then
-    echo "Pascal GTX 10xx (0x1380+) → G05"
-    echo "G05"
+  elif (( device_dec >= 0x1380 )); then
+    echo "Pascal GTX 10xx (0x1380+) → G06"
+    echo "G06"
     return 0
-  elif (( device_dec >= 0x0FC0 && device_dec <= 0x137F )); then
+  elif (( device_dec >= 0x0FC0 )); then
     echo "Maxwell GTX 9xx (0x0FC0+) → G05"
     echo "G05"
     return 0
-  elif (( device_dec >= 0x0DC0 && device_dec <= 0x0FBFF )); then
+  elif (( device_dec >= 0x0DC0 )); then
     echo "Kepler GTX 7xx (0x0DC0+) → G04"
     echo "G04"
     return 0
@@ -118,7 +118,7 @@ detect_intel_generation() {
     echo "Arrow Lake 15th Gen+ (0x7600+)"
     echo "iHD"
     return 0
-  elif (( device_dec >= 0x7D00 && device_dec <= 0x7DFFF )); then
+  elif (( device_dec >= 0x7D00 && device_dec <= 0x7DFF )); then
     echo "Raptor Lake 13th Gen (0x7D00+)"
     echo "iHD"
     return 0
@@ -171,7 +171,7 @@ detect_amd_gpu() {
     echo "RDNA (RX 5000+) OpenCL capable"
     return 0
   else
-    echo "RDNA/RDNA2 or older"
+    echo "Legacy (GCN/Polaris)"
     return 0
   fi
 }
@@ -205,6 +205,23 @@ detect_amd_discrete_gpu() {
     return 0
   fi
   return 1
+}
+
+nvidia_smi_ok() {
+  command -v nvidia-smi &>/dev/null || return 1
+  nvidia-smi -L &>/dev/null 2>&1
+}
+
+get_vainfo_output() {
+  if command -v vainfo &>/dev/null; then
+    vainfo 2>/dev/null || true
+  fi
+  return 0
+}
+
+vainfo_has() {
+  local pattern="$1"
+  [[ -n "${VAINFO_OUTPUT:-}" ]] && echo "$VAINFO_OUTPUT" | grep -qiE "$pattern"
 }
 
 # ------------------------------------------
@@ -325,6 +342,8 @@ NVIDIA_DRIVER_ACTIVE=false
 INTEL_DRIVER_ACTIVE=false
 AMD_DRIVER_ACTIVE=false
 
+VAINFO_OUTPUT=$(get_vainfo_output)
+
 # Check repos
 zypper repos 2>/dev/null | grep -qi "packman" && PACKMAN_ACTIVE=true
 
@@ -334,19 +353,30 @@ pkg_installed "gstreamer-plugins-ugly" && GSTREAMER_UGLY_ACTIVE=true
 pkg_installed "power-profiles-daemon" && PPD_ACTIVE=true
 
 # Check GPU drivers
-pkg_installed "nvidia-driver" && NVIDIA_DRIVER_ACTIVE=true
-pkg_installed "intel-media-driver" && INTEL_DRIVER_ACTIVE=true
-pkg_installed "rocm-core" && AMD_DRIVER_ACTIVE=true
-
-if [[ "${NVIDIA_DRIVER_ACTIVE}" == "true" ]]; then
+if [[ "${NVIDIA_DETECTED}" == "true" ]] && nvidia_smi_ok; then
+  NVIDIA_DRIVER_ACTIVE=true
+  info "  ✓ NVIDIA driver active (nvidia-smi OK)"
+elif rpm -qa | grep -qE '^nvidia-driver-G0'; then
+  NVIDIA_DRIVER_ACTIVE=true
   info "  ✓ NVIDIA driver already installed"
 fi
 
-if [[ "${INTEL_DRIVER_ACTIVE}" == "true" ]]; then
+if [[ "${INTEL_DETECTED}" == "true" ]] && vainfo_has "iHD"; then
+  INTEL_DRIVER_ACTIVE=true
+  info "  ✓ Intel VA-API (iHD) already active"
+elif [[ "${INTEL_DETECTED}" == "true" ]] && vainfo_has "i965"; then
+  INTEL_DRIVER_ACTIVE=true
+  info "  ✓ Intel VA-API (i965) already active"
+elif pkg_installed "intel-media-driver" || pkg_installed "libva-intel-driver"; then
+  INTEL_DRIVER_ACTIVE=true
   info "  ✓ Intel Media Driver already installed"
 fi
 
-if [[ "${AMD_DRIVER_ACTIVE}" == "true" ]]; then
+if [[ "${AMD_DETECTED}" == "true" ]] && vainfo_has "radeonsi"; then
+  AMD_DRIVER_ACTIVE=true
+  info "  ✓ AMD VA-API (radeonsi) already active"
+elif pkg_installed "rocm-core"; then
+  AMD_DRIVER_ACTIVE=true
   info "  ✓ AMD driver already installed"
 fi
 
@@ -435,8 +465,14 @@ if [[ "${PACKMAN_ACTIVE}" == "true" \
     else
       step "[P0.5] Installing NVIDIA driver - $NVIDIA_SERIES"
 
-      # NVIDIA_GSERIES already detected: G04 (Kepler), G05 (Maxwell/Pascal), G06+ (Turing)
+      # NVIDIA_GSERIES already detected: G04 (Kepler), G05 (Maxwell), G06 (Pascal+)
       info "Installing NVIDIA G-series: $NVIDIA_GSERIES"
+
+      # Blacklist nouveau ONLY if not already done
+      if [[ ! -f /etc/modprobe.d/nvidia-disable-nouveau.conf && ! -f /etc/modprobe.d/blacklist-nouveau.conf ]]; then
+        echo "blacklist nouveau" | tee /etc/modprobe.d/nvidia-disable-nouveau.conf >/dev/null
+        echo "options nouveau modeset=0" >> /etc/modprobe.d/nvidia-disable-nouveau.conf
+      fi
 
       zypper_install \
         "nvidia-driver-${NVIDIA_GSERIES}" \
@@ -451,7 +487,7 @@ if [[ "${PACKMAN_ACTIVE}" == "true" \
       # Hybrid graphics support
       if [[ "${HYBRID_MODE}" == "true" ]]; then
         step "[P0.5-HYBRID] Configuring NVIDIA hybrid graphics..."
-        zypper_install nvidia-prime || warn "nvidia-prime unavailable"
+        zypper_install suse-prime || warn "suse-prime unavailable"
       fi
 
       ok "NVIDIA driver installation queued (will take effect after reboot)."
@@ -471,7 +507,7 @@ if [[ "${PACKMAN_ACTIVE}" == "true" \
       zypper_install libdrm-amd || true
 
       # RDNA series → ROCm support
-      if [[ "$AMD_SERIES" == *"RDNA"* ]]; then
+      if [[ "$AMD_SERIES" == RDNA* ]]; then
         info "Installing ROCm compute stack for RDNA..."
         zypper_install rocm-core rocm-dkms rocm-smi || warn "ROCm may not be available in repos"
       fi
