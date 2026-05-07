@@ -15,6 +15,7 @@
     ./modules/packages/gui.nix
     ./modules/programs/cli-tools.nix
     ./modules/programs/gnome.nix
+    ./modules/programs/zed.nix
   ];
 
   programs.home-manager.enable = true;
