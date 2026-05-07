@@ -438,6 +438,41 @@ if [[ "${RPM_FUSION_ACTIVE}" == "true" && "${FFMPEG_ACTIVE}" == "false" ]]; then
   ok "RPM Fusion confirmed active."
 
   # -----------------------------------------------------------------------
+  # PHASE 0.25 — DNF Optimization (Performance Tuning)
+  # -----------------------------------------------------------------------
+  step "[P0.25] Configuring DNF for optimal performance..."
+
+  # Backup dnf.conf
+  cp /etc/dnf/dnf.conf /etc/dnf/dnf.conf.backup.$(date +%s) 2>/dev/null || true
+
+  # Add or update DNF performance settings
+  # Check if max_parallel_downloads already exists
+  if grep -q "^max_parallel_downloads=" /etc/dnf/dnf.conf; then
+    sed -i 's/^max_parallel_downloads=.*/max_parallel_downloads=20/' /etc/dnf/dnf.conf
+  else
+    echo "max_parallel_downloads=20" >> /etc/dnf/dnf.conf
+  fi
+
+  # Add fastestmirror if not present
+  if ! grep -q "^fastestmirror=" /etc/dnf/dnf.conf; then
+    echo "fastestmirror=True" >> /etc/dnf/dnf.conf
+  else
+    sed -i 's/^fastestmirror=.*/fastestmirror=True/' /etc/dnf/dnf.conf
+  fi
+
+  # Add keepcache if not present (keep downloaded packages)
+  if ! grep -q "^keepcache=" /etc/dnf/dnf.conf; then
+    echo "keepcache=True" >> /etc/dnf/dnf.conf
+  else
+    sed -i 's/^keepcache=.*/keepcache=True/' /etc/dnf/dnf.conf
+  fi
+
+  ok "DNF optimizations configured:"
+  info "  • max_parallel_downloads = 20 (faster parallel downloads)"
+  info "  • fastestmirror = True (use fastest mirror)"
+  info "  • keepcache = True (keep downloaded packages)"
+
+  # -----------------------------------------------------------------------
   # PHASE 0.5 — NVIDIA Driver (Smart Branch Selection)
   # -----------------------------------------------------------------------
   if [[ "${NVIDIA_DETECTED}" == "true" ]]; then
@@ -727,6 +762,7 @@ EOF
   echo -e "${BOLD}+--------------------------------------------------+${RESET}"
   echo -e "${BOLD}|  ROUND 2 COMPLETE — ALL PACKAGES INSTALLED       |${RESET}"
   echo -e "${BOLD}+---------------------------+----------------------+${RESET}"
+  echo -e "| DNF Optimization          | max_parallel=20, fast|"
   echo -e "| Firmware (free)           | linux-firmware, MCU  |"
   echo -e "| Firmware (nonfree)        | b43, broadcom-bt     |"
   echo -e "| Intel Iris Xe GPU         | intel-media-driver   |"
