@@ -341,6 +341,7 @@ PPD_ACTIVE=false
 NVIDIA_DRIVER_ACTIVE=false
 INTEL_DRIVER_ACTIVE=false
 AMD_DRIVER_ACTIVE=false
+DOCKER_ACTIVE=false
 
 VAINFO_OUTPUT=$(get_vainfo_output)
 
@@ -379,6 +380,12 @@ if [[ "${AMD_DETECTED}" == "true" ]] && vainfo_has "radeonsi"; then
 elif pkg_installed "rocm-core" || pkg_installed "amdgpu-core"; then
   AMD_DRIVER_ACTIVE=true
   info "  ✓ AMD driver already installed"
+fi
+
+# Check Docker
+if pkg_installed "docker-ce"; then
+  DOCKER_ACTIVE=true
+  info "  ✓ Docker already installed"
 fi
 
 info "State: Graphics_PPA=${GRAPHICS_PPA_ACTIVE} | Restricted=${RESTRICTED_ACTIVE} | ffmpeg=${FFMPEG_ACTIVE}"
@@ -858,6 +865,42 @@ EOF
   fi
 
   # -----------------------------------------------------------------------
+  # PHASE 10.7 — Docker Engine (official repo)
+  # -----------------------------------------------------------------------
+  step "[P10.7] Docker Engine (official repo)..."
+
+  if pkg_installed "docker-ce"; then
+    skip "Docker already installed"
+  else
+    # Remove conflicting packages
+    apt-get remove -y docker.io docker-compose docker-compose-v2 docker-doc podman-docker 2>/dev/null || true
+
+    # Add Docker GPG key
+    apt-get install -y ca-certificates curl
+    install -m 0755 -d /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc 2>/dev/null || warn "Failed to download Docker GPG key"
+    chmod a+r /etc/apt/keyrings/docker.asc
+
+    # Add Docker repository
+    tee /etc/apt/sources.list.d/docker.sources <<EOF >/dev/null
+Types: deb
+URIs: https://download.docker.com/linux/ubuntu
+Suites: \$(. /etc/os-release && echo \"\${UBUNTU_CODENAME:-\$VERSION_CODENAME}\")
+Components: stable
+Architectures: \$(dpkg --print-architecture)
+Signed-By: /etc/apt/keyrings/docker.asc
+EOF
+
+    apt-get update -y
+    apt_install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+    # Enable and start Docker
+    systemctl enable --now docker \
+      && ok "Docker service enabled & started." \
+      || warn "Failed to enable Docker service"
+  fi
+
+  # -----------------------------------------------------------------------
   # PHASE 11 — Final upgrade & cleanup
   # -----------------------------------------------------------------------
   step "[P11] Final upgrade & cleanup..."
@@ -889,6 +932,7 @@ EOF
   echo -e "| Printer/Scanner           | cups, sane-utils     |"
   echo -e "| Firmware Updates          | fwupd LVFS           |"
   echo -e "| VS Code                  | code (Microsoft repo) |"
+  echo -e "| Docker Engine             | docker-ce, docker-compose |"
   echo -e "${BOLD}+---------------------------+----------------------+${RESET}"
   echo ""
   warn "REBOOT required to load new firmware and kernel modules."

@@ -341,6 +341,7 @@ PPD_ACTIVE=false
 NVIDIA_DRIVER_ACTIVE=false
 INTEL_DRIVER_ACTIVE=false
 AMD_DRIVER_ACTIVE=false
+DOCKER_ACTIVE=false
 
 VAINFO_OUTPUT=$(get_vainfo_output)
 
@@ -378,6 +379,12 @@ if [[ "${AMD_DETECTED}" == "true" ]] && vainfo_has "radeonsi"; then
 elif pkg_installed "rocm-core"; then
   AMD_DRIVER_ACTIVE=true
   info "  ✓ AMD driver already installed"
+fi
+
+# Check Docker
+if pkg_installed "docker"; then
+  DOCKER_ACTIVE=true
+  info "  ✓ Docker already installed"
 fi
 
 info "State: Packman=${PACKMAN_ACTIVE} | ffmpeg=${FFMPEG_ACTIVE} | NVIDIA=${NVIDIA_DRIVER_ACTIVE}"
@@ -818,6 +825,29 @@ EOF
   fi
 
   # -----------------------------------------------------------------------
+  # PHASE 9 — Docker Engine (official repo)
+  # -----------------------------------------------------------------------
+  step "[P9] Docker Engine (official repo)..."
+
+  if pkg_installed "docker"; then
+    skip "Docker already installed"
+  else
+    # Add Docker repository (openSUSE uses community repo or manual)
+    info "Adding Docker repository..."
+    zypper addrepo https://download.docker.com/linux/opensuse/docker.repo 2>/dev/null \
+      || info "Docker repo may already exist or community repo will be used"
+
+    # Refresh and install Docker
+    zypper --non-interactive refresh 2>/dev/null || true
+    zypper_install docker docker-compose
+
+    # Enable and start Docker
+    systemctl enable --now docker \
+      && ok "Docker service enabled & started." \
+      || warn "Failed to enable Docker service"
+  fi
+
+  # -----------------------------------------------------------------------
   # PHASE 10 — Final upgrade & cleanup
   # -----------------------------------------------------------------------
   step "[P10] Final upgrade & cleanup..."
@@ -859,6 +889,7 @@ EOF
   echo -e "| Printer/Scanner           | cups, sane-backends  |"
   echo -e "| Firmware Updates          | fwupd LVFS           |"
   echo -e "| VS Code                  | code (Microsoft repo) |"
+  echo -e "| Docker Engine             | docker, docker-compose|"
   echo -e "${BOLD}+---------------------------+----------------------+${RESET}"
   echo ""
   warn "REBOOT required to load new firmware, Mesa, and kernel modules."
