@@ -19,4 +19,15 @@
   ];
 
   programs.home-manager.enable = true;
+
+  nix = {
+    settings = {
+      auto-optimise-store = true;
+    };
+    gc = {
+      automatic = true;
+      frequency = "weekly";
+      options = "--delete-older-than 28d";
+    };
+  };
 }

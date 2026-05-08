@@ -23,10 +23,10 @@
 
     # Additional packages for LSP servers in FHS environment
     extraPackages = with pkgs; [
-      rust-analyzer
+	    rust-analyzer
       nixd
-      nodePackages.pyright
-      nodePackages.bash-language-server
+      pyright
+      bash-language-server
       shfmt
       shellcheck
     ];
