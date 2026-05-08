@@ -21,12 +21,13 @@
   programs.home-manager.enable = true;
 
   nix = {
+	package = pkgs.nix;
     settings = {
       auto-optimise-store = true;
     };
     gc = {
       automatic = true;
-      frequency = "weekly";
+      dates = "weekly";
       options = "--delete-older-than 28d";
     };
   };
