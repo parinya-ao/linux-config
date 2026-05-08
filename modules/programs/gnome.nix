@@ -39,8 +39,8 @@ with lib.hm.gvariant;
     #  welcome-dialog-last-shown-version → Suppresses the first-run welcome dialog.
     #
     "org/gnome/shell" = {
-      disable-user-extensions           = true;
-      enabled-extensions                = [];
+      disable-user-extensions = true;
+      enabled-extensions = [ ];
       welcome-dialog-last-shown-version = "9999.0";
 
       # App picker / Favorites: Apps pinned to the dock (adjust as needed).
@@ -51,7 +51,6 @@ with lib.hm.gvariant;
         "org.gnome.Console.desktop"
       ];
     };
-
 
     # ════════════════════════════════════════════════════════════════════════════
     #  §1  INTERFACE & THEMING — Adwaita Pure Dark
@@ -64,34 +63,33 @@ with lib.hm.gvariant;
     #      without requiring extensions.
     #
     "org/gnome/desktop/interface" = {
-      color-scheme            = "prefer-dark";       # Adwaita Dark.
-      accent-color            = "teal";              # GNOME 47+ accent color.
-      gtk-theme               = "Adwaita";           # Strictly Adwaita to prevent UI crashes.
-      icon-theme              = "Adwaita";
-      cursor-theme            = "Adwaita";
-      cursor-size             = 24;
+      color-scheme = "prefer-dark"; # Adwaita Dark.
+      accent-color = "teal"; # GNOME 47+ accent color.
+      gtk-theme = "Adwaita"; # Strictly Adwaita to prevent UI crashes.
+      icon-theme = "Adwaita";
+      cursor-theme = "Adwaita";
+      cursor-size = 24;
 
       # Top bar clock configuration.
-      clock-show-date         = true;
-      clock-show-weekday      = true;
-      clock-format            = "24h";               # Change to "12h" if preferred.
+      clock-show-date = true;
+      clock-show-weekday = true;
+      clock-format = "24h"; # Change to "12h" if preferred.
 
       # Battery display.
       show-battery-percentage = true;
 
       # Font rendering: Optimized for 2880x1800 HiDPI displays (e.g., Acer Swift SFG14-71).
-      font-antialiasing       = "rgba";              # Subpixel antialiasing.
-      font-hinting            = "slight";            # Optimal for HiDPI displays.
-      text-scaling-factor     = 1.0;
+      font-antialiasing = "rgba"; # Subpixel antialiasing.
+      font-hinting = "slight"; # Optimal for HiDPI displays.
+      text-scaling-factor = 1.0;
 
       # Animations: Enabled to improve spatial awareness.
-      enable-animations       = true;
+      enable-animations = true;
 
       # Toolkit backend behavior.
-      gtk-enable-primary-paste = false;              # Disables middle-click paste to prevent accidental inputs.
-      enable-hot-corners      = true;                # Enables the top-left hot corner for the Activities Overview.
+      gtk-enable-primary-paste = false; # Disables middle-click paste to prevent accidental inputs.
+      enable-hot-corners = true; # Enables the top-left hot corner for the Activities Overview.
     };
-
 
     # ════════════════════════════════════════════════════════════════════════════
     #  §2  WINDOW MANAGER PREFERENCES
@@ -108,16 +106,15 @@ with lib.hm.gvariant;
     #    close           : 3rd button on the right.
     #
     "org/gnome/desktop/wm/preferences" = {
-      button-layout                = "appmenu:minimize,maximize,close";
-      focus-mode                   = "click";        # Windows/macOS-style click-to-focus behavior.
-      auto-raise                   = false;
-      num-workspaces               = 1;              # ★ SINGLE WORKSPACE FIX
+      button-layout = "appmenu:minimize,maximize,close";
+      focus-mode = "click"; # Windows/macOS-style click-to-focus behavior.
+      auto-raise = false;
+      num-workspaces = 1; # ★ SINGLE WORKSPACE FIX
       action-double-click-titlebar = "toggle-maximize";
       action-middle-click-titlebar = "lower";
-      action-right-click-titlebar  = "menu";
-      resize-with-right-button     = false;          # Disables meta+right-click window resizing.
+      action-right-click-titlebar = "menu";
+      resize-with-right-button = false; # Disables meta+right-click window resizing.
     };
-
 
     # ════════════════════════════════════════════════════════════════════════════
     #  §3  MUTTER — Wayland Compositor
@@ -133,62 +130,71 @@ with lib.hm.gvariant;
     #    → Marked as experimental but stable on GNOME 45+ with Intel Xe graphics.
     #
     "org/gnome/mutter" = {
-      dynamic-workspaces         = false;            # ★ Disables dynamic workspaces (locks to 1).
+      dynamic-workspaces = false; # ★ Disables dynamic workspaces (locks to 1).
       workspaces-only-on-primary = true;
-      edge-tiling                = true;             # Snaps windows to screen edges.
-      experimental-features      = [ "scale-monitor-framebuffer" ];
+      edge-tiling = true; # Snaps windows to screen edges.
+      experimental-features = [ "scale-monitor-framebuffer" ];
 
       # Centered new windows (macOS-like behavior).
-      center-new-windows         = true;
+      center-new-windows = true;
     };
-
 
     # ════════════════════════════════════════════════════════════════════════════
     #  §4  KEYBOARD & INPUT SOURCES
     # ════════════════════════════════════════════════════════════════════════════
 
     "org/gnome/desktop/peripherals/keyboard" = {
-      delay           = mkUint32 180;  # 180ms delay before key repeat initiates.
-      repeat-interval = mkUint32 25;   # 25ms interval between repeats (~40 chars/sec).
+      delay = mkUint32 180; # 180ms delay before key repeat initiates.
+      repeat-interval = mkUint32 25; # 25ms interval between repeats (~40 chars/sec).
     };
 
     "org/gnome/desktop/input-sources" = {
-      sources     = [
-        (mkTuple [ "xkb" "us" ])       # English (US).
-        (mkTuple [ "xkb" "th" ])       # Thai.
+      sources = [
+        (mkTuple [
+          "xkb"
+          "us"
+        ]) # English (US).
+        (mkTuple [
+          "xkb"
+          "th"
+        ]) # Thai.
       ];
       mru-sources = [
-        (mkTuple [ "xkb" "us" ])
-        (mkTuple [ "xkb" "th" ])
+        (mkTuple [
+          "xkb"
+          "us"
+        ])
+        (mkTuple [
+          "xkb"
+          "th"
+        ])
       ];
       xkb-options = [
-        "grp:caps_toggle"              # Toggles layout using CapsLock.
-        "terminate:ctrl_alt_bksp"      # Kills the X/Wayland session with Ctrl+Alt+Backspace.
+        "grp:caps_toggle" # Toggles layout using CapsLock.
+        "terminate:ctrl_alt_bksp" # Kills the X/Wayland session with Ctrl+Alt+Backspace.
       ];
     };
-
 
     # ════════════════════════════════════════════════════════════════════════════
     #  §5  TOUCHPAD & MOUSE
     # ════════════════════════════════════════════════════════════════════════════
 
     "org/gnome/desktop/peripherals/touchpad" = {
-      click-method                 = "areas";        # Physical Left/Right click zones.
+      click-method = "areas"; # Physical Left/Right click zones.
       two-finger-scrolling-enabled = true;
-      tap-to-click                 = true;
-      natural-scroll               = true;           # macOS-style natural scrolling (content follows finger).
-      speed                        = 0.3;
-      disable-while-typing         = true;           # Prevents accidental taps while typing.
-      tap-and-drag                 = true;           # Tap once, then drag to select/move.
-      tap-and-drag-lock            = false;
+      tap-to-click = true;
+      natural-scroll = true; # macOS-style natural scrolling (content follows finger).
+      speed = 0.3;
+      disable-while-typing = true; # Prevents accidental taps while typing.
+      tap-and-drag = true; # Tap once, then drag to select/move.
+      tap-and-drag-lock = false;
     };
 
     "org/gnome/desktop/peripherals/mouse" = {
-      natural-scroll = false;                        # Traditional mouse scrolling (scroll wheel up = content moves up).
-      speed          = 0.0;
-      accel-profile  = "default";
+      natural-scroll = false; # Traditional mouse scrolling (scroll wheel up = content moves up).
+      speed = 0.0;
+      accel-profile = "default";
     };
-
 
     # ════════════════════════════════════════════════════════════════════════════
     #  §6  KEYBINDINGS
@@ -214,20 +220,20 @@ with lib.hm.gvariant;
       #   screenshot UI instead of the legacy 'gnome-screenshot' tool.
       #   Mapping is handled in §6.3 via 'org/gnome/shell/keybindings'.
       #   These legacy keys are cleared to prevent conflicts.
-      screenshot      = [];
-      area-screenshot = [];
+      screenshot = [ ];
+      area-screenshot = [ ];
     };
 
     # Terminal: Ctrl+Alt+T (universal standard).
     "org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom0" = {
-      name    = "Terminal (Ghostty)";
+      name = "Terminal (Ghostty)";
       command = "ghostty";
       binding = "<Control><Alt>t";
     };
 
     # Files: Super+E (Windows Explorer style).
     "org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom1" = {
-      name    = "Files (Nautilus)";
+      name = "Files (Nautilus)";
       command = "nautilus --new-window";
       binding = "<Super>e";
     };
@@ -239,65 +245,71 @@ with lib.hm.gvariant;
     "org/gnome/desktop/wm/keybindings" = {
 
       # ── Window Control ──────────────────────────────────────────────────────
-      close             = [ "<Super>q" "<Alt>F4" ];  # Super+Q (macOS) and Alt+F4 (Windows).
-      maximize          = [ "<Super>Up" ];           # Windows-style: Snap top / Maximize.
-      unmaximize        = [ "<Super>Down" ];         # Windows-style: Restore down / Unmaximize.
-      toggle-fullscreen = [ "<Super>f" "F11" ];      # F11 (Universal) and Super+F.
-      minimize          = [ "<Super>h" ];            # macOS-style: Hide/Minimize.
+      close = [
+        "<Super>q"
+        "<Alt>F4"
+      ]; # Super+Q (macOS) and Alt+F4 (Windows).
+      maximize = [ "<Super>Up" ]; # Windows-style: Snap top / Maximize.
+      unmaximize = [ "<Super>Down" ]; # Windows-style: Restore down / Unmaximize.
+      toggle-fullscreen = [
+        "<Super>f"
+        "F11"
+      ]; # F11 (Universal) and Super+F.
+      minimize = [ "<Super>h" ]; # macOS-style: Hide/Minimize.
 
       # Window Tiling: Windows 11 snap style.
-      tile-left  = [ "<Super>Left" ];
+      tile-left = [ "<Super>Left" ];
       tile-right = [ "<Super>Right" ];
 
       # Show Desktop: Super+D (Windows) / F11 (macOS).
       show-desktop = [ "<Super>d" ];
 
       # Moves windows between active monitors.
-      move-to-monitor-left  = [ "<Super><Shift>Left" ];
+      move-to-monitor-left = [ "<Super><Shift>Left" ];
       move-to-monitor-right = [ "<Super><Shift>Right" ];
-      move-to-monitor-up    = [ "<Super><Shift>Up" ];
-      move-to-monitor-down  = [ "<Super><Shift>Down" ];
+      move-to-monitor-up = [ "<Super><Shift>Up" ];
+      move-to-monitor-down = [ "<Super><Shift>Down" ];
 
       # Application and Window Switching.
-      switch-applications          = [ "<Super>Tab" ];
+      switch-applications = [ "<Super>Tab" ];
       switch-applications-backward = [ "<Super><Shift>Tab" ];
-      switch-windows               = [ "<Alt>Tab" ];
-      switch-windows-backward      = [ "<Alt><Shift>Tab" ];
+      switch-windows = [ "<Alt>Tab" ];
+      switch-windows-backward = [ "<Alt><Shift>Tab" ];
 
       # Cycles through windows of the same application class (e.g., multiple Firefox instances).
-      cycle-windows          = [ "<Super>grave" ];   # Super+Grave (Backtick).
+      cycle-windows = [ "<Super>grave" ]; # Super+Grave (Backtick).
       cycle-windows-backward = [ "<Super><Shift>grave" ];
 
       # ── Workspace Switching (Cleared for single workspace setup) ────────────
-      switch-to-workspace-1    = [];
-      switch-to-workspace-2    = [];
-      switch-to-workspace-3    = [];
-      switch-to-workspace-4    = [];
-      switch-to-workspace-5    = [];
-      switch-to-workspace-6    = [];
-      switch-to-workspace-last = [];
-      switch-to-workspace-left = [];
-      switch-to-workspace-right= [];
-      switch-to-workspace-up   = [];
-      switch-to-workspace-down = [];
+      switch-to-workspace-1 = [ ];
+      switch-to-workspace-2 = [ ];
+      switch-to-workspace-3 = [ ];
+      switch-to-workspace-4 = [ ];
+      switch-to-workspace-5 = [ ];
+      switch-to-workspace-6 = [ ];
+      switch-to-workspace-last = [ ];
+      switch-to-workspace-left = [ ];
+      switch-to-workspace-right = [ ];
+      switch-to-workspace-up = [ ];
+      switch-to-workspace-down = [ ];
 
-      move-to-workspace-1      = [];
-      move-to-workspace-2      = [];
-      move-to-workspace-3      = [];
-      move-to-workspace-4      = [];
-      move-to-workspace-5      = [];
-      move-to-workspace-6      = [];
-      move-to-workspace-last   = [];
-      move-to-workspace-left   = [];
-      move-to-workspace-right  = [];
-      move-to-workspace-up     = [];
-      move-to-workspace-down   = [];
+      move-to-workspace-1 = [ ];
+      move-to-workspace-2 = [ ];
+      move-to-workspace-3 = [ ];
+      move-to-workspace-4 = [ ];
+      move-to-workspace-5 = [ ];
+      move-to-workspace-6 = [ ];
+      move-to-workspace-last = [ ];
+      move-to-workspace-left = [ ];
+      move-to-workspace-right = [ ];
+      move-to-workspace-up = [ ];
+      move-to-workspace-down = [ ];
 
       # ── Miscellaneous ───────────────────────────────────────────────────────
-      panel-main-menu    = [];                       # Disables Super+F1 to prevent overlap.
-      panel-run-dialog   = [ "<Alt>F2" ];            # Alt+F2: Run command dialog.
-      begin-move         = [ "<Alt>F7" ];            # Initiates window movement via keyboard.
-      begin-resize       = [ "<Alt>F8" ];            # Initiates window resizing via keyboard.
+      panel-main-menu = [ ]; # Disables Super+F1 to prevent overlap.
+      panel-run-dialog = [ "<Alt>F2" ]; # Alt+F2: Run command dialog.
+      begin-move = [ "<Alt>F7" ]; # Initiates window movement via keyboard.
+      begin-resize = [ "<Alt>F8" ]; # Initiates window resizing via keyboard.
     };
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -318,99 +330,103 @@ with lib.hm.gvariant;
     #
     "org/gnome/shell/keybindings" = {
       # Windows-style screenshot trigger: Super+Shift+S.
-      show-screenshot-ui        = [ "<Super><Shift>s" ];
+      show-screenshot-ui = [ "<Super><Shift>s" ];
 
       # Application Grid: Super+A or double-tap Super.
-      toggle-application-view   = [ "<Super>a" ];
+      toggle-application-view = [ "<Super>a" ];
 
       # Notification panel focus.
       focus-active-notification = [ "<Super>n" ];
 
       # Disables unnecessary shortcuts to prevent conflicts.
-      toggle-message-tray       = [];
-      open-new-window-shortcut-0= [];
+      toggle-message-tray = [ ];
+      open-new-window-shortcut-0 = [ ];
     };
-
 
     # ════════════════════════════════════════════════════════════════════════════
     #  §7  POWER MANAGEMENT
     # ════════════════════════════════════════════════════════════════════════════
 
     "org/gnome/settings-daemon/plugins/power" = {
-      power-button-action            = "nothing";    # Disables power button action to prevent accidental suspension.
-      sleep-inactive-ac-timeout      = 3600;         # Suspends after 1 hour of inactivity on AC power.
-      sleep-inactive-ac-type         = "suspend";
-      sleep-inactive-battery-timeout = 900;          # Suspends after 15 minutes of inactivity on battery power.
-      sleep-inactive-battery-type    = "suspend";
-      ambient-enabled                = false;        # Disables ambient light sensor for consistent brightness.
+      power-button-action = "nothing"; # Disables power button action to prevent accidental suspension.
+      sleep-inactive-ac-timeout = 3600; # Suspends after 1 hour of inactivity on AC power.
+      sleep-inactive-ac-type = "suspend";
+      sleep-inactive-battery-timeout = 900; # Suspends after 15 minutes of inactivity on battery power.
+      sleep-inactive-battery-type = "suspend";
+      ambient-enabled = false; # Disables ambient light sensor for consistent brightness.
     };
 
     # Screen blanking intervals.
     "org/gnome/desktop/session" = {
-      idle-delay = mkUint32 600;                     # Blanks screen after 10 minutes of inactivity.
+      idle-delay = mkUint32 600; # Blanks screen after 10 minutes of inactivity.
     };
 
     # Screen locking policies.
     "org/gnome/desktop/screensaver" = {
-      lock-enabled        = true;
-      lock-delay          = mkUint32 60;             # Locks screen 1 minute after screen blanking.
+      lock-enabled = true;
+      lock-delay = mkUint32 60; # Locks screen 1 minute after screen blanking.
       user-switch-enabled = true;
     };
-
 
     # ════════════════════════════════════════════════════════════════════════════
     #  §8  NIGHT LIGHT
     # ════════════════════════════════════════════════════════════════════════════
 
     "org/gnome/settings-daemon/plugins/color" = {
-      night-light-enabled            = true;
-      night-light-temperature        = mkUint32 3700; # Warm white color temperature (adjustable between 2700K and 6500K).
-      night-light-schedule-automatic = true;          # Automatically schedules based on local sunset/sunrise times.
+      night-light-enabled = true;
+      night-light-temperature = mkUint32 3700; # Warm white color temperature (adjustable between 2700K and 6500K).
+      night-light-schedule-automatic = true; # Automatically schedules based on local sunset/sunrise times.
     };
-
 
     # ════════════════════════════════════════════════════════════════════════════
     #  §9  PRIVACY & TELEMETRY
     # ════════════════════════════════════════════════════════════════════════════
 
     "org/gnome/desktop/privacy" = {
-      report-technical-problems = false;             # Disables automatic crash reporting.
-      send-software-usage-stats = false;             # Disables telemetry and software usage statistics.
-      remove-old-temp-files     = true;
-      remove-old-trash-files    = true;
-      old-files-age             = mkUint32 7;        # Purges files older than 7 days.
-      remember-recent-files     = true;
-      recent-files-max-age      = 30;                # Retains recent files history for 30 days.
+      report-technical-problems = false; # Disables automatic crash reporting.
+      send-software-usage-stats = false; # Disables telemetry and software usage statistics.
+      remove-old-temp-files = true;
+      remove-old-trash-files = true;
+      old-files-age = mkUint32 7; # Purges files older than 7 days.
+      remember-recent-files = true;
+      recent-files-max-age = 30; # Retains recent files history for 30 days.
     };
-
 
     # ════════════════════════════════════════════════════════════════════════════
     #  §10  NOTIFICATIONS
     # ════════════════════════════════════════════════════════════════════════════
 
     "org/gnome/desktop/notifications" = {
-      show-banners        = true;                    # Enables notification banners (set to false for persistent Do Not Disturb).
-      show-in-lock-screen = false;                   # Hides notifications on the lock screen for privacy.
+      show-banners = true; # Enables notification banners (set to false for persistent Do Not Disturb).
+      show-in-lock-screen = false; # Hides notifications on the lock screen for privacy.
     };
-
 
     # ════════════════════════════════════════════════════════════════════════════
     #  §11  NAUTILUS — File Manager
     # ════════════════════════════════════════════════════════════════════════════
 
     "org/gnome/nautilus/preferences" = {
-      default-folder-viewer   = "list-view";
-      show-hidden-files       = false;
-      show-create-link        = true;
-      show-delete-permanently = true;                # Enables permanent deletion via Shift+Delete.
-      recursive-search        = "local-only";
+      default-folder-viewer = "list-view";
+      show-hidden-files = false;
+      show-create-link = true;
+      show-delete-permanently = true; # Enables permanent deletion via Shift+Delete.
+      recursive-search = "local-only";
     };
 
     "org/gnome/nautilus/list-view" = {
-      default-zoom-level      = "small";
-      use-tree-view           = true;                # Enables inline folder expansion in list view.
-      default-column-order    = [ "name" "size" "type" "date_modified" ];
-      default-visible-columns = [ "name" "size" "date_modified" ];
+      default-zoom-level = "small";
+      use-tree-view = true; # Enables inline folder expansion in list view.
+      default-column-order = [
+        "name"
+        "size"
+        "type"
+        "date_modified"
+      ];
+      default-visible-columns = [
+        "name"
+        "size"
+        "date_modified"
+      ];
     };
 
     "org/gnome/nautilus/icon-view" = {
@@ -418,11 +434,10 @@ with lib.hm.gvariant;
     };
 
     "org/gtk/gtk4/settings/file-chooser" = {
-      show-hidden            = false;
+      show-hidden = false;
       sort-directories-first = true;
-      show-size-column       = true;
+      show-size-column = true;
     };
-
 
     # ════════════════════════════════════════════════════════════════════════════
     #  §12  TEXT EDITOR (GNOME Text Editor)
@@ -430,23 +445,21 @@ with lib.hm.gvariant;
 
     "org/gnome/TextEditor" = {
       highlight-current-line = true;
-      show-line-numbers      = true;
-      show-map               = false;
-      indent-style           = "space";
-      tab-width              = mkUint32 4;
-      use-system-font        = true;
-      restore-session        = false;                # Disables session restoration for a clean slate on launch (improves stability).
+      show-line-numbers = true;
+      show-map = false;
+      indent-style = "space";
+      tab-width = mkUint32 4;
+      use-system-font = true;
+      restore-session = false; # Disables session restoration for a clean slate on launch (improves stability).
     };
-
 
     # ════════════════════════════════════════════════════════════════════════════
     #  §13  CALENDAR & CLOCK
     # ════════════════════════════════════════════════════════════════════════════
 
     "org/gnome/desktop/calendar" = {
-      show-weekdate = true;                          # Displays week numbers in the calendar.
+      show-weekdate = true; # Displays week numbers in the calendar.
     };
-
 
     # ════════════════════════════════════════════════════════════════════════════
     #  §14  LOCATION
@@ -458,7 +471,6 @@ with lib.hm.gvariant;
       enabled = true;
     };
 
-
     # ════════════════════════════════════════════════════════════════════════════
     #  §15  TWEAKS COMPATIBILITY
     # ════════════════════════════════════════════════════════════════════════════
@@ -467,17 +479,15 @@ with lib.hm.gvariant;
       show-extensions-notice = false;
     };
 
-
     # ════════════════════════════════════════════════════════════════════════════
     #  §16  WELLBEING / BREAK REMINDERS
     # ════════════════════════════════════════════════════════════════════════════
 
     "org/gnome/desktop/break-reminders/movement" = {
-      duration-seconds = mkUint32 300;               # 5-minute break duration.
-      interval-seconds = mkUint32 1800;              # Triggers every 30 minutes.
-      play-sound       = true;
+      duration-seconds = mkUint32 300; # 5-minute break duration.
+      interval-seconds = mkUint32 1800; # Triggers every 30 minutes.
+      play-sound = true;
     };
-
 
     # ════════════════════════════════════════════════════════════════════════════
     #  §17  DISPLAY & FRACTIONAL SCALING

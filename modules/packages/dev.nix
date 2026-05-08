@@ -11,5 +11,5 @@
     bun
     docker-compose
     distrobox
-    ];
+  ];
 }

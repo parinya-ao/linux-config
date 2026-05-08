@@ -19,6 +19,7 @@
   ];
 
   programs.home-manager.enable = true;
+<<<<<<< Updated upstream
 
   nix = {
 	package = pkgs.nix;
@@ -31,4 +32,6 @@
       options = "--delete-older-than 28d";
     };
   };
+=======
+>>>>>>> Stashed changes
 }

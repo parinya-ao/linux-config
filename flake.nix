@@ -19,7 +19,14 @@
   };
 
   # Entry point that processes inputs and defines system configurations.
-  outputs = { self, nixpkgs, home-manager, claude-code, ... }@inputs:
+  outputs =
+    {
+      self,
+      nixpkgs,
+      home-manager,
+      claude-code,
+      ...
+    }@inputs:
     let
       # Target system architecture.
       system = "x86_64-linux";
@@ -28,7 +35,7 @@
     in
     {
       # Code formatter triggered by 'nix fmt'.
-      formatter.${system} = pkgs.nixfmt-rfc-style;
+      formatter.${system} = pkgs.nixfmt;
 
       # Home Manager configuration for user 'parinya'.
       homeConfigurations."parinya" = home-manager.lib.homeManagerConfiguration {

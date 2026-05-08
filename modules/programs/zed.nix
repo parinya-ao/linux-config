@@ -23,7 +23,7 @@
 
     # Additional packages for LSP servers in FHS environment
     extraPackages = with pkgs; [
-	    rust-analyzer
+      rust-analyzer
       nixd
       pyright
       bash-language-server
@@ -63,7 +63,12 @@
         dock = "bottom";
         detect_venv = {
           on = {
-            directories = [ ".env" "env" ".venv" "venv" ];
+            directories = [
+              ".env"
+              "env"
+              ".venv"
+              "venv"
+            ];
             activate_script = "default";
           };
         };
@@ -108,13 +113,19 @@
           formatter = {
             external = {
               command = "rustfmt";
-              arguments = [ "--edition" "2021" ];
+              arguments = [
+                "--edition"
+                "2021"
+              ];
             };
           };
         };
 
         "Nix" = {
-          language_servers = [ "!nil" "nixd" ];
+          language_servers = [
+            "!nil"
+            "nixd"
+          ];
           format_on_save = {
             external = {
               command = "alejandra";
@@ -139,7 +150,11 @@
           format_on_save = {
             external = {
               command = "shfmt";
-              arguments = [ "-i" "2" "-" ];
+              arguments = [
+                "-i"
+                "2"
+                "-"
+              ];
             };
           };
         };
