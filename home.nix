@@ -19,19 +19,4 @@
   ];
 
   programs.home-manager.enable = true;
-<<<<<<< Updated upstream
-
-  nix = {
-	package = pkgs.nix;
-    settings = {
-      auto-optimise-store = true;
-    };
-    gc = {
-      automatic = true;
-      dates = "weekly";
-      options = "--delete-older-than 28d";
-    };
-  };
-=======
->>>>>>> Stashed changes
 }
