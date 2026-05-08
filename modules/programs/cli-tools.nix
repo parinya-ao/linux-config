@@ -27,7 +27,6 @@
     just # modern Makefile (justfile)
     nix-tree # visualize nix dependencies
     nvd # nix diff between generations
-    ghostty
   ];
 
   # eza (ls replacement)
