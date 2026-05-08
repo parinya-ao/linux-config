@@ -19,7 +19,7 @@ BLUE=$'\033[1;34m'
 RED=$'\033[1;31m'
 
 # other package
-source .package/ghostty.sh
+source ./package/ghostty.sh
 
 # ------------------------------------------
 # HELPERS
