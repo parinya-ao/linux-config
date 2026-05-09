@@ -48,7 +48,7 @@ with lib.hm.gvariant;
         "org.gnome.Nautilus.desktop"
         "firefox.desktop"
         "org.gnome.TextEditor.desktop"
-        "org.gnome.Console.desktop"
+        "org.gnome.Ptyxis.desktop"
       ];
     };
 
@@ -226,8 +226,8 @@ with lib.hm.gvariant;
 
     # Terminal: Ctrl+Alt+T (universal standard).
     "org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom0" = {
-      name = "Terminal (Ghostty)";
-      command = "ghostty";
+      name = "Terminal (Ptyxis)";
+      command = "ptyxis";
       binding = "<Control><Alt>t";
     };
 
