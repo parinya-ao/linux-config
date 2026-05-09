@@ -2,12 +2,6 @@
 
 {
   home.packages = with pkgs; [
-    bat
-    fd
-    ripgrep
-    fzf
-    eza
-    htop
     tmux
     jq
     curl
@@ -17,7 +11,7 @@
     fastfetch
     tldr
     p7zip
-    unzip
     xclip
+    htop
   ];
 }

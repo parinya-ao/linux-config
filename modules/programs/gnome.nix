@@ -144,8 +144,8 @@ with lib.hm.gvariant;
     # ════════════════════════════════════════════════════════════════════════════
 
     "org/gnome/desktop/peripherals/keyboard" = {
-      delay = mkUint32 180; # 180ms delay before key repeat initiates.
-      repeat-interval = mkUint32 25; # 25ms interval between repeats (~40 chars/sec).
+      delay = mkUint32 200; # 180ms delay before key repeat initiates.
+      repeat-interval = mkUint32 35; # 25ms interval between repeats (~40 chars/sec).
     };
 
     "org/gnome/desktop/input-sources" = {

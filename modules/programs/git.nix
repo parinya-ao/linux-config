@@ -18,7 +18,7 @@
     enable = true;
     signing.format = null;
 
-    # ใช้ settings แทน extraConfig
+    # Use settings attribute set instead of extraConfig for better modularity
     settings = {
       alias = {
         amend = "commit --amend --no-edit";

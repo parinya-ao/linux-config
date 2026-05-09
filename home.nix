@@ -12,6 +12,7 @@
     ./modules/programs/git.nix
     ./modules/programs/bash.nix
     ./modules/programs/fish.nix
+    ./modules/programs/neovim.nix
     ./modules/packages/gui.nix
     ./modules/programs/cli-tools.nix
     ./modules/programs/gnome.nix

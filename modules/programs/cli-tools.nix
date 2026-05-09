@@ -15,7 +15,6 @@
     choose # cut/awk replacement
     xh # curl/httpie replacement
     ouch # compress/decompress everything
-    zoxide # smarter cd
     pay-respects
     mcfly # smart shell history
     zellij # modern tmux alternative
