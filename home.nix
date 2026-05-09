@@ -19,4 +19,16 @@
   ];
 
   programs.home-manager.enable = true;
+
+  # settings
+  nix = {
+    package = pkgs.nix;
+    settings = {
+      max-jobs = "auto";
+      cores = 0;
+      http-connections = 50;
+      auto-optimise-store = true;
+      substituters = [ "https://cache.nixos.org" ];
+    };
+  };
 }
