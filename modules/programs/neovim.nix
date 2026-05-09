@@ -1,6 +1,12 @@
-{ pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
 let
+  cfg = config.my.programs.neovim;
   kickstart = pkgs.fetchFromGitHub {
     owner = "nvim-lua";
     repo = "kickstart.nvim";
@@ -9,22 +15,26 @@ let
   };
 in
 {
-  # This deploys the kickstart.nvim config to ~/.config/nvim
-  # Neovim will handle plugin installation (lazy.nvim) on its first run.
-  xdg.configFile."nvim" = {
-    source = kickstart;
-    recursive = true;
-  };
+  options.my.programs.neovim.enable = lib.mkEnableOption "Neovim with kickstart.nvim";
 
-  home.packages = with pkgs; [
-    neovim
-    # Required dependencies for kickstart.nvim and its plugins (LSP, Tree-sitter, etc.)
-    ripgrep
-    fd
-    clang
-    nodejs
-    tree-sitter
-    unzip
-    git # Required to clone plugins internally
-  ];
+  config = lib.mkIf cfg.enable {
+    # This deploys the kickstart.nvim config to ~/.config/nvim
+    # Neovim will handle plugin installation (lazy.nvim) on its first run.
+    xdg.configFile."nvim" = {
+      source = kickstart;
+      recursive = true;
+    };
+
+    home.packages = with pkgs; [
+      neovim
+      # Required dependencies for kickstart.nvim and its plugins (LSP, Tree-sitter, etc.)
+      ripgrep
+      fd
+      clang
+      nodejs
+      tree-sitter
+      unzip
+      git # Required to clone plugins internally
+    ];
+  };
 }

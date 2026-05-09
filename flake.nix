@@ -16,6 +16,9 @@
 
     # Third-party flake providing the Claude Code CLI.
     claude-code.url = "github:sadjow/claude-code-nix";
+
+    # flake claude desktop
+    claude-desktop.url = "github:aaddrick/claude-desktop-debian";
   };
 
   # Entry point that processes inputs and defines system configurations.
@@ -25,6 +28,7 @@
       nixpkgs,
       home-manager,
       claude-code,
+      claude-desktop,
       ...
     }@inputs:
     let
@@ -35,7 +39,7 @@
     in
     {
       # Code formatter triggered by 'nix fmt'.
-      formatter.${system} = pkgs.nixfmt;
+      formatter.${system} = pkgs.nixfmt-tree;
 
       # Home Manager configuration for user 'parinya'.
       homeConfigurations."parinya" = home-manager.lib.homeManagerConfiguration {

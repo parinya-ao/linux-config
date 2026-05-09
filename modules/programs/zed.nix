@@ -1,181 +1,193 @@
-{ pkgs, lib, ... }:
-
 {
-  programs.zed-editor = {
-    enable = true;
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
-    # Extensions to pre-install
-    extensions = [
-      "nix"
-      "toml"
-      "rust"
-      "python"
-      "json"
-      "yaml"
-      "markdown"
-      "bash"
-      "fish"
-      "git-firefly"
-    ];
+let
+  cfg = config.my.programs.zed;
+in
+{
+  options.my.programs.zed.enable = lib.mkEnableOption "Zed editor";
 
-    # Include remote server support for SSH collaboration
-    installRemoteServer = true;
+  config = lib.mkIf cfg.enable {
+    programs.zed-editor = {
+      enable = true;
 
-    # Additional packages for LSP servers in FHS environment
-    extraPackages = with pkgs; [
-      rust-analyzer
-      nixd
-      pyright
-      bash-language-server
-      shfmt
-      shellcheck
-    ];
+      # Extensions to pre-install
+      extensions = [
+        "nix"
+        "toml"
+        "rust"
+        "python"
+        "json"
+        "yaml"
+        "markdown"
+        "bash"
+        "fish"
+        "git-firefly"
+      ];
 
-    # User settings and configuration
-    userSettings = {
-      # Theme and appearance
-      theme = {
-        mode = "system";
-        dark = "One Dark";
-        light = "One Light";
-      };
+      # Include remote server support for SSH collaboration
+      installRemoteServer = true;
 
-      # Time format
-      hour_format = "hour24";
+      # Additional packages for LSP servers in FHS environment
+      extraPackages = with pkgs; [
+        rust-analyzer
+        nixd
+        pyright
+        bash-language-server
+        shfmt
+        shellcheck
+      ];
 
-      # Vim mode enabled
-      vim_mode = true;
+      # User settings and configuration
+      userSettings = {
+        # Theme and appearance
+        theme = {
+          mode = "system";
+          dark = "One Dark";
+          light = "One Light";
+        };
 
-      # Auto-update disabled (using nix for updates)
-      auto_update = false;
+        # Time format
+        hour_format = "hour24";
 
-      # Editor font and sizing
-      ui_font_size = 14;
-      buffer_font_size = 13;
-      font_family = "FiraCode Nerd Font";
-      line_height = "comfortable";
+        # Vim mode enabled
+        vim_mode = true;
 
-      # Whitespace visibility
-      show_whitespaces = "all";
+        # Auto-update disabled (using nix for updates)
+        auto_update = false;
 
-      # Terminal configuration
-      terminal = {
-        dock = "bottom";
-        detect_venv = {
-          on = {
-            directories = [
-              ".env"
-              "env"
-              ".venv"
-              "venv"
+        # Editor font and sizing
+        ui_font_size = 14;
+        buffer_font_size = 13;
+        font_family = "FiraCode Nerd Font";
+        line_height = "comfortable";
+
+        # Whitespace visibility
+        show_whitespaces = "all";
+
+        # Terminal configuration
+        terminal = {
+          dock = "bottom";
+          detect_venv = {
+            on = {
+              directories = [
+                ".env"
+                "env"
+                ".venv"
+                "venv"
+              ];
+              activate_script = "default";
+            };
+          };
+          env = {
+            TERM = "alacritty";
+          };
+          shell = "system";
+          working_directory = "current_project_directory";
+        };
+
+        # LSP configuration
+        lsp = {
+          rust-analyzer = {
+            binary = {
+              path_lookup = true;
+            };
+          };
+
+          nix = {
+            binary = {
+              path_lookup = true;
+            };
+          };
+
+          pyright = {
+            binary = {
+              path_lookup = true;
+            };
+          };
+
+          bash-language-server = {
+            binary = {
+              path_lookup = true;
+            };
+          };
+        };
+
+        # Language-specific settings
+        languages = {
+          "Rust" = {
+            format_on_save = "on";
+            formatter = {
+              external = {
+                command = "rustfmt";
+                arguments = [
+                  "--edition"
+                  "2021"
+                ];
+              };
+            };
+          };
+
+          "Nix" = {
+            language_servers = [
+              "!nil"
+              "nixd"
             ];
-            activate_script = "default";
+            format_on_save = {
+              external = {
+                command = "alejandra";
+                arguments = [ "-" ];
+              };
+            };
           };
-        };
-        env = {
-          TERM = "alacritty";
-        };
-        shell = "system";
-        working_directory = "current_project_directory";
-      };
 
-      # LSP configuration
-      lsp = {
-        rust-analyzer = {
-          binary = {
-            path_lookup = true;
+          "Python" = {
+            language_servers = [ "pyright" ];
+            format_on_save = "on";
+            formatter = {
+              external = {
+                command = "black";
+                arguments = [ "-" ];
+              };
+            };
           };
-        };
 
-        nix = {
-          binary = {
-            path_lookup = true;
-          };
-        };
-
-        pyright = {
-          binary = {
-            path_lookup = true;
-          };
-        };
-
-        bash-language-server = {
-          binary = {
-            path_lookup = true;
-          };
-        };
-      };
-
-      # Language-specific settings
-      languages = {
-        "Rust" = {
-          format_on_save = "on";
-          formatter = {
-            external = {
-              command = "rustfmt";
-              arguments = [
-                "--edition"
-                "2021"
-              ];
+          "Bash" = {
+            language_servers = [ "bash-language-server" ];
+            format_on_save = {
+              external = {
+                command = "shfmt";
+                arguments = [
+                  "-i"
+                  "2"
+                  "-"
+                ];
+              };
             };
           };
         };
 
-        "Nix" = {
-          language_servers = [
-            "!nil"
-            "nixd"
-          ];
-          format_on_save = {
-            external = {
-              command = "alejandra";
-              arguments = [ "-" ];
-            };
-          };
-        };
+        # Other settings
+        load_direnv = "shell_hook";
+        base_keymap = "VSCode";
 
-        "Python" = {
-          language_servers = [ "pyright" ];
-          format_on_save = "on";
-          formatter = {
-            external = {
-              command = "black";
-              arguments = [ "-" ];
-            };
-          };
-        };
-
-        "Bash" = {
-          language_servers = [ "bash-language-server" ];
-          format_on_save = {
-            external = {
-              command = "shfmt";
-              arguments = [
-                "-i"
-                "2"
-                "-"
-              ];
-            };
-          };
+        # Use git to determine project root
+        project_panel = {
+          auto_reveal_entries = true;
         };
       };
 
-      # Other settings
-      load_direnv = "shell_hook";
-      base_keymap = "VSCode";
-
-      # Use git to determine project root
-      project_panel = {
-        auto_reveal_entries = true;
-      };
+      # Optional: User keymaps can be added here
+      # userKeymaps = [ ... ];
     };
 
-    # Optional: User keymaps can be added here
-    # userKeymaps = [ ... ];
-  };
-
-  # Optional: Add Zed to easily accessible location
-  home.shellAliases = {
-    zed = "zeditor";
+    # Optional: Add Zed to easily accessible location
+    home.shellAliases = {
+      zed = "zeditor";
+    };
   };
 }
