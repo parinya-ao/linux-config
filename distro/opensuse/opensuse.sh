@@ -413,13 +413,13 @@ if [[ "${PACKMAN_ACTIVE}" == "false" ]]; then
 
   # Add Packman Essentials repo (priority 90 = higher than default)
   step "[1/4] Adding Packman Essentials..."
-  zypper addrepo --cfp 90 --name "packman-essentials" \
+  zypper addrepo --priority 90 --name "packman-essentials" \
     "${PACKMAN_REPO}" packman-essentials \
     || warn "packman-essentials may already exist — continuing"
 
   # Add full Packman for extras like libdvdcss2
   step "[2/4] Adding Packman Full..."
-  zypper addrepo --cfp 90 --name "packman" \
+  zypper addrepo --priority 90 --name "packman" \
     "${PACKMAN_FULL}" packman \
     || warn "packman-full may already exist — continuing"
 
@@ -763,9 +763,18 @@ if [[ "${PACKMAN_ACTIVE}" == "true" \
     || warn "No firmware updates or fwupd issue — skipping."
 
   # -----------------------------------------------------------------------
-  # PHASE 9 — Extra hardware support
+  # PHASE 9 — Extra hardware & apps
   # -----------------------------------------------------------------------
-  step "[P9] Extra hardware support..."
+  step "[P9] Extra hardware & apps..."
+
+  # Brave Browser Beta
+  if [[ "${BRAVE_ACTIVE}" == "false" ]]; then
+    step "Adding Brave Browser Beta repository..."
+    zypper addrepo https://brave-browser-rpm-beta.s3.brave.com/brave-browser-beta.repo \
+      || warn "Brave repo already exists or could not be added"
+    zypper --non-interactive --gpg-auto-import-keys refresh
+    zypper_install brave-browser-beta
+  fi
 
   # Printer support (CUPS)
   zypper_install \

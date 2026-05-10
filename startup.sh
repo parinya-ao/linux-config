@@ -170,9 +170,8 @@ else
   need_cmd git
   # ✅ reset hard แทน stash → ไม่มีทางหยุดรอ input เลย
   # (local changes จะถูก discard — เพราะ source of truth คือ remote)
-  git -C "$TARGET_DIR" fetch --quiet origin
-  git -C "$TARGET_DIR" reset --hard origin/main 2>/dev/null \
-    || git -C "$TARGET_DIR" reset --hard origin/master
+  # git -C "$TARGET_DIR" fetch --quiet origin
+  # git -C "$TARGET_DIR" reset --hard origin/main 2>/dev/null
   ok "Repo synced to remote HEAD."
 fi
 
