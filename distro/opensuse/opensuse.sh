@@ -28,6 +28,11 @@ warn()  { echo -e "${YELLOW}[WARN]${RESET} $*"; }
 fail()  { echo -e "${RED}[FAIL]${RESET} $*"; exit 1; }
 info()  { echo -e "${YELLOW}[INFO]${RESET} $*"; }
 
+# ------------------------------------------
+# PACKAGES
+# ------------------------------------------
+source "$(dirname "$0")/package/docker.sh"
+
 zypper_install() {
   zypper --non-interactive install --no-recommends "$@" \
     && ok "Installed: $*" \
@@ -766,16 +771,6 @@ if [[ "${PACKMAN_ACTIVE}" == "true" \
   # PHASE 9 — Extra hardware & apps
   # -----------------------------------------------------------------------
   step "[P9] Extra hardware & apps..."
-
-  # Brave Browser Beta
-  if [[ "${BRAVE_ACTIVE}" == "false" ]]; then
-    step "Adding Brave Browser Beta repository..."
-    zypper addrepo https://brave-browser-rpm-beta.s3.brave.com/brave-browser-beta.repo \
-      || warn "Brave repo already exists or could not be added"
-    zypper --non-interactive --gpg-auto-import-keys refresh
-    zypper_install brave-browser-beta
-  fi
-
   # Printer support (CUPS)
   zypper_install \
     cups \
@@ -811,27 +806,9 @@ if [[ "${PACKMAN_ACTIVE}" == "true" \
   ok "Extra hardware support installed."
 
   # -----------------------------------------------------------------------
-  # PHASE 9 — Docker Engine (official repo)
+  # PHASE 9 — Docker Engine
   # -----------------------------------------------------------------------
-  step "[P9] Docker Engine (official repo)..."
-
-  if pkg_installed "docker"; then
-    skip "Docker already installed"
-  else
-    # Add Docker repository (openSUSE uses community repo or manual)
-    info "Adding Docker repository..."
-    zypper addrepo https://download.docker.com/linux/opensuse/docker.repo 2>/dev/null \
-      || info "Docker repo may already exist or community repo will be used"
-
-    # Refresh and install Docker
-    zypper --non-interactive refresh 2>/dev/null || true
-    zypper_install docker docker-compose
-
-    # Enable and start Docker
-    systemctl enable --now docker \
-      && ok "Docker service enabled & started." \
-      || warn "Failed to enable Docker service"
-  fi
+  install_docker
 
   # -----------------------------------------------------------------------
   # PHASE 10 — Final upgrade & cleanup
