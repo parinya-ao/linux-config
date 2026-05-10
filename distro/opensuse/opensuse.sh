@@ -796,6 +796,9 @@ if [[ "${PACKMAN_ACTIVE}" == "true" \
     xf86-input-libinput \
     || warn "libinput already present"
 
+  # terminal
+  zypper_install ptyxis || warn "ptyxis already present"
+
   ok "Extra hardware support installed."
 
   # -----------------------------------------------------------------------
