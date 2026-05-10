@@ -1,4 +1,6 @@
-!/bin/bash
+#!/bin/bash
+
+flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
 
 programs=(
   com.discordapp.Discord
@@ -10,6 +12,7 @@ programs=(
   com.usebruno.Bruno
   io.dbeaver.DBeaverCommunity
   com.usebottles.bottles
+  org.gaphor.Gaphor
 )
 
-flatpak install "${programs[@]}" -y
+flatpak install --user "${programs[@]}" -y

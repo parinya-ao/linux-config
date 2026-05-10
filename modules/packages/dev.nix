@@ -17,6 +17,8 @@ in
       gradle
       # gcc
       clang
+      gdb
+      clang-tools
       go
       nodejs
       python3
