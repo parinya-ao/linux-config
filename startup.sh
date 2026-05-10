@@ -44,6 +44,12 @@ need_cmd grep
 need_cmd cut
 SELF_DIR="$(resolve_self_dir)"
 
+is_atomic() {
+  command -v rpm-ostree >/dev/null 2>&1 || return 1
+  rpm-ostree status >/dev/null 2>&1 || return 1
+  return 0
+}
+
 # ── stdin guard: ปิด interactive input ทุกอย่าง ──────────────────────────────
 # ถ้ารันแบบ pipe (curl | bash) stdin อาจเป็น pipe ไม่ใช่ terminal
 # บังคับ close stdin เพื่อให้ทุก child process ไม่รอ keyboard
@@ -69,6 +75,9 @@ pick_distro_script() {
     ubuntu|debian|linuxmint|pop|elementary|neon|zorin|kali|parrot)
       printf '%s/distro/ubuntu/ubuntu.sh\n' "$SELF_DIR"; return 0 ;;
     fedora)
+      if is_atomic; then
+        printf '%s/distro/fedora/atomic.sh\n' "$SELF_DIR"; return 0
+      fi
       printf '%s/distro/fedora/fedora.sh\n' "$SELF_DIR"; return 0 ;;
     opensuse-tumbleweed|opensuse-leap|opensuse-slowroll|opensuse)
       printf '%s/distro/opensuse/opensuse.sh\n' "$SELF_DIR"; return 0 ;;
@@ -77,6 +86,9 @@ pick_distro_script() {
     *" debian "*)
       printf '%s/distro/ubuntu/ubuntu.sh\n' "$SELF_DIR"; return 0 ;;
     *" fedora "*|*" rhel "*|*" centos "*)
+      if is_atomic; then
+        printf '%s/distro/fedora/atomic.sh\n' "$SELF_DIR"; return 0
+      fi
       printf '%s/distro/fedora/fedora.sh\n' "$SELF_DIR"; return 0 ;;
     *" suse "*|*" opensuse "*)
       printf '%s/distro/opensuse/opensuse.sh\n' "$SELF_DIR"; return 0 ;;
@@ -104,7 +116,8 @@ info "Script:    $DISTRO_SCRIPT"
 # ─────────────────────────────────────────────────────────────────────────────
 step "Running distro driver: $(basename "$DISTRO_SCRIPT")"
 # ✅ stdin already closed above — child script cannot block waiting for input
-/usr/bin/env bash "$DISTRO_SCRIPT" "$@"
+# Distro driver requires root for package installation, firmware, etc.
+sudo /usr/bin/env bash "$DISTRO_SCRIPT" "$@"
 ok "Distro driver finished."
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -1,0 +1,61 @@
+name: Update Flake Lock
+
+on:
+  schedule:
+    - cron: "0 17 * * 0"   # อาทิตย์ 17:00 UTC = จันทร์ 00:00 Bangkok (+7)
+  workflow_dispatch:
+
+concurrency:
+  group: update-flake-lock
+  cancel-in-progress: false
+
+jobs:
+  update-lockfile:
+    name: Update + Dry-run Build + PR
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Free Disk Space
+        uses: jlumbroso/free-disk-space@v1.3.1
+        with:
+          tool-cache: false
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: false
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v30
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            accept-flake-config = true
+
+      - name: Setup Magic Nix Cache
+        uses: DeterminateSystems/magic-nix-cache-action@v7
+
+      # อัปเดต flake.lock บน runner ก่อน (ยังไม่ push)
+      - name: Update flake.lock locally
+        run: nix flake update
+
+      # Dry-run: ลอง build ด้วย lockfile ใหม่ก่อน
+      # ถ้า fail ตรงนี้ → ไม่สร้าง PR ขยะให้รก inbox
+      - name: Dry-run build with new lockfile
+        run: nix build .#homeConfigurations.parinya.activationPackage --no-link
+
+      # Build ผ่าน → ค่อยสร้าง PR
+      - name: Create PR with updated flake.lock
+        uses: DeterminateSystems/update-flake-lock@v24
+        with:
+          pr-title: "chore(nix): update flake.lock"
+          pr-labels: |
+            dependencies
+            automated
+          commit-msg: "chore(nix): update flake.lock [automated]"

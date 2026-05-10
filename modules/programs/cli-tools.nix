@@ -1,47 +1,129 @@
-{ pkgs, inputs, ... }:
-
 {
-  # Install standalone CLI packages that do not have dedicated Home Manager modules yet.
-  home.packages = [
-    # Install Claude Code CLI from the flake input
-    inputs.claude-code.packages.${pkgs.system}.default
-  ];
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
-  # Configure eza (a modern, maintained replacement for ls)
-  programs.eza = {
-    enable = true;
-    # Automatically create aliases like 'ls' and 'll' for Fish shell
-    enableFishIntegration = true;
-    # Enable icons in terminal output
-    icons = "auto";
+let
+  cfg = config.my.programs.cli-tools;
+in
+{
+  options.my.programs.cli-tools = {
+    enable = lib.mkEnableOption "Core CLI tools (eza, bat, fzf, etc.)";
   };
 
-  # Configure bat (a cat clone with syntax highlighting and Git integration)
-  programs.bat = {
-    enable = true;
-    config = {
-      # Set the default syntax highlighting theme
-      theme = "TwoDark";
+  config = lib.mkIf cfg.enable {
+    home.packages = with pkgs; [
+      # Rust CLI replacements
+      duf # df replacement
+      dust # du replacement
+      procs # ps replacement
+      bottom # top/htop replacement
+      gping # ping with graph
+      sd # sed replacement (simpler syntax)
+      choose # cut/awk replacement
+      xh # curl/httpie replacement
+      ouch # compress/decompress everything
+      pay-respects
+      mcfly # smart shell history
+      zellij # modern tmux alternative
+
+      # Dev tools
+      tokei # count lines of code
+      hyperfine # benchmarking tool
+      watchexec # auto-run on file change
+      just # modern Makefile (justfile)
+      nix-tree # visualize nix dependencies
+      nvd # nix diff between generations
+    ];
+
+    # eza (ls replacement)
+    programs.eza = {
+      enable = true;
+      enableFishIntegration = true;
+      enableBashIntegration = true;
+      icons = "auto";
+      git = true; # show git status in ls
+      extraOptions = [
+        "--group-directories-first"
+        "--header"
+        "--classify"
+      ];
     };
-  };
-  
-  # Configure direnv (unclutter your .profile and manage environment variables)
-  programs.direnv = {
-    enable = true;
-    # Enable fast, persistent use_nix and use_flake support
-    nix-direnv.enable = true;
-  };
 
-  # Configure gemini-cli (Google's Gemini CLI client)
-  programs.gemini-cli = {
-    enable = true;
-    package = pkgs.gemini-cli;
+    # bat (cat replacement)
+    programs.bat = {
+      enable = true;
+      config = {
+        theme = "TwoDark";
+        style = "full";
+        map-syntax = [
+          "*.nix:Nix"
+          "*.fish:fish"
+        ];
+      };
+      extraPackages = with pkgs.bat-extras; [
+        batdiff # bat-powered git diff
+        batman # bat-powered man pages
+        batgrep # bat + ripgrep
+        batwatch # bat + watch
+      ];
+    };
 
-    settings = {
-      # Use personal OAuth for authentication
-      security.auth.selectedType = "oauth-personal";
-      # Opt-in to early preview features
-      general.previewFeatures = true;
+    # direnv
+    programs.direnv = {
+      enable = true;
+      nix-direnv.enable = true;
+      config = {
+        global = {
+          warn_timeout = "5s";
+          load_dotenv = true;
+        };
+      };
+    };
+
+    # fzf (fuzzy finder)
+    programs.fzf = {
+      enable = true;
+      enableFishIntegration = true;
+      enableBashIntegration = true;
+      defaultCommand = "fd --type f --hidden --follow --exclude .git";
+      defaultOptions = [
+        "--height 40%"
+        "--layout=reverse"
+        "--border"
+        "--info=inline"
+      ];
+      fileWidgetCommand = "fd --type f --hidden --follow --exclude .git";
+      fileWidgetOptions = [ "--preview 'bat --color=always --style=numbers {}'" ];
+      changeDirWidgetCommand = "fd --type d --hidden --follow --exclude .git";
+      historyWidgetOptions = [
+        "--sort"
+        "--exact"
+      ];
+      colors = {
+        fg = "#cdd6f4";
+        "fg+" = "#cdd6f4";
+        bg = "#1e1e2e";
+        "bg+" = "#313244";
+        hl = "#f38ba8";
+        "hl+" = "#f38ba8";
+        info = "#cba6f7";
+        prompt = "#cba6f7";
+        pointer = "#f5e0dc";
+        marker = "#f5e0dc";
+        spinner = "#f5e0dc";
+        header = "#f38ba8";
+      };
+    };
+
+    # zoxide
+    programs.zoxide = {
+      enable = true;
+      enableFishIntegration = true;
+      enableBashIntegration = true;
+      options = [ "--cmd z" ]; # keep z command name
     };
   };
 }

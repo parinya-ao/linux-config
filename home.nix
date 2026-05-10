@@ -6,16 +6,16 @@
   home.stateVersion = "24.11";
 
   imports = [
-    ./modules/packages/cli.nix
-    ./modules/packages/dev.nix
-    ./modules/packages/docs.nix
-    ./modules/programs/git.nix
-    ./modules/programs/bash.nix
-    ./modules/programs/fish.nix
-    ./modules/packages/gui.nix
-    ./modules/programs/cli-tools.nix
-    ./modules/programs/gnome.nix
+    ./modules
   ];
+
+  # --- Best Practice: Enable Suites ---
+  my.suites = {
+    base.enable = true;
+    development.enable = true;
+    ai.enable = true;
+    desktop.enable = true;
+  };
 
   programs.home-manager.enable = true;
 }
