@@ -14,6 +14,6 @@
     ./programs/git.nix
     ./programs/gnome.nix
     ./programs/neovim.nix
-    ./programs/zed.nix
+
   ];
 }

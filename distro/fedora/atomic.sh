@@ -641,30 +641,6 @@ if [[ "${RPM_FUSION_ACTIVE}" == "true" && "${FFMPEG_ACTIVE}" == "false" ]]; then
     || warn "No firmware updates or fwupd issue."
 
   # -------------------------------------------------------------------
-  # PHASE 8.5: Visual Studio Code (official repo)
-  # -------------------------------------------------------------------
-  step "[P8.5] Visual Studio Code (official repo)..."
-
-  if pkg_installed "code"; then
-    skip "VS Code already installed"
-  else
-    if [[ ! -f /etc/yum.repos.d/vscode.repo ]]; then
-      $SUDO rpm --import https://packages.microsoft.com/keys/microsoft.asc
-      $SUDO tee /etc/yum.repos.d/vscode.repo >/dev/null <<'EOF'
-[code]
-name=Visual Studio Code
-baseurl=https://packages.microsoft.com/yumrepos/vscode
-enabled=1
-autorefresh=1
-type=rpm-md
-gpgcheck=1
-gpgkey=https://packages.microsoft.com/keys/microsoft.asc
-EOF
-    fi
-    roo_install code
-  fi
-
-  # -------------------------------------------------------------------
   # PHASE 9: Summary
   # -------------------------------------------------------------------
   step "[P9] Final ostree status..."

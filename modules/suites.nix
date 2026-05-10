@@ -24,7 +24,6 @@ in
     (lib.mkIf cfg.development.enable {
       my.programs.git.enable = true;
       my.programs.neovim.enable = true;
-      my.programs.zed.enable = true;
       my.packages.dev.enable = true;
     })
 
