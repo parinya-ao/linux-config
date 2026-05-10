@@ -1,0 +1,22 @@
+# entrypoint: ดึงทุก sub-pipeline มาไว้ที่เดียว
+# แก้อะไรเพิ่มให้ไปแก้ที่ .gitlab/ci/ แทน
+
+include:
+  - local: ".gitlab/ci/_anchors.yaml"
+  - local: ".gitlab/ci/shellcheck.yaml"
+  - local: ".gitlab/ci/nix-build.yaml"
+  - local: ".gitlab/ci/update.yaml"
+
+stages:
+  - lint
+  - test
+  - update
+
+# ── workflow: ควบคุมว่า pipeline ไหนถูกสร้าง ──────────
+# ป้องกัน branch pipeline ซ้อน MR pipeline พร้อมกัน
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - if: $CI_PIPELINE_SOURCE == "web"        # manual trigger via UI

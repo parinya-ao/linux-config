@@ -1,0 +1,36 @@
+# nix-build.yaml — Fail Fast lint → evaluate → build
+
+nix-build:
+  stage: test
+  extends: .nix-setup                         # inherit image + before_script (Cachix)
+  script:
+    # ── Fail Fast: เร็วที่สุด → ช้าที่สุด ──────────
+    - nix fmt -- --check
+    - nix run nixpkgs#statix -- check .
+    - nix run nixpkgs#deadnix -- --fail .
+    - nix flake check --no-build
+    # ── Full Build ───────────────────────────────────
+    - >
+      nix build
+      .#homeConfigurations.parinya.activationPackage
+      --no-link
+      --print-build-logs
+  after_script:
+    # push results กลับเข้า Cachix หลัง build สำเร็จ (เฉพาะ main branch)
+    - |
+      if [ -n "${CACHIX_AUTH_TOKEN:-}" ] && [ "$CI_COMMIT_BRANCH" = "$CI_DEFAULT_BRANCH" ]; then
+        nix build .#homeConfigurations.parinya.activationPackage \
+          --no-link 2>/dev/null || true
+        echo "[INFO] Cachix push skipped (use cachix watch-exec for full push)"
+      fi
+  rules:
+    - changes:
+        - "**/*.nix"
+        - "flake.lock"
+    - if: $CI_PIPELINE_SOURCE == "web"
+  # artifact: เก็บ build log ไว้ 1 สัปดาห์
+  artifacts:
+    when: on_failure
+    paths:
+      - /tmp/nix-build-*.log
+    expire_in: 1 week

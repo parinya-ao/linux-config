@@ -1,0 +1,29 @@
+# _anchors.yaml — hidden jobs ที่ไม่รัน แต่ให้ job อื่น inherit ผ่าน <<: *anchor
+# Note: YAML anchors ใช้ได้แค่ภายในไฟล์เดียวกัน
+#       ข้ามไฟล์ต้องใช้ !reference tag แทน
+
+# ── Nix setup template ──────────────────────────────
+.nix-setup:
+  image: docker.nix-community.org/nixpkgs/cachix-flakes:latest
+  variables:
+    NIX_CONFIG: |
+      experimental-features = nix-command flakes
+      accept-flake-config = true
+  before_script:
+    # ใช้ Cachix เป็น binary cache (ต้องตั้ง CACHIX_AUTH_TOKEN ใน CI/CD Variables)
+    # ถ้าไม่มี token ก็ยังรันได้ แค่ไม่มี cache
+    - |
+      if [ -n "${CACHIX_AUTH_TOKEN:-}" ]; then
+        cachix authtoken "$CACHIX_AUTH_TOKEN"
+        cachix use "${CACHIX_CACHE_NAME:-linux-config}"
+      else
+        echo "[INFO] No CACHIX_AUTH_TOKEN found, running without binary cache"
+      fi
+
+# ── Nix lint steps (ใช้ !reference ดึงใน job อื่น) ──
+.nix-lint-script:
+  script:
+    - nix fmt -- --check
+    - nix run nixpkgs#statix -- check .
+    - nix run nixpkgs#deadnix -- --fail .
+    - nix flake check --no-build
