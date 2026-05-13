@@ -58,7 +58,15 @@ exec </dev/null
 # ─────────────────────────────────────────────────────────────────────────────
 # PART 0 — Distro detection
 # ─────────────────────────────────────────────────────────────────────────────
-OS_RELEASE="/etc/os-release"
+STARTUP_OS_RELEASE_PATH="${STARTUP_OS_RELEASE_PATH:-/etc/os-release}"
+STARTUP_TEST_MODE="${STARTUP_TEST_MODE:-}"
+
+case "$STARTUP_TEST_MODE" in
+  ""|dispatch-only|distro-only) ;;
+  *) fail "Invalid STARTUP_TEST_MODE='$STARTUP_TEST_MODE' (use: dispatch-only, distro-only)" ;;
+esac
+
+OS_RELEASE="$STARTUP_OS_RELEASE_PATH"
 [ -r "$OS_RELEASE" ] || fail "Cannot read $OS_RELEASE"
 
 # shellcheck disable=SC1091
@@ -111,6 +119,11 @@ esac
 info "Detected:  ${BOLD}${OS_PRETTY}${RESET}"
 info "Script:    $DISTRO_SCRIPT"
 
+if [[ "$STARTUP_TEST_MODE" == "dispatch-only" ]]; then
+  ok "Dispatch-only test mode complete."
+  exit 0
+fi
+
 # ─────────────────────────────────────────────────────────────────────────────
 # PART 1 — Run distro-specific driver
 # ─────────────────────────────────────────────────────────────────────────────
@@ -119,6 +132,11 @@ step "Running distro driver: $(basename "$DISTRO_SCRIPT")"
 # Distro driver requires root for package installation, firmware, etc.
 sudo /usr/bin/env bash "$DISTRO_SCRIPT" "$@"
 ok "Distro driver finished."
+
+if [[ "$STARTUP_TEST_MODE" == "distro-only" ]]; then
+  ok "Distro-only test mode complete."
+  exit 0
+fi
 
 # ─────────────────────────────────────────────────────────────────────────────
 # PART 2 — Install Nix (Determinate Systems, no-confirm = fully non-interactive)

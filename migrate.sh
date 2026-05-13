@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 nix flake update nixpkgs
 
 nix run nixpkgs#nixfmt -- .

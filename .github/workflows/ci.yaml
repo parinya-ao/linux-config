@@ -45,7 +45,7 @@ jobs:
       - uses: ludeeus/action-shellcheck@2.0.0
         with:
           scandir: "./"
-          severity: warning
+          severity: error
           ignore_paths: ".git"
 
   # ─── ด่าน 2: Nix Lint + Format + Build ──────────────
@@ -81,7 +81,7 @@ jobs:
 
       # ── Fail Fast: Lint ก่อน Build (เร็วกว่า build) ──
       - name: Format check (nixfmt)
-        run: nix fmt -- --check
+        run: nix fmt -- --ci
 
       - name: Lint anti-patterns (statix)
         run: nix run nixpkgs#statix -- check .

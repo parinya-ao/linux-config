@@ -7,7 +7,7 @@ This section provides a high-level overview of the project's directory and file 
 /home/parinya/.config/home-manager/
 ├── distro/               # Distribution-specific driver scripts (Imperative Layer)
 │   ├── fedora/           # Fedora-specific setup and services
-│   ├── opensuse/         # openSUSE/Tumbleweed setup
+│   ├── opensuse/         # openSUSE driver + host modules (snapper/repos/drivers/docker)
 │   └── ubuntu/           # Ubuntu/Debian family setup
 ├── modules/              # Nix/Home Manager modules (Declarative Layer)
 │   ├── packages/         # Lists of Nix packages by category (ai, cli, dev, etc.)

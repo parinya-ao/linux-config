@@ -1,7 +1,6 @@
 {
   config,
   lib,
-  pkgs,
   ...
 }:
 let
@@ -67,9 +66,11 @@ in
         maintenance.auto = true;
         help.autocorrect = 10;
 
-        diff.algorithm = "histogram";
-        diff.colorMoved = "default";
-        diff.colorMovedWS = "allow-indentation-change";
+        diff = {
+          algorithm = "histogram";
+          colorMoved = "default";
+          colorMovedWS = "allow-indentation-change";
+        };
       };
     };
   };

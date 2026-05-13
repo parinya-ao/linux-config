@@ -24,11 +24,8 @@
   # Entry point that processes inputs and defines system configurations.
   outputs =
     {
-      self,
       nixpkgs,
       home-manager,
-      claude-code,
-      claude-desktop,
       ...
     }@inputs:
     let

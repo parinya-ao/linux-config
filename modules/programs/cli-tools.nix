@@ -38,92 +38,94 @@ in
       nvd # nix diff between generations
     ];
 
-    # eza (ls replacement)
-    programs.eza = {
-      enable = true;
-      enableFishIntegration = true;
-      enableBashIntegration = true;
-      icons = "auto";
-      git = true; # show git status in ls
-      extraOptions = [
-        "--group-directories-first"
-        "--header"
-        "--classify"
-      ];
-    };
-
-    # bat (cat replacement)
-    programs.bat = {
-      enable = true;
-      config = {
-        theme = "TwoDark";
-        style = "full";
-        map-syntax = [
-          "*.nix:Nix"
-          "*.fish:fish"
+    programs = {
+      # eza (ls replacement)
+      eza = {
+        enable = true;
+        enableFishIntegration = true;
+        enableBashIntegration = true;
+        icons = "auto";
+        git = true; # show git status in ls
+        extraOptions = [
+          "--group-directories-first"
+          "--header"
+          "--classify"
         ];
       };
-      extraPackages = with pkgs.bat-extras; [
-        batdiff # bat-powered git diff
-        batman # bat-powered man pages
-        batgrep # bat + ripgrep
-        batwatch # bat + watch
-      ];
-    };
 
-    # direnv
-    programs.direnv = {
-      enable = true;
-      nix-direnv.enable = true;
-      config = {
-        global = {
-          warn_timeout = "5s";
-          load_dotenv = true;
+      # bat (cat replacement)
+      bat = {
+        enable = true;
+        config = {
+          theme = "TwoDark";
+          style = "full";
+          map-syntax = [
+            "*.nix:Nix"
+            "*.fish:fish"
+          ];
+        };
+        extraPackages = with pkgs.bat-extras; [
+          batdiff # bat-powered git diff
+          batman # bat-powered man pages
+          batgrep # bat + ripgrep
+          batwatch # bat + watch
+        ];
+      };
+
+      # direnv
+      direnv = {
+        enable = true;
+        nix-direnv.enable = true;
+        config = {
+          global = {
+            warn_timeout = "5s";
+            load_dotenv = true;
+          };
         };
       };
-    };
 
-    # fzf (fuzzy finder)
-    programs.fzf = {
-      enable = true;
-      enableFishIntegration = true;
-      enableBashIntegration = true;
-      defaultCommand = "fd --type f --hidden --follow --exclude .git";
-      defaultOptions = [
-        "--height 40%"
-        "--layout=reverse"
-        "--border"
-        "--info=inline"
-      ];
-      fileWidgetCommand = "fd --type f --hidden --follow --exclude .git";
-      fileWidgetOptions = [ "--preview 'bat --color=always --style=numbers {}'" ];
-      changeDirWidgetCommand = "fd --type d --hidden --follow --exclude .git";
-      historyWidgetOptions = [
-        "--sort"
-        "--exact"
-      ];
-      colors = {
-        fg = "#cdd6f4";
-        "fg+" = "#cdd6f4";
-        bg = "#1e1e2e";
-        "bg+" = "#313244";
-        hl = "#f38ba8";
-        "hl+" = "#f38ba8";
-        info = "#cba6f7";
-        prompt = "#cba6f7";
-        pointer = "#f5e0dc";
-        marker = "#f5e0dc";
-        spinner = "#f5e0dc";
-        header = "#f38ba8";
+      # fzf (fuzzy finder)
+      fzf = {
+        enable = true;
+        enableFishIntegration = true;
+        enableBashIntegration = true;
+        defaultCommand = "fd --type f --hidden --follow --exclude .git";
+        defaultOptions = [
+          "--height 40%"
+          "--layout=reverse"
+          "--border"
+          "--info=inline"
+        ];
+        fileWidgetCommand = "fd --type f --hidden --follow --exclude .git";
+        fileWidgetOptions = [ "--preview 'bat --color=always --style=numbers {}'" ];
+        changeDirWidgetCommand = "fd --type d --hidden --follow --exclude .git";
+        historyWidgetOptions = [
+          "--sort"
+          "--exact"
+        ];
+        colors = {
+          fg = "#cdd6f4";
+          "fg+" = "#cdd6f4";
+          bg = "#1e1e2e";
+          "bg+" = "#313244";
+          hl = "#f38ba8";
+          "hl+" = "#f38ba8";
+          info = "#cba6f7";
+          prompt = "#cba6f7";
+          pointer = "#f5e0dc";
+          marker = "#f5e0dc";
+          spinner = "#f5e0dc";
+          header = "#f38ba8";
+        };
       };
-    };
 
-    # zoxide
-    programs.zoxide = {
-      enable = true;
-      enableFishIntegration = true;
-      enableBashIntegration = true;
-      options = [ "--cmd z" ]; # keep z command name
+      # zoxide
+      zoxide = {
+        enable = true;
+        enableFishIntegration = true;
+        enableBashIntegration = true;
+        options = [ "--cmd z" ]; # keep z command name
+      };
     };
   };
 }
