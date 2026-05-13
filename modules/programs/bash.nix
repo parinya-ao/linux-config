@@ -7,6 +7,7 @@
 
 let
   cfg = config.my.programs.bash;
+  sharedAliases = import ../shared/aliases.nix;
 in
 {
   options.my.programs.bash = {
@@ -17,31 +18,9 @@ in
     programs.bash = {
       enable = true;
 
-      shellAliases = {
-        ls = "eza --icons=auto --group-directories-first";
-        ll = "eza -lhF --icons=auto --git --group-directories-first";
-        la = "eza -lahF --icons=auto --git";
-        lt = "eza --tree --level=2 --icons=auto";
-        cat = "bat --style=full";
-        find = "fd";
+      shellAliases = sharedAliases // {
+        # Preserve bash-specific grep coloring
         grep = "rg --color=auto --smart-case";
-        sed = "sd";
-        awk = "choose";
-        cut = "choose";
-        diff = "delta";
-        man = "batman";
-        tree = "eza --tree";
-        curl = "xh";
-        df = "duf";
-        du = "dust";
-        ps = "procs";
-        top = "btm";
-        htop = "btm";
-        ping = "gping";
-        cd = "z";
-        ".." = "z ..";
-        "..." = "z ../..";
-        ".4" = "z ../../..";
       };
 
       initExtra = ''
