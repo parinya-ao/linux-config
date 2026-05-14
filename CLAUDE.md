@@ -1,29 +1,36 @@
 # CLAUDE.md — Agent Onboarding
 
-## 📋 Project Overview
-`linux-config` is a declarative, cross-distribution Linux environment manager using **Nix Flakes** and **Home Manager**. It automates system setup from a fresh install to a fully configured dev environment.
+## 📋 Project Purpose (WHY)
+`linux-config` is a declarative environment manager that automates the transition from a fresh Linux install to a fully configured workstation. It aims for **reproducibility** across distributions (Ubuntu, Fedora, openSUSE) using Nix.
 
-## 🚀 Key Commands
-- **Apply Config:** `home-manager switch --flake .#parinya`
+## 🏗️ Tech Stack & Structure (WHAT)
+- **Core:** Nix Flakes & Home Manager.
+- **Entry Points:** `startup.sh` (Initial bootstrap), `home.nix` (User config).
+- **Modules (`modules/`):**
+    - `suites.nix`: High-level feature toggles (`my.suites.base`, `development`, `ai`, `desktop`).
+    - `packages/`: Nix package lists categorized by purpose.
+    - `programs/`: Tool-specific configurations (Fish, Git, Neovim, etc.).
+- **Drivers (`distro/`):** Imperative Bash scripts for OS-specific preparation.
+
+## 🚀 Working on the Project (HOW)
+
+### Key Commands
+- **Apply Changes:** `home-manager switch --flake .#parinya`
 - **Update Dependencies:** `nix flake update`
-- **Format Nix Code:** `nix fmt`
-- **Bootstrap System:** `bash startup.sh`
-- **Check Generations:** `home-manager generations`
-- **Rollback:** `home-manager switch --flake . --switch-generation <N>`
+- **Bootstrap System:** `bash startup.sh` (Use on new systems)
 
-## 🛠 Development Patterns
-- **User Identity:** Defaults to `parinya`.
-- **Modular Config:** 
-    - Package lists go in `modules/packages/*.nix`.
-    - Tool configs go in `modules/programs/*.nix`.
-    - High-level toggles are managed via `my.suites` in `home.nix`.
-- **Shells:** 
-    - `startup.sh` and `distro/` use **Bash** (imperative).
-    - Interactive environment is **Fish** (declarative config in `modules/programs/fish.nix`).
+### Verification & Linting
+- **Format Code:** `nix fmt` (Always run before committing).
+- **Dry Run:** `home-manager build --flake .#parinya` (Verifies Nix syntax and evaluation).
+- **Check State:** `home-manager generations`
+
+### Development Patterns
+- **User Identity:** Hardcoded to `parinya`.
+- **Modular Edits:** Add packages to `modules/packages/` and configurations to `modules/programs/`.
+- **Suite-First:** Favor enabling/disabling suites in `home.nix` rather than manual package additions.
 
 ## 📚 Progressive Disclosure
-For deeper technical understanding, read these files:
-- `ARCHITECTURE.md`: High-level system design and file mapping.
-- `GEMINI.md`: Comprehensive instructional context for AI agents.
-- `QUICK_REFERENCE.md`: Troubleshooting and common command lists.
-- `modules/suites.nix`: Logic for the suite-based configuration system.
+Refer to these files for specialized context:
+- `ARCHITECTURE.md`: Deep dive into file mapping and system data flow.
+- `GEMINI.md`: Detailed instructions for AI agents (strategic guidance).
+- `modules/suites.nix`: Implementation logic for the suite system.

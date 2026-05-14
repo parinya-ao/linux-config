@@ -4,6 +4,8 @@ This repository provides a declarative, cross-distribution development environme
 
 ## 🏗️ Architecture & Core Technologies
 
+For a detailed architectural deep dive, see **[ARCHITECTURE.md](./ARCHITECTURE.md)**.
+
 - **Nix Flakes**: Manages reproducible dependencies and system state.
 - **Home Manager**: Manages user-specific configurations, dotfiles, and packages.
 - **Bootstrap Engine**: `startup.sh` detects the distribution and dispatches to specific drivers in `distro/` (Ubuntu/Debian, Fedora, openSUSE).
@@ -41,7 +43,7 @@ home-manager generations
 
 ## 📂 Project Structure
 
-- `flake.nix`: The entry point for the Nix configuration.
+- `flake.nix`: The entry point for the Nix configuration (Dependencies & Outputs).
 - `home.nix`: Primary user configuration; defines active suites.
 - `modules/`:
     - `suites.nix`: Defines the `my.suites` options.
