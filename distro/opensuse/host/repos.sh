@@ -1,6 +1,22 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+step() {
+  if command -v gum >/dev/null 2>&1; then
+    gum style --foreground 39 --bold "PHASE START"
+  else
+    echo "PHASE START"
+  fi
+}
+
+ok() {
+  if command -v gum >/dev/null 2>&1; then
+    gum style --foreground 82 "PHASE SUCCESS"
+  else
+    echo "PHASE SUCCESS"
+  fi
+}
+
 as_root() {
   if [[ $EUID -eq 0 ]]; then
     "$@"
@@ -17,7 +33,7 @@ set_priority_if_exists() {
   fi
 }
 
-echo "==> Hardening Repositories..."
+step
 
 . /etc/os-release
 
@@ -31,25 +47,15 @@ else
 fi
 
 if ! zypper lr | grep -qiE "(^|[[:space:]|])packman([[:space:]|]|$)"; then
-  echo "  * Adding Packman Essentials..."
   as_root zypper --non-interactive ar -cfp 80 "$PACKMAN_URL" packman
 fi
 
 as_root zypper --non-interactive --gpg-auto-import-keys ref
 
-echo "  * Applying stable update strategy..."
 if [[ "${ID:-}" == "opensuse-leap" ]]; then
   as_root zypper --non-interactive up --no-recommends
 else
   as_root zypper --non-interactive dup --no-recommends --allow-vendor-change
 fi
 
-if [[ "${ID:-}" != "opensuse-slowroll" ]]; then
-  echo "  [INFO] For maximum stability, prefer openSUSE Slowroll."
-fi
-
-if command -v transactional-update >/dev/null 2>&1; then
-  echo "  [INFO] Optional immutable mode: transactional-update dup && reboot"
-fi
-
-echo "  [OK] Repositories are locked and ready."
+ok

@@ -19,11 +19,46 @@ RED=$'\033[1;31m'
 # ------------------------------------------
 # HELPERS
 # ------------------------------------------
-step() { echo -e "\n${BLUE}[STEP]${RESET} $*"; }
-ok()   { echo -e "${GREEN}[OK]${RESET} $*"; }
-warn() { echo -e "${YELLOW}[WARN]${RESET} $*"; }
-fail() { echo -e "${RED}[FAIL]${RESET} $*"; exit 1; }
-info() { echo -e "${YELLOW}[INFO]${RESET} $*"; }
+step() {
+  if command -v gum >/dev/null 2>&1; then
+    gum style --foreground 39 --bold "PHASE START"
+  else
+    echo "PHASE START"
+  fi
+}
+
+ok() {
+  if command -v gum >/dev/null 2>&1; then
+    gum style --foreground 82 "PHASE SUCCESS"
+  else
+    echo "PHASE SUCCESS"
+  fi
+}
+
+warn() {
+  if command -v gum >/dev/null 2>&1; then
+    gum style --foreground 227 "ATTENTION REQUIRED"
+  else
+    echo "ATTENTION REQUIRED"
+  fi
+}
+
+fail() {
+  if command -v gum >/dev/null 2>&1; then
+    gum style --foreground 196 --bold "CRITICAL ERROR"
+  else
+    echo "CRITICAL ERROR"
+  fi
+  exit 1
+}
+
+info() {
+  if command -v gum >/dev/null 2>&1; then
+    gum style --foreground 39 "STATUS UPDATE"
+  else
+    echo "STATUS UPDATE"
+  fi
+}
 
 SUDO="sudo"
 if [[ $EUID -eq 0 ]]; then
@@ -37,7 +72,7 @@ pkg_installed() {
 }
 
 skip() {
-  info "Skipping: $*"
+  info
 }
 
 roo_install() {
@@ -48,18 +83,12 @@ roo_install() {
 }
 
 do_reboot() {
-  echo ""
-  echo -e "${YELLOW}>>> REBOOT REQUIRED <<<${RESET}"
-  echo -e "    After reboot, run: ${BOLD}bash $0${RESET}"
-  echo ""
-  if [ -t 0 ]; then
-    read -rp "  Reboot now? [Y/n]: " _ans || true
-    _ans="${_ans:-y}"
-    [[ "${_ans,,}" == "y" ]] && $SUDO systemctl reboot
+  warn
+  if command -v gum >/dev/null 2>&1; then
+    gum style "REBOOT REQUIRED TO CONTINUE"
   else
-    warn "Non-interactive shell: skipping reboot prompt."
+    echo "REBOOT REQUIRED TO CONTINUE"
   fi
-  echo "  Run 'systemctl reboot' when ready."
   exit 0
 }
 

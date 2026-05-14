@@ -22,11 +22,46 @@ RED=$'\033[1;31m'
 # ------------------------------------------
 # HELPERS
 # ------------------------------------------
-step()  { echo -e "\n${BLUE}[STEP]${RESET} $*"; }
-ok()    { echo -e "${GREEN}[OK]${RESET} $*"; }
-warn()  { echo -e "${YELLOW}[WARN]${RESET} $*"; }
-fail()  { echo -e "${RED}[FAIL]${RESET} $*"; exit 1; }
-info()  { echo -e "${YELLOW}[INFO]${RESET} $*"; }
+step() {
+  if command -v gum >/dev/null 2>&1; then
+    gum style --foreground 39 --bold "PHASE START"
+  else
+    echo "PHASE START"
+  fi
+}
+
+ok() {
+  if command -v gum >/dev/null 2>&1; then
+    gum style --foreground 82 "PHASE SUCCESS"
+  else
+    echo "PHASE SUCCESS"
+  fi
+}
+
+warn() {
+  if command -v gum >/dev/null 2>&1; then
+    gum style --foreground 227 "ATTENTION REQUIRED"
+  else
+    echo "ATTENTION REQUIRED"
+  fi
+}
+
+fail() {
+  if command -v gum >/dev/null 2>&1; then
+    gum style --foreground 196 --bold "CRITICAL ERROR"
+  else
+    echo "CRITICAL ERROR"
+  fi
+  exit 1
+}
+
+info() {
+  if command -v gum >/dev/null 2>&1; then
+    gum style --foreground 39 "STATUS UPDATE"
+  else
+    echo "STATUS UPDATE"
+  fi
+}
 
 apt_install() {
   DEBIAN_FRONTEND=noninteractive apt-get install -y "$@" \
@@ -43,8 +78,7 @@ pkg_installed() {
 }
 
 skip() {
-  # Skip message
-  info "⊘ Skipping: $*"
+  info
 }
 
 # ------------------------------------------
