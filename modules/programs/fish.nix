@@ -74,7 +74,7 @@ in
         nix-clean = "nix-collect-garbage -d && sudo nix-collect-garbage -d";
         nix-update = "nix flake update";
         nix-rebuild = "sudo nixos-rebuild switch --flake .#";
-        hm-switch = "home-manager switch --flake .#";
+        hm-switch = "nix-audit-session";
       };
 
       functions = {

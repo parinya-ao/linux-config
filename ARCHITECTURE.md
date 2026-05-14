@@ -2,9 +2,10 @@
 This document serves as a critical, living template designed to equip agents with a rapid and comprehensive understanding of the codebase's architecture, enabling efficient navigation and effective contribution from day one. Update this document as the codebase evolves.
 
 ## 1. Project Structure
-This section provides a high-level overview of the project's directory and file structure. It is essential for quickly navigating the codebase and understanding the separation between the imperative bootstrap layer and the declarative configuration layer.
+This section provides a high-level overview of the project's directory and file structure, categorised by architectural layer or major functional area. It is essential for quickly navigating the codebase, locating relevant files, and understanding the overall organization and separation of concerns.
 
 /home/parinya/.config/home-manager/
+├── audit/                # Tetragon tracing policy + Vector pipeline templates
 ├── distro/               # Distribution-specific driver scripts (Imperative Layer)
 │   ├── fedora/           # Fedora-specific setup and services
 │   ├── opensuse/         # openSUSE driver + host modules (snapper/repos/drivers/docker)
@@ -37,69 +38,105 @@ The system operates in two distinct phases: **Bootstrap** (Shell) and **Configur
 
 ## 3. Core Components
 
-### 3.1. Bootstrap Engine (Imperative)
-Name: Universal Bootstrap (`startup.sh` + `distro/`)
-Description: Detects the host Linux distribution and prepares the environment for Nix. It handles root-level tasks like package manager updates, firmware installation, and the initial Nix/Home Manager installation.
-Technologies: Bash, `curl`, `git`, `sudo`.
-Deployment: Executed manually on a fresh OS install.
+### 3.1. Bootstrap Engine (Imperative Layer)
 
-### 3.2. Declarative Environment (Nix)
+Name: Universal Bootstrap Engine
+
+Description: Detects the host Linux distribution and prepares the environment for Nix. It handles root-level tasks like package manager updates, firmware installation, and the initial Nix/Home Manager installation. It bridges the gap between a vanilla OS and a Nix-enabled system.
+
+Technologies: Bash, `curl`, `git`, `sudo`, Distribution-specific package managers (`dnf`, `zypper`, `apt`).
+
+Deployment: Executed manually on a fresh OS install via `bash startup.sh`.
+
+### 3.2. Declarative Environment (Declarative Layer)
+
 Name: Home Manager Configuration
-Description: Defines the end-state of the user's home directory. It manages package installation, shell configuration, GNOME extensions, and tool-specific settings (dotfiles).
+
+Description: Defines the end-state of the user's home directory. It manages package installation, shell configuration, GNOME extensions, and tool-specific settings (dotfiles). It ensures reproducibility across different machines.
+
 Technologies: Nix (Flakes), Home Manager.
+
 Deployment: Managed via `home-manager switch --flake .#parinya`.
 
 ## 4. Data Stores
 
 ### 4.1. Nix Store
-Name: `/nix/store`
-Type: Content-addressable read-only filesystem.
-Purpose: Stores all packages and configuration files in isolation, preventing dependency conflicts.
+
+Name: Nix Store
+
+Type: Content-addressable read-only filesystem (`/nix/store`).
+
+Purpose: Stores all packages and configuration files in isolation, preventing dependency conflicts and ensuring that the environment is immutable and reproducible.
+
+Key Schemas/Collections: N/A (Filesystem-based)
 
 ### 4.2. HM Generations
+
 Name: Home Manager Generations
+
 Type: Symlink-based versioning.
-Purpose: Allows the user to roll back the entire environment to a previous known-good state.
+
+Purpose: Allows the user to roll back the entire environment to a previous known-good state. Each "switch" creates a new generation.
 
 ## 5. External Integrations / APIs
 
 Nixpkgs: The primary source for all software packages (Unstable branch).
+
 Home Manager Flake: Provides the framework for declarative user environments.
-Claude Flakes: Integrates `claude-code` and `claude-desktop` directly into the Nix environment via external flake inputs.
+
+Claude Flakes: Integrates `claude-code` and `claude-desktop` directly into the Nix environment via external flake inputs (`github:sadjow/claude-code-nix`, `github:aaddrick/claude-desktop-debian`).
 
 ## 6. Deployment & Infrastructure
 
 Cloud Provider: N/A (Local Workstation/Personal Linux Desktop)
-CI/CD Pipeline: Manual `nix flake update` and local verification.
-Monitoring: `btm` (Bottom), `vitals` (GNOME Extension) configured via Nix.
+
+Key Services Used: Systemd (for user services), GNOME (for desktop environment management).
+
+CI/CD Pipeline: Manual `nix flake update` and local verification. GitHub Actions and GitLab CI are used for linting and build verification.
+
+Monitoring & Logging: `btm` (Bottom), `vitals` (GNOME Extension), and optional Tetragon+Vector audit pipeline configured via Nix.
 
 ## 7. Security Considerations
 
-Authentication: Sudo is required only for the initial bootstrap phase. Subsequent configuration changes are performed by the user.
-Data Isolation: Nix ensures that system-wide packages and user-specific packages do not interfere.
-Reproducibility: Flake lockfiles ensure that the exact same versions of tools are installed across different machines.
+Authentication: Sudo is required only for the initial bootstrap phase. Subsequent configuration changes are performed by the user without root privileges.
+
+Authorization: Nix ensures that system-wide packages and user-specific packages do not interfere.
+
+Data Encryption: TLS is used for fetching packages from the Nix cache and GitHub.
+
+Key Security Tools/Practices: Reproducibility ensures that the exact same code is running across environments.
 
 ## 8. Development & Testing Environment
 
-Local Setup Instructions: `bash startup.sh`
-Code Quality Tools: `nixfmt` (configured via `nix fmt`) for Nix files, `shellcheck` for driver scripts.
+Local Setup Instructions: `bash startup.sh` followed by `home-manager switch --flake .`.
+
+Testing Frameworks: Shellcheck for driver scripts.
+
+Code Quality Tools: `nixfmt` (configured via `nix fmt`) for Nix files.
 
 ## 9. Future Considerations / Roadmap
+
 - Implementation of `sops-nix` or `age` for secret management.
 - Formalizing the `steps/` directory to replace monolith distro scripts.
 - Supporting dynamic usernames (currently hardcoded to `parinya`).
+- **Native Docker installation for each distribution (work in progress).**
 
 ## 10. Project Identification
 
 Project Name: linux-config
+
 Repository URL: https://github.com/parinya-ao/linux-config
+
 Primary Contact/Team: parinya-ao
-Date of Last Update: 2026-05-10
+
+Date of Last Update: 2026-05-14
 
 ## 11. Glossary / Acronyms
 
 Nix: A purely functional package manager.
+
 Flake: A hermetic, reproducible Nix project format.
-Home Manager: A Nix-based system for managing user environments.
-HM: Short for Home Manager.
+
+Home Manager (HM): A Nix-based system for managing user environments.
+
 Generation: A specific versioned state of the user environment.

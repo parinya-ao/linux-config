@@ -4,6 +4,7 @@
   imports = [
     ./suites.nix
     ./packages/ai.nix
+    ./packages/audit.nix
     ./packages/cli.nix
     ./packages/dev.nix
     ./packages/docs.nix

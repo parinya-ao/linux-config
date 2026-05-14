@@ -18,6 +18,7 @@
     base.enable = true;
     development.enable = true;
     ai.enable = true;
+    audit.enable = true;
     desktop.enable = true;
   };
 

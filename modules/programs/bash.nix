@@ -21,6 +21,7 @@ in
       shellAliases = sharedAliases // {
         # Preserve bash-specific grep coloring
         grep = "rg --color=auto --smart-case";
+        hm-switch = "nix-audit-session";
       };
 
       initExtra = ''

@@ -1,0 +1,46 @@
+[sources.tetragon_raw]
+type = "file"
+include = ["/home/parinya/.local/state/nix-audit/tetragon_raw.json"]
+read_from = "beginning"
+
+[transforms.parse_tetragon_json]
+type = "remap"
+inputs = ["tetragon_raw"]
+source = """
+parsed, err = parse_json(.message)
+if err != null {
+  abort
+}
+. = parsed
+"""
+
+[transforms.filter_nix_events]
+type = "filter"
+inputs = ["parse_tetragon_json"]
+condition = """
+exists(.process.binary) &&
+(
+  includes(string!(.process.binary), "/nix/store/") ||
+  includes(string!(.process.binary), "nix-daemon")
+)
+"""
+
+[transforms.compact_nix_events]
+type = "remap"
+inputs = ["filter_nix_events"]
+source = """
+. = {
+  "t": .time ?? null,
+  "op": .action ?? .event_type ?? "UNKNOWN",
+  "p": .process.binary ?? null,
+  "a": .process.arguments ?? [],
+  "e": .process.exit_code ?? null,
+  "f": .file.path ?? null
+}
+"""
+
+[sinks.clean_audit_log]
+type = "file"
+inputs = ["compact_nix_events"]
+path = "/home/parinya/.local/state/nix-audit/nix_audit_clean.json"
+encoding.codec = "json"

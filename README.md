@@ -71,6 +71,21 @@ nix flake update
 home-manager switch --flake ~/.config/home-manager
 ```
 
+### Run Nix Audit Session (Tetragon + Vector)
+```bash
+# Optional: apply tracing policy in a Kubernetes/Tetragon environment
+nix-audit-apply-policy
+
+# Auto-audit Home Manager switch
+nix-audit-session
+
+# Or run any provisioning command with audit capture
+nix-audit-session -- home-manager switch --flake ~/.config/home-manager
+```
+
+Audit logs are automatically compacted and rotated at 10MB in:
+`~/.local/state/nix-audit/`
+
 ### Rollback
 ```bash
 # List generations
@@ -106,5 +121,5 @@ This is a personal configuration tailored for my workflow, but feel free to fork
 Distributed under the MIT License. See `LICENSE` for more information (Placeholder).
 
 ---
-**Last Updated:** 2026-05-10
+**Last Updated:** 2026-05-14
 **Tested On:** Ubuntu 24.04 LTS, Fedora 41, openSUSE Tumbleweed

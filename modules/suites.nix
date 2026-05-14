@@ -8,6 +8,7 @@ in
     base.enable = lib.mkEnableOption "Base CLI & Shell tools";
     development.enable = lib.mkEnableOption "Development tools (Editor, Git, compilers)";
     ai.enable = lib.mkEnableOption "AI Tools & CLIs";
+    audit.enable = lib.mkEnableOption "Audit policy and log pipeline for Nix activity";
     desktop.enable = lib.mkEnableOption "GNOME Desktop & GUI apps";
   };
 
@@ -38,6 +39,11 @@ in
     # AI Suite
     (lib.mkIf cfg.ai.enable {
       my.packages.ai.enable = true;
+    })
+
+    # Audit Suite
+    (lib.mkIf cfg.audit.enable {
+      my.packages.audit.enable = true;
     })
 
     # Desktop Suite
