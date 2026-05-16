@@ -24,7 +24,7 @@ in
 
       initExtra = ''
         # Add local binary path to PATH
-        export PATH="$HOME/.nix-profile/bin:$PATH"
+        export PATH="$HOME/.local/bin:$HOME/.nix-profile/bin:$PATH"
 
         # Configure shell history for performance and deduplication
         export HISTSIZE=100000

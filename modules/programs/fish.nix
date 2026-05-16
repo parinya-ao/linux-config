@@ -16,6 +16,7 @@ in
 
       interactiveShellInit = ''
         # PATH
+        fish_add_path $HOME/.local/bin
         fish_add_path $HOME/.nix-profile/bin
 
         # Suppress greeting
