@@ -2,6 +2,14 @@
 set -euo pipefail
 source "${BASH_SOURCE[0]%/*}/../../../lib/ui.sh"
 
+as_root() {
+  if [[ $EUID -eq 0 ]]; then
+    "$@"
+  else
+    sudo "$@"
+  fi
+}
+
 # ⚡ เปิด parallel download สำหรับ zypper
 ZYPP_CONF="/etc/zypp/zypp.conf"
 if ! grep -q "^download.max_concurrent_connections" "$ZYPP_CONF" 2>/dev/null; then
@@ -14,14 +22,6 @@ download.max_download_speed = 0
 download.max_silent_tries = 3
 EOF
 fi
-
-as_root() {
-  if [[ $EUID -eq 0 ]]; then
-    "$@"
-  else
-    sudo "$@"
-  fi
-}
 
 set_priority_if_exists() {
   local alias_name="$1"
