@@ -2,6 +2,15 @@
   # Description of the flake's purpose.
   description = "Home Manager configuration for user 'parinya' using Nix Flakes.";
 
+  nixConfig = {
+    extra-substituters = [
+      "https://linux-config.cachix.org"
+    ];
+    extra-trusted-public-keys = [
+      "linux-config.cachix.org-1:j+8u5q73J4YF+11JbK9s8Y8mK4aJp/qC6zL2R0hK1xU="
+    ];
+  };
+
   # External dependencies for this configuration.
   inputs = {
     # Main NixOS package repository (unstable branch for latest versions).
