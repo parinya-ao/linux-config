@@ -305,6 +305,11 @@ spin_run "Applying home manager flake" \
   ' sh "$TARGET_DIR"
 ok
 
+step
+spin_run "Configuring Flatpak applications" \
+  "${USER_CMD[@]}" sh -c 'bash "$1/flatpak/main.sh"' sh "$TARGET_DIR"
+ok
+
 STARTUP_CLEAR_FINAL="${STARTUP_CLEAR_FINAL:-0}"
 if [[ "$STARTUP_CLEAR_FINAL" == "1" ]]; then
   clear
