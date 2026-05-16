@@ -155,9 +155,9 @@ in
             style = "bold purple";
           };
           git_status = {
-            ahead = "⇡${count}";
-            behind = "⇣${count}";
-            diverged = "⇕⇡${ahead_count}⇣${behind_count}";
+            ahead = "⇡\${count}";
+            behind = "⇣\${count}";
+            diverged = "⇕⇡\${ahead_count}⇣\${behind_count}";
             modified = "!";
             staged = "+";
             untracked = "?";
