@@ -13,6 +13,7 @@ programs=(
   io.dbeaver.DBeaverCommunity
   com.usebottles.bottles
   org.gaphor.Gaphor
+  io.ente.auth
 )
 
 flatpak install --user "${programs[@]}" -y
