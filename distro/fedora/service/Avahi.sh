@@ -1,9 +1,6 @@
 #!/bin/bash
 set -euo pipefail
 
-#!/bin/bash
-set -euo pipefail
-
 # ------------------------------------------
 # UI HELPERS
 # ------------------------------------------

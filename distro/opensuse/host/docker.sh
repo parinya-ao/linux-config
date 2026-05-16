@@ -2,14 +2,7 @@
 set -euo pipefail
 source "${BASH_SOURCE[0]%/*}/../../../lib/ui.sh"
 source "${BASH_SOURCE[0]%/*}/../../../lib/docker.sh"
-
-as_root() {
-  if [[ $EUID -eq 0 ]]; then
-    "$@"
-  else
-    sudo "$@"
-  fi
-}
+source "${BASH_SOURCE[0]%/*}/../../../lib/privilege.sh"
 
 step "Installing Docker Engine"
 

@@ -96,10 +96,20 @@ in
           '';
         };
 
-        # Quick nix shell
+        # nix-powered branch switcher
         ns = {
           description = "nix-shell with package";
           body = "nix shell nixpkgs#$argv[1]";
+        };
+
+        # Migration helper
+        migrate = {
+          description = "Update nixpkgs, format, and rebuild";
+          body = ''
+            nix flake update nixpkgs
+            nix run nixpkgs#nixfmt -- .
+            home-manager switch --flake . -b backup
+          '';
         };
       };
     };

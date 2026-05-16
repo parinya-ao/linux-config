@@ -1,43 +1,69 @@
 #!/usr/bin/env bash
-set -euo pipefail
+# =============================================================================
+# clean.sh — Universal System Cleanup & Optimization
+# =============================================================================
+set -Eeuo pipefail
 
-echo "🧹 Full system cleanup starting..."
+SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SELF_DIR/lib/ui.sh"
+source "$SELF_DIR/lib/privilege.sh"
 
-# ── Nix cleanup ────────────────────────────────────────
-echo "[1/7] Removing old Home Manager generations..."
-nix-collect-garbage -d
-sudo nix-collect-garbage -d
+step "Starting full system cleanup..."
 
-echo "[2/7] Optimizing Nix store (hardlink duplicates)..."
-nix store optimise
+# ── 1. Nix Cleanup ────────────────────────────────────
+status_line "Removing old Home Manager generations..."
+nix-collect-garbage -d 2>/dev/null || true
+as_root nix-collect-garbage -d 2>/dev/null || true
 
-echo "[3/7] Removing Nix build leftovers..."
+status_line "Optimizing Nix store (hardlink duplicates)..."
+nix store optimise 2>/dev/null || true
+
+status_line "Removing Nix build leftovers..."
 rm -rf ~/.cache/nix/ 2>/dev/null || true
-rm -rf /tmp/nix-* 2>/dev/null || true
+as_root rm -rf /tmp/nix-* /tmp/home-manager-* 2>/dev/null || true
 
-# ── System cleanup ─────────────────────────────────────
-echo "[4/7] Cleaning zypper package cache..."
-sudo zypper clean --all 2>/dev/null || true
-
-echo "[5/7] Purging old kernels..."
-sudo zypper purge-kernels 2>/dev/null || true
-
-echo "[6/7] Trimming journal logs (keep 1 day)..."
-sudo journalctl --vacuum-time=1d 2>/dev/null || true
-
-echo "[7/7] Cleaning Snapper snapshots..."
-if command -v snapper >/dev/null 2>&1; then
-    sudo snapper -c root cleanup number 2>/dev/null || true
+# ── 2. Distribution Specific ──────────────────────────
+if [[ -f /etc/os-release ]]; then
+  source /etc/os-release
+  case "${ID:-}" in
+    ubuntu|debian)
+      status_line "Cleaning apt cache..."
+      as_root apt-get autoremove -y 2>/dev/null || true
+      as_root apt-get clean 2>/dev/null || true
+      ;;
+    fedora)
+      status_line "Cleaning dnf cache..."
+      as_root dnf autoremove -y 2>/dev/null || true
+      as_root dnf clean all 2>/dev/null || true
+      ;;
+    opensuse*|suse)
+      status_line "Cleaning zypper cache..."
+      as_root zypper clean --all 2>/dev/null || true
+      as_root zypper purge-kernels 2>/dev/null || true
+      ;;
+  esac
 fi
 
-# ── Report ─────────────────────────────────────────────
+# ── 3. Logs & Snapshots ──────────────────────────────
+status_line "Trimming journal logs (keep 1 day)..."
+as_root journalctl --vacuum-time=1d 2>/dev/null || true
+
+if command -v snapper >/dev/null 2>&1; then
+  status_line "Cleaning Snapper snapshots..."
+  as_root snapper -c root cleanup number 2>/dev/null || true
+fi
+
+# ── 4. Disk Usage Report ──────────────────────────────
 echo ""
 echo "═══════════════════════════════════════"
 echo "📊 Disk Usage Report"
 echo "═══════════════════════════════════════"
-echo "Nix store:  $(du -sh /nix/store 2>/dev/null | cut -f1)"
-echo "zypper cache: $(du -sh /var/cache/zypp 2>/dev/null | cut -f1)"
-echo "Journal:    $(journalctl --disk-usage 2>/dev/null | grep -oP '[\d.]+\s*\w+')"
-echo "Root free:  $(df -h / | awk 'NR==2{print $4}')"
+echo "Nix store:    $(du -sh /nix/store 2>/dev/null | cut -f1 || echo "N/A")"
+if [[ -d /var/cache/zypp ]]; then
+  echo "zypper cache: $(du -sh /var/cache/zypp 2>/dev/null | cut -f1 || echo "0")"
+fi
+echo "Journal:      $(journalctl --disk-usage 2>/dev/null | grep -oP '[\d.]+\s*\w+' | head -1 || echo "N/A")"
+echo "Root free:    $(df -h / | awk 'NR==2{print $4}')"
 echo "═══════════════════════════════════════"
-echo "✅ Cleanup complete!"
+
+ok "Cleanup complete!"

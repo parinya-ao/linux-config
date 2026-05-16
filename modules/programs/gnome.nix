@@ -220,9 +220,6 @@ in
         # ★ Screenshot Portal: Utilizes the Wayland-native GNOME 42+ built-in
         #   screenshot UI instead of the legacy 'gnome-screenshot' tool.
         #   Mapping is handled in §6.3 via 'org/gnome/shell/keybindings'.
-        #   These legacy keys are cleared to prevent conflicts.
-        screenshot = [ ];
-        area-screenshot = [ ];
       };
 
       # Terminal: Ctrl+Alt+T (universal standard).
@@ -281,33 +278,7 @@ in
         cycle-windows = [ "<Super>grave" ]; # Super+Grave (Backtick).
         cycle-windows-backward = [ "<Super><Shift>grave" ];
 
-        # ── Workspace Switching (Cleared for single workspace setup) ────────────
-        switch-to-workspace-1 = [ ];
-        switch-to-workspace-2 = [ ];
-        switch-to-workspace-3 = [ ];
-        switch-to-workspace-4 = [ ];
-        switch-to-workspace-5 = [ ];
-        switch-to-workspace-6 = [ ];
-        switch-to-workspace-last = [ ];
-        switch-to-workspace-left = [ ];
-        switch-to-workspace-right = [ ];
-        switch-to-workspace-up = [ ];
-        switch-to-workspace-down = [ ];
-
-        move-to-workspace-1 = [ ];
-        move-to-workspace-2 = [ ];
-        move-to-workspace-3 = [ ];
-        move-to-workspace-4 = [ ];
-        move-to-workspace-5 = [ ];
-        move-to-workspace-6 = [ ];
-        move-to-workspace-last = [ ];
-        move-to-workspace-left = [ ];
-        move-to-workspace-right = [ ];
-        move-to-workspace-up = [ ];
-        move-to-workspace-down = [ ];
-
         # ── Miscellaneous ───────────────────────────────────────────────────────
-        panel-main-menu = [ ]; # Disables Super+F1 to prevent overlap.
         panel-run-dialog = [ "<Alt>F2" ]; # Alt+F2: Run command dialog.
         begin-move = [ "<Alt>F7" ]; # Initiates window movement via keyboard.
         begin-resize = [ "<Alt>F8" ]; # Initiates window resizing via keyboard.
@@ -338,10 +309,6 @@ in
 
         # Notification panel focus.
         focus-active-notification = [ "<Super>n" ];
-
-        # Disables unnecessary shortcuts to prevent conflicts.
-        toggle-message-tray = [ ];
-        open-new-window-shortcut-0 = [ ];
       };
 
       # ════════════════════════════════════════════════════════════════════════════

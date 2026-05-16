@@ -6,49 +6,11 @@ set -Eeuo pipefail
 umask 022
 
 # ------------------------------------------
-# UI HELPERS
+# LIBRARIES & HELPERS
 # ------------------------------------------
-# Local minimal definitions before lib/ui.sh is available
-step() {
-  if command -v gum >/dev/null 2>&1; then
-    gum style --foreground 39 --bold "[STEP] $*"
-  else
-    printf '\e[34;1m[STEP] %s\e[0m\n' "$*"
-  fi
-}
-
-ok() {
-  if command -v gum >/dev/null 2>&1; then
-    gum style --foreground 82 "[OK] $*"
-  else
-    printf '\e[32m[OK] %s\e[0m\n' "$*"
-  fi
-}
-
-warn() {
-  if command -v gum >/dev/null 2>&1; then
-    gum style --foreground 227 "[WARN] $*" >&2
-  else
-    printf '\e[33m[WARN] %s\e[0m\n' "$*" >&2
-  fi
-}
-
-fail() {
-  if command -v gum >/dev/null 2>&1; then
-    gum style --foreground 196 --bold "[FAIL] $*" >&2
-  else
-    printf '\e[31;1m[FAIL] %s\e[0m\n' "$*" >&2
-  fi
-  exit 1
-}
-
-status_line() {
-  if command -v gum >/dev/null 2>&1; then
-    gum style "$*"
-  else
-    printf '%s\n' "$*"
-  fi
-}
+SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SELF_DIR/lib/ui.sh"
+source "$SELF_DIR/lib/privilege.sh"
 
 spin_run() {
   local title="$1"
@@ -61,7 +23,7 @@ spin_run() {
 }
 
 need_cmd() {
-  command -v "$1" >/dev/null 2>&1 || fail
+  command -v "$1" >/dev/null 2>&1 || fail "Command not found: $1"
 }
 
 resolve_self_dir() {
@@ -79,14 +41,6 @@ is_atomic() {
   command -v rpm-ostree >/dev/null 2>&1 || return 1
   rpm-ostree status >/dev/null 2>&1 || return 1
   return 0
-}
-
-run_privileged() {
-  if [[ $EUID -eq 0 ]]; then
-    "$@"
-  else
-    sudo "$@"
-  fi
 }
 
 start_sudo_keepalive() {
@@ -112,14 +66,14 @@ stop_sudo_keepalive() {
 install_gum() {
   case "$1" in
     ubuntu)
-      run_privileged env DEBIAN_FRONTEND=noninteractive apt-get update -y
-      run_privileged env DEBIAN_FRONTEND=noninteractive apt-get install -y gum
+      as_root env DEBIAN_FRONTEND=noninteractive apt-get update -y
+      as_root env DEBIAN_FRONTEND=noninteractive apt-get install -y gum
       ;;
     fedora)
-      run_privileged dnf install -y gum
+      as_root dnf install -y gum
       ;;
     opensuse)
-      run_privileged zypper --non-interactive -y in --no-recommends gum
+      as_root zypper --non-interactive -y in --no-recommends gum
       ;;
     *)
       return 1
@@ -266,7 +220,7 @@ NIX_CONF="/etc/nix/nix.conf"
 if ! grep -q "auto-optimise-store" "$NIX_CONF" 2>/dev/null; then
     step
     status_line "Optimizing Nix configuration"
-    run_privileged tee -a "$NIX_CONF" > /dev/null <<'EOF'
+    as_root tee -a "$NIX_CONF" > /dev/null <<'EOF'
 
 # Disk optimization
 auto-optimise-store = true
@@ -328,43 +282,7 @@ ok
 # ═══════════════════════════════════════════════════════
 # PHASE: Post-install Cleanup & Optimization
 # ═══════════════════════════════════════════════════════
-step
-status_line "Cleaning up and optimizing disk space"
-
-# ── 1. Distribution specific cleanup ─────────────────
-case "$DISTRO_FAMILY" in
-  ubuntu)
-    run_privileged apt-get autoremove -y 2>/dev/null || true
-    run_privileged apt-get clean 2>/dev/null || true
-    ;;
-  fedora)
-    run_privileged dnf autoremove -y 2>/dev/null || true
-    run_privileged dnf clean all 2>/dev/null || true
-    ;;
-  opensuse)
-    run_privileged zypper clean --all 2>/dev/null || true
-    run_privileged zypper purge-kernels 2>/dev/null || true
-    ;;
-esac
-
-# ── 2. Nix: ลบ old generations (เก็บแค่ current) ──────
-"${USER_CMD[@]}" nix-collect-garbage -d 2>/dev/null || true
-run_privileged nix-collect-garbage -d 2>/dev/null || true
-
-# ── 4. Nix: optimize store (hardlink duplicate files) ──
-"${USER_CMD[@]}" nix store optimise 2>/dev/null || true
-
-# ── 5. Journal logs: เก็บแค่ 1 วัน ────────────────────
-run_privileged journalctl --vacuum-time=1d 2>/dev/null || true
-
-# ── 6. tmp cleanup ────────────────────────────────────
-run_privileged rm -rf /tmp/nix-* /tmp/home-manager-* 2>/dev/null || true
-
-# ── 7. Snapper: cleanup old snapshots ─────────────────
-if command -v snapper >/dev/null 2>&1; then
-    run_privileged snapper -c root cleanup number 2>/dev/null || true
-fi
-ok
+bash "$SELF_DIR/clean.sh"
 
 STARTUP_CLEAR_FINAL="${STARTUP_CLEAR_FINAL:-0}"
 if [[ "$STARTUP_CLEAR_FINAL" == "1" ]]; then

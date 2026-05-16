@@ -12,17 +12,13 @@ in
 
   config = lib.mkIf cfg.enable {
     home.packages = with pkgs; [
-      tmux
       jq
       curl
       wget
-      lsd
       fastfetch
       tldr
       p7zip
       xclip
-      htop
-      github-copilot-cli
     ];
   };
 }

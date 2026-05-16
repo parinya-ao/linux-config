@@ -1,14 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 source "${BASH_SOURCE[0]%/*}/../../../lib/ui.sh"
-
-as_root() {
-  if [[ $EUID -eq 0 ]]; then
-    "$@"
-  else
-    sudo "$@"
-  fi
-}
+source "${BASH_SOURCE[0]%/*}/../../../lib/privilege.sh"
 
 set_config_value() {
   local key="$1"

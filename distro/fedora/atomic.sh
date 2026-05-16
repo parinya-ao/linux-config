@@ -18,24 +18,25 @@ BLUE=$'\033[1;34m'
 RED=$'\033[1;31m'
 
 # ------------------------------------------
-# UI HELPERS
+# LIBRARIES & HELPERS
 # ------------------------------------------
 source "${BASH_SOURCE[0]%/*}/../../lib/ui.sh"
+source "${BASH_SOURCE[0]%/*}/../../lib/hardware.sh"
+source "${BASH_SOURCE[0]%/*}/../../lib/fedora-common.sh"
 
 SUDO="sudo"
 if [[ $EUID -eq 0 ]]; then
   SUDO=""
 fi
 
-need_cmd() { command -v "$1" &>/dev/null || fail "Required command not found: $1"; }
+PKG_INSTALL_CMD="$SUDO rpm-ostree install --idempotent --allow-inactive"
+PKG_OVERRIDE_REMOVE_CMD="$SUDO rpm-ostree override remove"
 
-pkg_installed() {
-  rpm -q "$1" &>/dev/null
-}
+need_cmd() { command -v "$1" &>/dev/null || fail "Required command not found: $1"; }
 
 roo_install() {
   info "Layering: $*"
-  $SUDO rpm-ostree install --idempotent --allow-inactive "$@" \
+  $PKG_INSTALL_CMD "$@" \
     && ok "Layered: $*" \
     || warn "Some packages in [$*] unavailable or already present - continuing"
 }
@@ -294,144 +295,16 @@ if [[ "${RPM_FUSION_ACTIVE}" == "true" && "${FFMPEG_ACTIVE}" == "false" ]]; then
     fi
   fi
 
-  # -------------------------------------------------------------------
-  # PHASE 1: Base firmware (free)
-  # -------------------------------------------------------------------
-  step "[P1] Base firmware (free)..."
-  roo_install \
-    linux-firmware \
-    linux-firmware-whence \
-    intel-gpu-firmware \
-    iwlwifi-dvm-firmware \
-    iwlwifi-mvm-firmware \
-    microcode_ctl \
-    fwupd \
-    fwupd-plugin-flashrom
+  phase_firmware_free
+  phase_firmware_nonfree
 
-  # -------------------------------------------------------------------
-  # PHASE 2: Non-free / tainted firmware
-  # -------------------------------------------------------------------
-  step "[P2] Non-free and tainted firmware..."
-  roo_install \
-    intel-audio-firmware \
-    b43-firmware \
-    broadcom-bt-firmware \
-    dvb-firmware \
-    nouveau-firmware \
-    || warn "Some tainted firmware skipped (may not apply to your hardware)"
 
-  # -------------------------------------------------------------------
-  # PHASE 3: Intel Media Driver / VA-API
-  # -------------------------------------------------------------------
-  step "[P3] Intel Media Driver / VA-API..."
-
-  if [[ "${INTEL_DETECTED}" == "true" ]]; then
-    if [[ "${INTEL_DRIVER_ACTIVE}" == "true" ]]; then
-      skip "Intel media driver already installed"
-    else
-      step "  -> $INTEL_GEN (driver: $INTEL_DRIVER)"
-
-      case "${INTEL_DRIVER}" in
-        "iHD")
-          info "Installing intel-media-driver (iHD)..."
-          roo_install intel-media-driver libva2 libva-utils libva-intel-driver || warn "iHD install failed"
-          ;;
-        "i965"|*)
-          info "Installing libva-intel-driver (i965)..."
-          roo_install libva-intel-driver libva2 libva-utils || warn "i965 install failed"
-          ;;
-      esac
-    fi
-  else
-    info "No Intel iGPU detected - skipping Intel media driver"
-  fi
-
-  roo_install libva2 libva-utils mesa-dri-drivers mesa-vulkan-drivers || true
-
-  # -------------------------------------------------------------------
-  # PHASE 4: Audio (SOF / PipeWire)
-  # -------------------------------------------------------------------
-  step "[P4] Audio drivers and PipeWire stack..."
-  roo_install \
-    sof-firmware \
-    alsa-sof-firmware \
-    alsa-firmware \
-    alsa-utils \
-    pipewire \
-    pipewire-alsa \
-    pipewire-pulseaudio \
-    pipewire-jack \
-    wireplumber \
-    pavucontrol
-
-  # -------------------------------------------------------------------
-  # PHASE 5: Multimedia codecs (FFmpeg + GStreamer)
-  # -------------------------------------------------------------------
-  step "[P5] Multimedia codecs..."
-
-  OVERRIDE_PKGS=()
-  for pkg in fdk-aac-free ffmpeg-free libavcodec-free libavdevice-free \
-             libavfilter-free libavformat-free libavutil-free \
-             libpostproc-free libswresample-free libswscale-free; do
-    rpm -q "$pkg" &>/dev/null && OVERRIDE_PKGS+=("$pkg")
-  done
-
-  if [[ ${#OVERRIDE_PKGS[@]} -gt 0 ]]; then
-    info "Overriding: ${OVERRIDE_PKGS[*]}"
-    $SUDO rpm-ostree override remove "${OVERRIDE_PKGS[@]}" --install ffmpeg \
-      && ok "ffmpeg override staged." \
-      || warn "ffmpeg override failed - check: rpm-ostree override status"
-  else
-    warn "No free ffmpeg packages found to override - installing ffmpeg directly..."
-    roo_install ffmpeg
-  fi
-
-  roo_install \
-    libavcodec-freeworld \
-    gstreamer1-plugins-base \
-    gstreamer1-plugins-good \
-    gstreamer1-plugins-good-extras \
-    gstreamer1-plugins-ugly \
-    gstreamer1-plugins-bad-free \
-    gstreamer1-plugins-bad-freeworld \
-    gstreamer1-libav \
-    gstreamer1-vaapi \
-    gstreamer1-plugin-openh264 \
-    mozilla-openh264 \
-    x265 \
-    x265-libs \
-    lame \
-    libdvdcss
-
-  # -------------------------------------------------------------------
-  # PHASE 6: Bluetooth
-  # -------------------------------------------------------------------
-  step "[P6] Bluetooth stack..."
-  roo_install bluez bluez-tools bluez-firmware
-  $SUDO systemctl enable --now bluetooth &>/dev/null \
-    && ok "bluetooth.service enabled and started." \
-    || warn "Failed to enable bluetooth.service"
-
-  # -------------------------------------------------------------------
-  # PHASE 7: Power management
-  # -------------------------------------------------------------------
-  step "[P7] Power management..."
-  roo_install thermald power-profiles-daemon
-  $SUDO systemctl enable --now thermald &>/dev/null \
-    && ok "thermald enabled." \
-    || warn "thermald enable failed."
-  $SUDO systemctl enable --now power-profiles-daemon &>/dev/null \
-    && ok "power-profiles-daemon enabled." \
-    || warn "power-profiles-daemon enable failed."
-
-  # -------------------------------------------------------------------
-  # PHASE 8: LVFS firmware updates
-  # -------------------------------------------------------------------
-  step "[P8] LVFS firmware check..."
-  fwupdmgr refresh --force \
-    && fwupdmgr get-updates \
-    && ok "LVFS checked." \
-    || warn "No firmware updates or fwupd issue."
+  phase_intel_media
+  phase_audio
+  phase_codecs
+  phase_bluetooth
+  phase_power
+  phase_lvfs
 
   # -------------------------------------------------------------------
   # PHASE 9: Summary

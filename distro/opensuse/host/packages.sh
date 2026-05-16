@@ -2,21 +2,10 @@
 set -euo pipefail
 
 source "${BASH_SOURCE[0]%/*}/../../../lib/ui.sh"
+source "${BASH_SOURCE[0]%/*}/../../../lib/privilege.sh"
 
 BOOTSTRAP_USER="${SUDO_USER:-$(id -un)}"
 BOOTSTRAP_HOME="$(getent passwd "$BOOTSTRAP_USER" | cut -d: -f6)"
-
-as_root() {
-    if [[ $EUID -eq 0 ]]; then "$@"; else sudo "$@"; fi
-}
-
-as_user() {
-    if [[ $EUID -eq 0 ]] && [[ -n "${SUDO_USER:-}" ]]; then
-        sudo -u "$BOOTSTRAP_USER" env "HOME=$BOOTSTRAP_HOME" "$@"
-    else
-        "$@"
-    fi
-}
 
 # ── Firefox Developer Edition ──────────────────────
 step "Firefox Developer Edition"

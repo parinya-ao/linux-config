@@ -23,26 +23,19 @@ RED=$'\033[1;31m'
 source "${BASH_SOURCE[0]%/*}/package/ghostty.sh"
 
 # ------------------------------------------
-# UI HELPERS
+# LIBRARIES & HELPERS
 # ------------------------------------------
 source "${BASH_SOURCE[0]%/*}/../../lib/ui.sh"
 source "${BASH_SOURCE[0]%/*}/../../lib/docker.sh"
-
-# ------------------------------------------
-# IDEMPOTENT PACKAGE CHECK
-# ------------------------------------------
-pkg_installed() {
-  # Check if package is installed (rpm)
-  rpm -q "$1" &>/dev/null
-}
-
-# ------------------------------------------
-# HARDWARE DETECTION ENGINE
-# ------------------------------------------
 source "${BASH_SOURCE[0]%/*}/../../lib/hardware.sh"
+source "${BASH_SOURCE[0]%/*}/../../lib/fedora-common.sh"
+
+PKG_INSTALL_CMD="dnf install -y"
+PKG_SWAP_CMD="dnf swap -y"
+PKG_GROUP_CMD="dnf group"
 
 dnf_install() {
-  dnf install -y "$@" \
+  $PKG_INSTALL_CMD "$@" \
     && ok "Installed: $*" \
     || warn "Some packages in [$*] unavailable or already present — continuing"
 }
@@ -358,141 +351,14 @@ if [[ "${RPM_FUSION_ACTIVE}" == "true" && "${FFMPEG_ACTIVE}" == "false" ]]; then
     fi
   fi
 
-  # -----------------------------------------------------------------------
-  # PHASE 1 — Base firmware (free)
-  # -----------------------------------------------------------------------
-  step "[P1] Base firmware (free)..."
-  dnf_install \
-    linux-firmware \
-    linux-firmware-whence \
-    intel-gpu-firmware \
-    iwlwifi-dvm-firmware \
-    iwlwifi-mvm-firmware \
-    microcode_ctl \
-    fwupd \
-    fwupd-plugin-flashrom
-
-  # -----------------------------------------------------------------------
-  # PHASE 2 — Non-free / tainted firmware
-  # -----------------------------------------------------------------------
-  step "[P2] Non-free & tainted firmware..."
-  dnf_install \
-    intel-audio-firmware \
-    b43-firmware \
-    broadcom-bt-firmware \
-    dvb-firmware \
-    nouveau-firmware \
-    || warn "Some tainted firmware skipped (may not apply to your hardware)"
-
-  # -----------------------------------------------------------------------
-  # PHASE 3 — Intel Iris Xe GPU + VA-API (Generation-Aware)
-  # -----------------------------------------------------------------------
-  step "[P3] Intel Media Driver / VA-API..."
-
-  if [[ "${INTEL_DETECTED}" == "true" ]]; then
-    if [[ "${INTEL_DRIVER_ACTIVE}" == "true" ]]; then
-      skip "Intel Media Driver already installed"
-    else
-      step "  → $INTEL_GEN (Media Driver: $INTEL_DRIVER)"
-
-      case "${INTEL_DRIVER}" in
-        "iHD")
-          info "Installing intel-media-driver (iHD) for modern Intel GPUs..."
-          dnf_install intel-media-driver libva2 libva-utils libva-intel-driver || warn "iHD install failed"
-          ;;
-        "i965"|*)
-          info "Installing libva-intel-driver (i965) for legacy Intel GPUs..."
-          dnf_install libva-intel-driver libva2 libva-utils || warn "i965 install failed"
-          ;;
-      esac
-    fi
-  else
-    info "No Intel iGPU detected - skipping Intel Media Driver"
-  fi
-
-  # Always install generic VA-API + Mesa
-  dnf_install libva2 libva-utils mesa-dri-drivers mesa-vulkan-drivers || true
-
-  # -----------------------------------------------------------------------
-  # PHASE 4 — Audio (SOF / PipeWire)
-  # -----------------------------------------------------------------------
-  step "[P4] Audio drivers & PipeWire stack..."
-  dnf_install \
-    sof-firmware \
-    alsa-sof-firmware \
-    alsa-firmware \
-    alsa-utils \
-    pipewire \
-    pipewire-alsa \
-    pipewire-pulseaudio \
-    pipewire-jack \
-    wireplumber \
-    pavucontrol
-
-  # -----------------------------------------------------------------------
-  # PHASE 5 — Multimedia codecs (FFmpeg + GStreamer)
-  # -----------------------------------------------------------------------
-  step "[P5] Multimedia codecs..."
-
-  # Swap ffmpeg-free -> full ffmpeg
-  dnf swap -y ffmpeg-free ffmpeg --allowerasing \
-    && ok "ffmpeg swapped to full version." \
-    || warn "ffmpeg swap failed — trying direct install..."
-
-  # Fallback: install ffmpeg directly if swap failed
-  rpm -q ffmpeg &>/dev/null || dnf_install ffmpeg
-
-  dnf_install \
-    libavcodec-freeworld \
-    gstreamer1-plugins-base \
-    gstreamer1-plugins-good \
-    gstreamer1-plugins-good-extras \
-    gstreamer1-plugins-ugly \
-    gstreamer1-plugins-bad-free \
-    gstreamer1-plugins-bad-freeworld \
-    gstreamer1-libav \
-    gstreamer1-vaapi \
-    gstreamer1-plugin-openh264 \
-    mozilla-openh264 \
-    x265 \
-    x265-libs \
-    lame \
-    libdvdcss
-
-  # Multimedia group upgrade
-  dnf group upgrade -y --with-optional Multimedia \
-    && ok "Multimedia group upgraded." \
-    || warn "Multimedia group upgrade skipped."
-
-  # -----------------------------------------------------------------------
-  # PHASE 6 — Bluetooth
-  # -----------------------------------------------------------------------
-  step "[P6] Bluetooth stack..."
-  dnf_install bluez bluez-tools bluez-firmware
-  systemctl enable --now bluetooth \
-    && ok "bluetooth.service enabled & started." \
-    || warn "Failed to enable bluetooth.service"
-
-  # -----------------------------------------------------------------------
-  # PHASE 7 — Power management
-  # -----------------------------------------------------------------------
-  step "[P7] Power management..."
-  dnf_install thermald power-profiles-daemon
-  systemctl enable --now thermald \
-    && ok "thermald enabled." \
-    || warn "thermald enable failed."
-  systemctl enable --now power-profiles-daemon \
-    && ok "power-profiles-daemon enabled." \
-    || warn "power-profiles-daemon enable failed."
-
-  # -----------------------------------------------------------------------
-  # PHASE 8 — LVFS firmware updates
-  # -----------------------------------------------------------------------
-  step "[P8] LVFS firmware check..."
-  fwupdmgr refresh --force \
-    && fwupdmgr get-updates \
-    && ok "LVFS checked." \
-    || warn "No firmware updates or fwupd issue — skipping."
+  phase_firmware_free
+  phase_firmware_nonfree
+  phase_intel_media
+  phase_audio
+  phase_codecs
+  phase_bluetooth
+  phase_power
+  phase_lvfs
 
   # -----------------------------------------------------------------------
   # PHASE 8.7 — Docker Engine (official repo)

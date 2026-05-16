@@ -20,6 +20,7 @@ in
       inputs.claude-code.packages.${pkgs.system}.default
       inputs.codex-cli.packages.${pkgs.system}.default
       inputs.claude-desktop.packages.${pkgs.system}.claude-desktop-fhs
+      pkgs.github-copilot-cli
     ];
 
     programs.gemini-cli = {

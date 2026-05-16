@@ -1,14 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 source "${BASH_SOURCE[0]%/*}/../../../lib/ui.sh"
-
-as_root() {
-  if [[ $EUID -eq 0 ]]; then
-    "$@"
-  else
-    sudo "$@"
-  fi
-}
+source "${BASH_SOURCE[0]%/*}/../../../lib/privilege.sh"
 
 # ⚡ เปิด parallel download สำหรับ zypper
 ZYPP_CONF="/etc/zypp/zypp.conf"
