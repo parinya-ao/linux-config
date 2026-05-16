@@ -32,18 +32,6 @@ in
         export HISTCONTROL=ignoreboth:erasedups
         shopt -s histappend
         PROMPT_COMMAND="history -a; $PROMPT_COMMAND"
-
-        # Initialize fzf keybindings and fuzzy completion
-        source ${pkgs.fzf}/share/fzf/key-bindings.bash
-        source ${pkgs.fzf}/share/fzf/completion.bash
-        export FZF_DEFAULT_COMMAND='fd --type f --hidden --follow --exclude .git'
-        export FZF_DEFAULT_OPTS='--height 40% --layout=reverse --border --info=inline'
-
-        # Initialize zoxide (smarter cd)
-        eval "$(zoxide init bash)"
-
-        # Initialize Starship prompt
-        eval "$(starship init bash)"
       '';
 
       historyControl = [

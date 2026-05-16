@@ -131,6 +131,48 @@ in
         enableBashIntegration = true;
         options = [ "--cmd z" ]; # keep z command name
       };
+
+      # starship prompt
+      starship = {
+        enable = true;
+        enableFishIntegration = true;
+        enableBashIntegration = true;
+        settings = {
+          format = "$directory$git_branch$git_status$nix_shell$cmd_duration$line_break$character";
+          add_newline = true;
+          character = {
+            success_symbol = "[❯](bold green)";
+            error_symbol = "[❯](bold red)";
+            vimcmd_symbol = "[❮](bold yellow)";
+          };
+          directory = {
+            style = "bold cyan";
+            truncation_length = 3;
+            truncate_to_repo = true;
+          };
+          git_branch = {
+            symbol = " ";
+            style = "bold purple";
+          };
+          git_status = {
+            ahead = "⇡${count}";
+            behind = "⇣${count}";
+            diverged = "⇕⇡${ahead_count}⇣${behind_count}";
+            modified = "!";
+            staged = "+";
+            untracked = "?";
+            stashed = "≡";
+          };
+          nix_shell = {
+            symbol = " ";
+            style = "bold blue";
+          };
+          cmd_duration = {
+            min_time = 2000;
+            format = "took [$duration](bold yellow) ";
+          };
+        };
+      };
     };
   };
 }

@@ -256,21 +256,24 @@ if ! command -v nix >/dev/null 2>&1; then
   step
   spin_run "Installing nix package manager" \
     sh -c "curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install --no-confirm"
-  
-  # ⚡ Enable auto-optimise → ทุก build จะ hardlink อัตโนมัติ
-  NIX_CONF="/etc/nix/nix.conf"
-  if ! grep -q "auto-optimise-store" "$NIX_CONF" 2>/dev/null; then
-      run_privileged tee -a "$NIX_CONF" > /dev/null <<'EOF'
+  ok
+else
+  status_line "Nix detected skipping installation"
+fi
+
+# ⚡ Enable auto-optimise → ทุก build จะ hardlink อัตโนมัติ
+NIX_CONF="/etc/nix/nix.conf"
+if ! grep -q "auto-optimise-store" "$NIX_CONF" 2>/dev/null; then
+    step
+    status_line "Optimizing Nix configuration"
+    run_privileged tee -a "$NIX_CONF" > /dev/null <<'EOF'
 
 # Disk optimization
 auto-optimise-store = true
 min-free = 1073741824
 max-free = 3221225472
 EOF
-  fi
-  ok
-else
-  status_line "Nix detected skipping installation"
+    ok
 fi
 
 NIX_PROFILE='/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh'
@@ -328,13 +331,23 @@ ok
 step
 status_line "Cleaning up and optimizing disk space"
 
-# ── 1. zypper: ลบ RPM cache ที่ download มาทั้งหมด ────
-run_privileged zypper clean --all 2>/dev/null || true
+# ── 1. Distribution specific cleanup ─────────────────
+case "$DISTRO_FAMILY" in
+  ubuntu)
+    run_privileged apt-get autoremove -y 2>/dev/null || true
+    run_privileged apt-get clean 2>/dev/null || true
+    ;;
+  fedora)
+    run_privileged dnf autoremove -y 2>/dev/null || true
+    run_privileged dnf clean all 2>/dev/null || true
+    ;;
+  opensuse)
+    run_privileged zypper clean --all 2>/dev/null || true
+    run_privileged zypper purge-kernels 2>/dev/null || true
+    ;;
+esac
 
-# ── 2. zypper: ลบ kernel เก่า ─────────────────────────
-run_privileged zypper purge-kernels 2>/dev/null || true
-
-# ── 3. Nix: ลบ old generations (เก็บแค่ current) ──────
+# ── 2. Nix: ลบ old generations (เก็บแค่ current) ──────
 "${USER_CMD[@]}" nix-collect-garbage -d 2>/dev/null || true
 run_privileged nix-collect-garbage -d 2>/dev/null || true
 

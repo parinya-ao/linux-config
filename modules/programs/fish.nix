@@ -22,12 +22,6 @@ in
         # Suppress greeting
         set -g fish_greeting ""
 
-        # zoxide integration
-        zoxide init fish | source
-
-        # fzf integration
-        fzf --fish | source
-
         # Keybindings: Ctrl+R → fzf history
         bind \cr 'history | fzf --tac | read -l cmd; and commandline $cmd'
 
@@ -106,46 +100,6 @@ in
         ns = {
           description = "nix-shell with package";
           body = "nix shell nixpkgs#$argv[1]";
-        };
-      };
-    };
-
-    programs.starship = {
-      enable = true;
-      enableFishIntegration = true;
-      settings = {
-        format = "$directory$git_branch$git_status$nix_shell$cmd_duration$line_break$character";
-        add_newline = true;
-        character = {
-          success_symbol = "[❯](bold green)";
-          error_symbol = "[❯](bold red)";
-          vimcmd_symbol = "[❮](bold yellow)";
-        };
-        directory = {
-          style = "bold cyan";
-          truncation_length = 3;
-          truncate_to_repo = true;
-        };
-        git_branch = {
-          symbol = " ";
-          style = "bold purple";
-        };
-        git_status = {
-          ahead = "⇡\${count}";
-          behind = "⇣\${count}";
-          diverged = "⇕⇡\${ahead_count}⇣\${behind_count}";
-          modified = "!";
-          staged = "+";
-          untracked = "?";
-          stashed = "≡";
-        };
-        nix_shell = {
-          symbol = " ";
-          style = "bold blue";
-        };
-        cmd_duration = {
-          min_time = 2000;
-          format = "took [$duration](bold yellow) ";
         };
       };
     };
