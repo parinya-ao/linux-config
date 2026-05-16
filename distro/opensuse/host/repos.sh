@@ -2,6 +2,19 @@
 set -euo pipefail
 source "${BASH_SOURCE[0]%/*}/../../../lib/ui.sh"
 
+# ⚡ เปิด parallel download สำหรับ zypper
+ZYPP_CONF="/etc/zypp/zypp.conf"
+if ! grep -q "^download.max_concurrent_connections" "$ZYPP_CONF" 2>/dev/null; then
+    as_root tee -a "$ZYPP_CONF" > /dev/null <<'EOF'
+
+## Turbo download settings
+download.max_concurrent_connections = 10
+download.min_download_speed = 0
+download.max_download_speed = 0
+download.max_silent_tries = 3
+EOF
+fi
+
 as_root() {
   if [[ $EUID -eq 0 ]]; then
     "$@"

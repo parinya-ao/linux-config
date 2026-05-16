@@ -256,6 +256,18 @@ if ! command -v nix >/dev/null 2>&1; then
   step
   spin_run "Installing nix package manager" \
     sh -c "curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install --no-confirm"
+  
+  # ⚡ Enable auto-optimise → ทุก build จะ hardlink อัตโนมัติ
+  NIX_CONF="/etc/nix/nix.conf"
+  if ! grep -q "auto-optimise-store" "$NIX_CONF" 2>/dev/null; then
+      run_privileged tee -a "$NIX_CONF" > /dev/null <<'EOF'
+
+# Disk optimization
+auto-optimise-store = true
+min-free = 1073741824
+max-free = 3221225472
+EOF
+  fi
   ok
 else
   status_line "Nix detected skipping installation"
@@ -308,6 +320,37 @@ ok
 step
 spin_run "Configuring Flatpak applications" \
   "${USER_CMD[@]}" sh -c 'bash "$1/flatpak/main.sh"' sh "$TARGET_DIR"
+ok
+
+# ═══════════════════════════════════════════════════════
+# PHASE: Post-install Cleanup & Optimization
+# ═══════════════════════════════════════════════════════
+step
+status_line "Cleaning up and optimizing disk space"
+
+# ── 1. zypper: ลบ RPM cache ที่ download มาทั้งหมด ────
+run_privileged zypper clean --all 2>/dev/null || true
+
+# ── 2. zypper: ลบ kernel เก่า ─────────────────────────
+run_privileged zypper purge-kernels 2>/dev/null || true
+
+# ── 3. Nix: ลบ old generations (เก็บแค่ current) ──────
+"${USER_CMD[@]}" nix-collect-garbage -d 2>/dev/null || true
+run_privileged nix-collect-garbage -d 2>/dev/null || true
+
+# ── 4. Nix: optimize store (hardlink duplicate files) ──
+"${USER_CMD[@]}" nix store optimise 2>/dev/null || true
+
+# ── 5. Journal logs: เก็บแค่ 1 วัน ────────────────────
+run_privileged journalctl --vacuum-time=1d 2>/dev/null || true
+
+# ── 6. tmp cleanup ────────────────────────────────────
+run_privileged rm -rf /tmp/nix-* /tmp/home-manager-* 2>/dev/null || true
+
+# ── 7. Snapper: cleanup old snapshots ─────────────────
+if command -v snapper >/dev/null 2>&1; then
+    run_privileged snapper -c root cleanup number 2>/dev/null || true
+fi
 ok
 
 STARTUP_CLEAR_FINAL="${STARTUP_CLEAR_FINAL:-0}"
