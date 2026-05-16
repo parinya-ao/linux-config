@@ -527,6 +527,17 @@ if [[ "${RPM_FUSION_ACTIVE}" == "true" && "${FFMPEG_ACTIVE}" == "false" ]]; then
   fi
 
   # -----------------------------------------------------------------------
+  # PHASE 9.5 — Avahi Service (disable)
+  # -----------------------------------------------------------------------
+  step "[P9.5] Disabling Avahi (mDNS)..."
+  if systemctl is-active avahi-daemon >/dev/null 2>&1; then
+      systemctl disable --now avahi-daemon
+      ok "Avahi disabled."
+  else
+      skip "Avahi already disabled"
+  fi
+
+  # -----------------------------------------------------------------------
   # PHASE 9 — Final upgrade & cleanup
   # -----------------------------------------------------------------------
   step "[P9] Final upgrade & cleanup..."
