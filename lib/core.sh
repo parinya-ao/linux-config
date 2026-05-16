@@ -36,3 +36,5 @@ cleanup() {
     fi
     exit $exit_code
 }
+
+trap cleanup EXIT

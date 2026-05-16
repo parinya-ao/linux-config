@@ -1,21 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-
-step() {
-  if command -v gum >/dev/null 2>&1; then
-    gum style --foreground 39 --bold "PHASE START"
-  else
-    echo "PHASE START"
-  fi
-}
-
-ok() {
-  if command -v gum >/dev/null 2>&1; then
-    gum style --foreground 82 "PHASE SUCCESS"
-  else
-    echo "PHASE SUCCESS"
-  fi
-}
+source "${BASH_SOURCE[0]%/*}/../../../lib/ui.sh"
 
 as_root() {
   if [[ $EUID -eq 0 ]]; then
@@ -37,7 +22,7 @@ set_config_value() {
   fi
 }
 
-step
+step "Configuring Snapper snapshots"
 
 if ! command -v snapper >/dev/null 2>&1; then
   as_root zypper --non-interactive in --no-recommends snapper
@@ -58,4 +43,5 @@ if ! as_root snapper -c root list | grep -Fq "Pre-Nix-Setup"; then
 fi
 
 as_root systemctl enable --now snapper-timeline.timer snapper-cleanup.timer >/dev/null 2>&1 || true
-ok
+ok "Snapper configured"
+

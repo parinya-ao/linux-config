@@ -1,21 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-
-step() {
-  if command -v gum >/dev/null 2>&1; then
-    gum style --foreground 39 --bold "PHASE START"
-  else
-    echo "PHASE START"
-  fi
-}
-
-ok() {
-  if command -v gum >/dev/null 2>&1; then
-    gum style --foreground 82 "PHASE SUCCESS"
-  else
-    echo "PHASE SUCCESS"
-  fi
-}
+source "${BASH_SOURCE[0]%/*}/../../../lib/ui.sh"
 
 as_root() {
   if [[ $EUID -eq 0 ]]; then
@@ -33,7 +18,7 @@ set_priority_if_exists() {
   fi
 }
 
-step
+step "Setting up Packman repos and updating system"
 
 . /etc/os-release
 
@@ -58,4 +43,4 @@ else
   as_root zypper --non-interactive dup --no-recommends --allow-vendor-change
 fi
 
-ok
+ok "Repos configured and system updated"

@@ -1,52 +1,27 @@
 #!/bin/bash
 set -euo pipefail
 
-step() {
-  if command -v gum >/dev/null 2>&1; then
-    gum style --foreground 39 --bold "PHASE START"
-  else
-    echo "PHASE START"
-  fi
-}
+#!/bin/bash
+set -euo pipefail
 
-ok() {
-  if command -v gum >/dev/null 2>&1; then
-    gum style --foreground 82 "PHASE SUCCESS"
-  else
-    echo "PHASE SUCCESS"
-  fi
-}
+# ------------------------------------------
+# UI HELPERS
+# ------------------------------------------
+source "${BASH_SOURCE[0]%/*}/../../../lib/ui.sh"
 
-warn() {
-  if command -v gum >/dev/null 2>&1; then
-    gum style --foreground 227 "ATTENTION REQUIRED"
-  else
-    echo "ATTENTION REQUIRED"
-  fi
-}
+[ "$EUID" -eq 0 ] || fail "Must be root"
 
-fail() {
-  if command -v gum >/dev/null 2>&1; then
-    gum style --foreground 196 --bold "CRITICAL ERROR"
-  else
-    echo "CRITICAL ERROR"
-  fi
-  exit 1
-}
-
-[ "$EUID" -eq 0 ] || fail
-
-step
+step "Stopping Avahi services"
 systemctl stop avahi-daemon.service avahi-daemon.socket 2>/dev/null || true
 systemctl disable avahi-daemon.service avahi-daemon.socket 2>/dev/null || true
 
-step
+step "Masking Avahi services"
 systemctl mask avahi-daemon.service avahi-daemon.socket
 systemctl stop passim.service 2>/dev/null || true
 systemctl disable passim.service 2>/dev/null || true
 systemctl mask passim.service 2>/dev/null || true
 
-step
+step "Creating system presets"
 mkdir -p /etc/systemd/system-preset
 cat > /etc/systemd/system-preset/10-no-avahi.preset << 'EOF'
 disable avahi-daemon.service
@@ -54,7 +29,7 @@ disable avahi-daemon.socket
 disable passim.service
 EOF
 
-step
+step "Configuring Avahi daemon"
 if [ -f /etc/avahi/avahi-daemon.conf ]; then
   sed -i \
     -e 's/^#*[[:space:]]*use-ipv4=.*/use-ipv4=no/' \
@@ -62,13 +37,13 @@ if [ -f /etc/avahi/avahi-daemon.conf ]; then
     -e 's/^#*[[:space:]]*disallow-other-stacks=.*/disallow-other-stacks=yes/' \
     /etc/avahi/avahi-daemon.conf
 else
-  warn
+  warn "avahi-daemon.conf not found"
 fi
 
-step
+step "Verifying Avahi status"
 STATUS="$(systemctl is-enabled avahi-daemon.service 2>/dev/null || echo 'unknown')"
 if [ "$STATUS" != "masked" ]; then
-  warn
+  warn "Avahi not masked: $STATUS"
 fi
 
-ok
+ok "Avahi services disabled and masked"

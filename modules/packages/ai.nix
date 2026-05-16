@@ -18,6 +18,7 @@ in
   config = lib.mkIf cfg.enable {
     home.packages = [
       inputs.claude-code.packages.${pkgs.system}.default
+      inputs.codex-cli.packages.${pkgs.system}.default
       inputs.claude-desktop.packages.${pkgs.system}.claude-desktop-fhs
     ];
 

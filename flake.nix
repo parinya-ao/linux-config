@@ -15,10 +15,22 @@
     };
 
     # Third-party flake providing the Claude Code CLI.
-    claude-code.url = "github:sadjow/claude-code-nix";
+    claude-code = {
+      url = "github:sadjow/claude-code-nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    # Third-party flake providing the Codex CLI.
+    codex-cli = {
+      url = "github:sadjow/codex-cli-nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
 
     # flake claude desktop
-    claude-desktop.url = "github:aaddrick/claude-desktop-debian";
+    claude-desktop = {
+      url = "github:aaddrick/claude-desktop-debian";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   # Entry point that processes inputs and defines system configurations.

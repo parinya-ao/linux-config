@@ -5,6 +5,7 @@
 # Usage: sudo bash atomic.sh   (or bash atomic.sh; sudo will be used as needed)
 # =============================================================================
 set -euo pipefail
+trap 'fail "Error on line $LINENO of ${BASH_SOURCE[0]}"' ERR
 
 # ------------------------------------------
 # COLORS
@@ -17,48 +18,9 @@ BLUE=$'\033[1;34m'
 RED=$'\033[1;31m'
 
 # ------------------------------------------
-# HELPERS
+# UI HELPERS
 # ------------------------------------------
-step() {
-  if command -v gum >/dev/null 2>&1; then
-    gum style --foreground 39 --bold "PHASE START"
-  else
-    echo "PHASE START"
-  fi
-}
-
-ok() {
-  if command -v gum >/dev/null 2>&1; then
-    gum style --foreground 82 "PHASE SUCCESS"
-  else
-    echo "PHASE SUCCESS"
-  fi
-}
-
-warn() {
-  if command -v gum >/dev/null 2>&1; then
-    gum style --foreground 227 "ATTENTION REQUIRED"
-  else
-    echo "ATTENTION REQUIRED"
-  fi
-}
-
-fail() {
-  if command -v gum >/dev/null 2>&1; then
-    gum style --foreground 196 --bold "CRITICAL ERROR"
-  else
-    echo "CRITICAL ERROR"
-  fi
-  exit 1
-}
-
-info() {
-  if command -v gum >/dev/null 2>&1; then
-    gum style --foreground 39 "STATUS UPDATE"
-  else
-    echo "STATUS UPDATE"
-  fi
-}
+source "${BASH_SOURCE[0]%/*}/../../lib/ui.sh"
 
 SUDO="sudo"
 if [[ $EUID -eq 0 ]]; then
@@ -71,10 +33,6 @@ pkg_installed() {
   rpm -q "$1" &>/dev/null
 }
 
-skip() {
-  info
-}
-
 roo_install() {
   info "Layering: $*"
   $SUDO rpm-ostree install --idempotent --allow-inactive "$@" \
@@ -83,208 +41,14 @@ roo_install() {
 }
 
 do_reboot() {
-  warn
-  if command -v gum >/dev/null 2>&1; then
-    gum style "REBOOT REQUIRED TO CONTINUE"
-  else
-    echo "REBOOT REQUIRED TO CONTINUE"
-  fi
+  warn "REBOOT REQUIRED TO CONTINUE"
   exit 0
 }
 
 # ------------------------------------------
-# GPU DETECTION ENGINE
+# HARDWARE DETECTION ENGINE
 # ------------------------------------------
-detect_nvidia_series() {
-  [[ "${HAVE_LSPCI}" == "true" ]] || return 1
-  local device_id
-  device_id=$(lspci -nn 2>/dev/null | grep -i "10de:" | grep -i "vga\|3d\|display" | head -1 | grep -oP '\[10de:\K[0-9a-f]{4}' || echo "")
-
-  if [[ -z "$device_id" ]]; then
-    return 1
-  fi
-
-  local device_dec=$((16#$device_id))
-
-  if (( device_dec >= 0x2200 )); then
-    echo "Ada RTX 40xx (0x2200+)"
-    echo "latest"
-    return 0
-  elif (( device_dec >= 0x1B80 )); then
-    echo "Ampere RTX 30xx (0x1B80+)"
-    echo "latest"
-    return 0
-  elif (( device_dec >= 0x1600 )); then
-    echo "Turing RTX 20xx / GTX 16xx (0x1600+)"
-    echo "latest"
-    return 0
-  elif (( device_dec >= 0x1380 )); then
-    echo "Pascal GTX 10xx (0x1380+)"
-    echo "latest"
-    return 0
-  elif (( device_dec >= 0x0FC0 )); then
-    echo "Maxwell GTX 9xx (0x0FC0+)"
-    echo "470"
-    return 0
-  elif (( device_dec >= 0x0DC0 )); then
-    echo "Kepler GTX 7xx (0x0DC0+)"
-    echo "390"
-    return 0
-  else
-    echo "Unknown NVIDIA GPU (ID: 0x$device_id)"
-    echo "latest"
-    return 0
-  fi
-}
-
-detect_intel_generation() {
-  [[ "${HAVE_LSPCI}" == "true" ]] || return 1
-  local device_id
-  device_id=$(lspci -nn 2>/dev/null | grep -i "8086:" | grep -i "vga\|3d\|display" | head -1 | grep -oP '\[8086:\K[0-9a-f]{4}' || echo "")
-
-  if [[ -z "$device_id" ]]; then
-    return 1
-  fi
-
-  local device_dec=$((16#$device_id))
-
-  if (( device_dec >= 0x7600 && device_dec <= 0x7FFF )); then
-    echo "Arrow Lake 15th Gen+ (0x7600+)"
-    echo "iHD"
-    return 0
-  elif (( device_dec >= 0x7D00 && device_dec <= 0x7DFF )); then
-    echo "Raptor Lake 13th Gen (0x7D00+)"
-    echo "iHD"
-    return 0
-  elif (( device_dec >= 0x4600 && device_dec <= 0x46FF )); then
-    echo "Alder Lake 12th Gen (0x4600+)"
-    echo "iHD"
-    return 0
-  elif (( device_dec >= 0x9A00 && device_dec <= 0x9AFF )); then
-    echo "Tiger Lake 11th Gen (0x9A00+)"
-    echo "iHD"
-    return 0
-  elif (( device_dec >= 0x8A00 && device_dec <= 0x8AFF )); then
-    echo "Ice Lake 10th Gen (0x8A00+)"
-    echo "iHD"
-    return 0
-  elif (( device_dec >= 0x5900 && device_dec <= 0x59FF )); then
-    echo "Coffee Lake 9th Gen (0x5900+)"
-    echo "iHD"
-    return 0
-  elif (( device_dec >= 0x3E00 && device_dec <= 0x3EFF )); then
-    echo "Coffee Lake 8th Gen (0x3E00+)"
-    echo "iHD"
-    return 0
-  elif (( device_dec >= 0x1900 && device_dec <= 0x19FF )); then
-    echo "Skylake 6th Gen (0x1900+)"
-    echo "i965"
-    return 0
-  elif (( device_dec >= 0x1600 && device_dec <= 0x16FF )); then
-    echo "Broadwell 5th Gen (0x1600+)"
-    echo "i965"
-    return 0
-  else
-    echo "Unknown Intel GPU (ID: 0x$device_id)"
-    echo "iHD"
-    return 0
-  fi
-}
-
-detect_amd_gpu() {
-  [[ "${HAVE_LSPCI}" == "true" ]] || return 1
-  local device_id
-  device_id=$(lspci -nn 2>/dev/null | grep -i "1002:" | grep -i "vga\|3d\|display" | head -1 | grep -oP '\[1002:\K[0-9a-f]{4}' || echo "")
-
-  if [[ -z "$device_id" ]]; then
-    return 1
-  fi
-
-  local device_dec=$((16#$device_id))
-
-  if (( device_dec >= 0x7300 )); then
-    echo "RDNA (RX 5000+)"
-    return 0
-  else
-    echo "Legacy (GCN/Polaris)"
-    return 0
-  fi
-}
-
-detect_wifi_driver() {
-  [[ "${HAVE_LSPCI}" == "true" ]] || return 1
-  local wifi_vendor
-  wifi_vendor=$(lspci 2>/dev/null | grep -i "network.*wireless\|wireless.*controller" | head -1 || true)
-
-  if echo "$wifi_vendor" | grep -qi "broadcom\|bcm"; then
-    echo "broadcom"
-  elif echo "$wifi_vendor" | grep -qi "intel"; then
-    echo "intel-wifi"
-  elif echo "$wifi_vendor" | grep -qi "realtek\|rtl"; then
-    echo "realtek"
-  elif echo "$wifi_vendor" | grep -qi "atheros\|qualcomm\|qca"; then
-    echo "atheros"
-  else
-    echo "generic"
-  fi
-}
-
-detect_nvidia_gpu() {
-  [[ "${HAVE_LSPCI}" == "true" ]] || return 1
-  local nvidia_devices
-  nvidia_devices=$(lspci -nn 2>/dev/null | grep -i "10de:" | grep -i "vga\|3d\|display" || echo "")
-  if [[ -n "$nvidia_devices" ]]; then
-    echo "$nvidia_devices"
-    return 0
-  fi
-  return 1
-}
-
-detect_intel_gpu() {
-  [[ "${HAVE_LSPCI}" == "true" ]] || return 1
-  local intel_devices
-  intel_devices=$(lspci -nn 2>/dev/null | grep -i "8086:" | grep -i "vga\|3d\|display" || echo "")
-  if [[ -n "$intel_devices" ]]; then
-    echo "$intel_devices"
-    return 0
-  fi
-  return 1
-}
-
-detect_amd_discrete_gpu() {
-  [[ "${HAVE_LSPCI}" == "true" ]] || return 1
-  local amd_devices
-  amd_devices=$(lspci -nn 2>/dev/null | grep -i "1002:" | grep -i "vga\|3d" | grep -v "00:02" || echo "")
-  if [[ -n "$amd_devices" ]]; then
-    echo "$amd_devices"
-    return 0
-  fi
-  return 1
-}
-
-detect_hybrid_graphics() {
-  if detect_nvidia_gpu >/dev/null 2>&1 && detect_intel_gpu >/dev/null 2>&1; then
-    return 0
-  fi
-  return 1
-}
-
-nvidia_smi_ok() {
-  command -v nvidia-smi &>/dev/null || return 1
-  nvidia-smi -L &>/dev/null 2>&1
-}
-
-get_vainfo_output() {
-  if command -v vainfo &>/dev/null; then
-    vainfo 2>/dev/null || true
-  fi
-  return 0
-}
-
-vainfo_has() {
-  local pattern="$1"
-  [[ -n "${VAINFO_OUTPUT:-}" ]] && echo "$VAINFO_OUTPUT" | grep -qiE "$pattern"
-}
+source "${BASH_SOURCE[0]%/*}/../../lib/hardware.sh"
 
 # ------------------------------------------
 # PRE-CHECKS

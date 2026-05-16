@@ -5,61 +5,55 @@
 set -Eeuo pipefail
 umask 022
 
-HAS_GUM=0
-if command -v gum >/dev/null 2>&1; then
-  HAS_GUM=1
-fi
-
-has_gum() {
-  [[ "$HAS_GUM" -eq 1 ]]
-}
-
+# ------------------------------------------
+# UI HELPERS
+# ------------------------------------------
+# Local minimal definitions before lib/ui.sh is available
 step() {
-  if has_gum; then
-    gum style --foreground 39 --bold "PHASE START"
+  if command -v gum >/dev/null 2>&1; then
+    gum style --foreground 39 --bold "[STEP] $*"
   else
-    printf '%s\n' "PHASE START"
+    printf '\e[34;1m[STEP] %s\e[0m\n' "$*"
   fi
 }
 
 ok() {
-  if has_gum; then
-    gum style --foreground 82 "PHASE SUCCESS"
+  if command -v gum >/dev/null 2>&1; then
+    gum style --foreground 82 "[OK] $*"
   else
-    printf '%s\n' "PHASE SUCCESS"
+    printf '\e[32m[OK] %s\e[0m\n' "$*"
   fi
 }
 
 warn() {
-  if has_gum; then
-    gum style --foreground 227 "ATTENTION REQUIRED" >&2
+  if command -v gum >/dev/null 2>&1; then
+    gum style --foreground 227 "[WARN] $*" >&2
   else
-    printf '%s\n' "ATTENTION REQUIRED" >&2
+    printf '\e[33m[WARN] %s\e[0m\n' "$*" >&2
   fi
 }
 
 fail() {
-  if has_gum; then
-    gum style --foreground 196 --bold "CRITICAL ERROR" >&2
+  if command -v gum >/dev/null 2>&1; then
+    gum style --foreground 196 --bold "[FAIL] $*" >&2
   else
-    printf '%s\n' "CRITICAL ERROR" >&2
+    printf '\e[31;1m[FAIL] %s\e[0m\n' "$*" >&2
   fi
   exit 1
 }
 
 status_line() {
-  local message="$1"
-  if has_gum; then
-    gum style "$message"
+  if command -v gum >/dev/null 2>&1; then
+    gum style "$*"
   else
-    printf '%s\n' "$message"
+    printf '%s\n' "$*"
   fi
 }
 
 spin_run() {
   local title="$1"
   shift
-  if has_gum; then
+  if command -v gum >/dev/null 2>&1; then
     gum spin --show-output --spinner line --title "$title" -- "$@"
   else
     "$@"

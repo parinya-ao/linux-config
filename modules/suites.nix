@@ -20,6 +20,7 @@ in
           bash.enable = true;
           fish.enable = true;
           cli-tools.enable = true;
+          neovim.enable = true;
         };
         packages.cli.enable = true;
       };

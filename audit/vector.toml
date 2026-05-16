@@ -1,6 +1,6 @@
 [sources.tetragon_raw]
 type = "file"
-include = ["/home/parinya/.local/state/nix-audit/tetragon_raw.json"]
+include = ["${XDG_STATE_HOME:-$HOME/.local/state}/nix-audit/tetragon_raw.json"]
 read_from = "beginning"
 
 [transforms.parse_tetragon_json]
@@ -42,5 +42,5 @@ source = """
 [sinks.clean_audit_log]
 type = "file"
 inputs = ["compact_nix_events"]
-path = "/home/parinya/.local/state/nix-audit/nix_audit_clean.json"
+path = "${XDG_STATE_HOME:-$HOME/.local/state}/nix-audit/nix_audit_clean.json"
 encoding.codec = "json"

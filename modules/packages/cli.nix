@@ -16,7 +16,6 @@ in
       jq
       curl
       wget
-      neovim
       lsd
       fastfetch
       tldr

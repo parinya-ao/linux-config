@@ -15,7 +15,6 @@ This section provides a high-level overview of the project's directory and file 
 │   ├── programs/         # Deep configuration for specific tools (fish, git, gnome, etc.)
 │   ├── suites.nix        # High-level feature toggles (Base, Dev, AI, Desktop)
 │   └── default.nix       # Module entry point importing all sub-modules
-├── steps/                # Granular bootstrap steps called by drivers
 ├── flatpak/              # Flatpak application management scripts
 ├── lib/                  # Shared shell utility functions for drivers
 ├── flake.nix             # Root Nix Flake definition (Dependencies & Outputs)
@@ -117,7 +116,6 @@ Code Quality Tools: `nixfmt` (configured via `nix fmt`) for Nix files.
 ## 9. Future Considerations / Roadmap
 
 - Implementation of `sops-nix` or `age` for secret management.
-- Formalizing the `steps/` directory to replace monolith distro scripts.
 - Supporting dynamic usernames (currently hardcoded to `parinya`).
 - **Native Docker installation for each distribution (work in progress).**
 

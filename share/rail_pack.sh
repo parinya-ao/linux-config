@@ -1,2 +1,8 @@
 #!/usr/bin/env bash
-curl -sSL https://railpack.com/install.sh | sh
+set -Eeuo pipefail
+
+TMPFILE="$(mktemp)"
+trap 'rm -f "$TMPFILE"' EXIT
+
+curl -fsSL https://railpack.com/install.sh -o "$TMPFILE"
+bash "$TMPFILE"

@@ -19,8 +19,6 @@ in
       enable = true;
 
       shellAliases = sharedAliases // {
-        # Preserve bash-specific grep coloring
-        grep = "rg --color=auto --smart-case";
         hm-switch = "nix-audit-session";
       };
 
@@ -46,10 +44,6 @@ in
 
         # Initialize Starship prompt
         eval "$(starship init bash)"
-
-        # Configure bat as the pager for improved man page readability
-        export LESS='-R --use-color -Dd+r$Du+b'
-        export MANPAGER='bat -l man -p'
       '';
 
       historyControl = [

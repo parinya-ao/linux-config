@@ -38,6 +38,11 @@ in
       nvd # nix diff between generations
     ];
 
+    home.sessionVariables = {
+      MANPAGER = "batman";
+      LESS = "-R --use-color -Dd+r$Du+b";
+    };
+
     programs = {
       # eza (ls replacement)
       eza = {

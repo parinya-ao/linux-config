@@ -1,29 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-
-step() {
-  if command -v gum >/dev/null 2>&1; then
-    gum style --foreground 39 --bold "PHASE START"
-  else
-    echo "PHASE START"
-  fi
-}
-
-ok() {
-  if command -v gum >/dev/null 2>&1; then
-    gum style --foreground 82 "PHASE SUCCESS"
-  else
-    echo "PHASE SUCCESS"
-  fi
-}
-
-warn() {
-  if command -v gum >/dev/null 2>&1; then
-    gum style --foreground 227 "ATTENTION REQUIRED"
-  else
-    echo "ATTENTION REQUIRED"
-  fi
-}
+source "${BASH_SOURCE[0]%/*}/../../../lib/ui.sh"
 
 as_root() {
   if [[ $EUID -eq 0 ]]; then
@@ -36,7 +13,7 @@ as_root() {
 install_optional() {
   local pkg="$1"
   if ! as_root zypper --non-interactive in --no-recommends "$pkg" >/dev/null 2>&1; then
-    warn
+    warn "Failed to install optional package: $pkg"
   fi
 }
 
@@ -49,11 +26,11 @@ run_opi_codecs() {
   elif echo "$opi_help" | grep -qE "(^|[[:space:]])-y([[:space:]]|,|$)"; then
     as_root opi codecs -y
   else
-    warn
+    warn "OPI codec installation failed or unsupported version"
   fi
 }
 
-step
+step "Installing drivers and codecs"
 
 for pkg in \
   fwupd \
@@ -93,4 +70,4 @@ if systemctl list-unit-files | grep -q "^bluetooth.service"; then
   as_root systemctl enable --now bluetooth.service >/dev/null 2>&1 || true
 fi
 
-ok
+ok "Drivers and codecs configured"
