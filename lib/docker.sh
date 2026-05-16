@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 [[ -n "${_LIB_DOCKER_LOADED:-}" ]] && return 0
 
 docker_add_user_to_group() {

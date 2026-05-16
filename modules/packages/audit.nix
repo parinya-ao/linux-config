@@ -118,8 +118,10 @@ in
       '')
     ];
 
-    xdg.configFile."nix-audit/monitor-etc-changes.yaml".source = ../../audit/monitor-etc-changes.yaml;
-    xdg.configFile."nix-audit/vector.toml".source = ../../audit/vector.toml;
-    xdg.configFile."nix-audit/logrotate.conf".source = ../../audit/logrotate.conf;
+    xdg.configFile = {
+      "nix-audit/monitor-etc-changes.yaml".source = ../../audit/monitor-etc-changes.yaml;
+      "nix-audit/vector.toml".source = ../../audit/vector.toml;
+      "nix-audit/logrotate.conf".source = ../../audit/logrotate.conf;
+    };
   };
 }

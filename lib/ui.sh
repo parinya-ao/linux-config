@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 [[ -n "${_LIB_UI_LOADED:-}" ]] && return 0
 
 _HAS_GUM=false
