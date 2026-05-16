@@ -19,11 +19,3 @@
       else
         echo "[INFO] No CACHIX_AUTH_TOKEN found, running without binary cache"
       fi
-
-# ── Nix lint steps (ใช้ !reference ดึงใน job อื่น) ──
-.nix-lint-script:
-  script:
-    - nix fmt -- --ci
-    - nix run nixpkgs#statix -- check .
-    - nix run nixpkgs#deadnix -- --fail .
-    - nix flake check --no-build

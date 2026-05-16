@@ -156,4 +156,17 @@ vainfo_has() {
   [[ -n "${VAINFO_OUTPUT:-}" ]] && echo "$VAINFO_OUTPUT" | grep -qiE "$pattern"
 }
 
+detect_wifi_driver() {
+  [[ "$HAVE_LSPCI" != "true" ]] && echo "generic" && return
+  local wifi
+  wifi=$(lspci 2>/dev/null | grep -i 'Network controller' || true)
+  case "$wifi" in
+    *Intel*)    echo "iwlwifi" ;;
+    *Broadcom*) echo "broadcom" ;;
+    *Realtek*)  echo "rtl" ;;
+    *Atheros*|*Qualcomm*) echo "ath" ;;
+    *)          echo "generic" ;;
+  esac
+}
+
 export _LIB_HARDWARE_LOADED=1

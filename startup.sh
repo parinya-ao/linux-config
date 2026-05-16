@@ -223,6 +223,8 @@ start_sudo_keepalive
 # Close stdin after the single sudo password prompt.
 exec </dev/null
 
+has_gum() { command -v gum >/dev/null 2>&1; }
+
 if ! command -v gum >/dev/null 2>&1; then
   step
   status_line "Preparing terminal interface"

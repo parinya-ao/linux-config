@@ -50,7 +50,10 @@ in
     # Desktop Suite
     (lib.mkIf cfg.desktop.enable {
       my = {
-        programs.gnome.enable = true;
+        programs = {
+          gnome.enable = true;
+          wayland.enable = true;
+        };
         packages = {
           gui.enable = true;
           docs.enable = true;
