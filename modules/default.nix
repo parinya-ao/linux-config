@@ -16,5 +16,6 @@
     ./programs/gnome.nix
     ./programs/neovim.nix
     ./programs/wayland.nix
+    ./programs/ssh.nix
   ];
 }

@@ -1,2 +1,16 @@
 code.md
 code.xml
+
+# Prevent accidental secret commits
+*.pem
+*.key
+*.p12
+*.age
+*.sops.*
+.env
+.env.*
+secrets/
+
+# Nix/Home Manager leftovers
+result
+result-*

@@ -19,6 +19,7 @@ in
       tldr
       p7zip
       xclip
+      git-secrets
     ];
   };
 }
