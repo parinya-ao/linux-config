@@ -25,7 +25,11 @@ in
 
     programs.git = {
       enable = true;
-      signing.format = null;
+      signing = {
+        format = "ssh";
+        key = "~/.ssh/id_ed25519";
+        signByDefault = true;
+      };
 
       # Use settings attribute set instead of extraConfig for better modularity
       settings = {

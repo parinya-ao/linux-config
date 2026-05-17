@@ -9,6 +9,11 @@
       "*" = {
         extraOptions = {
           AddKeysToAgent = "yes";
+          IdentitiesOnly = "yes";
+          HashKnownHosts = "yes";
+          ServerAliveInterval = "60";
+          ServerAliveCountMax = "3";
+          StrictHostKeyChecking = "ask";
         };
       };
       "github.com" = {
