@@ -19,7 +19,7 @@ BLUE=$'\033[1;34m'
 RED=$'\033[1;31m'
 
 # other package
-source ./package/ghostty.sh
+source "$(dirname "$0")/package/ghostty.sh"
 
 # ------------------------------------------
 # HELPERS
@@ -567,7 +567,8 @@ if [[ "${RPM_FUSION_ACTIVE}" == "true" && "${FFMPEG_ACTIVE}" == "false" ]]; then
     iwlwifi-mvm-firmware \
     microcode_ctl \
     fwupd \
-    fwupd-plugin-flashrom
+    fwupd-plugin-flashrom \
+    dbus-x11
 
   # -----------------------------------------------------------------------
   # PHASE 2 — Non-free / tainted firmware
@@ -716,6 +717,9 @@ if [[ "${RPM_FUSION_ACTIVE}" == "true" && "${FFMPEG_ACTIVE}" == "false" ]]; then
       && ok "Docker service enabled & started." \
       || warn "Failed to enable Docker service"
 
+    # Add user to docker group
+    usermod -aG docker parinya && ok "Added parinya to docker group." || warn "Failed to add parinya to docker group"
+
     # Fix iptables if needed
     if journalctl -u docker 2>/dev/null | grep -q "failed to find iptables"; then
       info "Fixing iptables configuration..."
@@ -775,6 +779,6 @@ if [[ "${RPM_FUSION_ACTIVE}" == "true" && "${FFMPEG_ACTIVE}" == "true" ]]; then
   info "  ffmpeg -version           → Codec support"
   info "  pactl info                → PipeWire audio"
   info "  fwupdmgr get-updates      → Pending firmware"
-  dnf list installed | grep -E "ffmpeg|gstreamer1|intel-media" | head -20
+  dnf list installed | grep -E "ffmpeg|gstreamer1|intel-media" | head -20 || true
   exit 0
 fi

@@ -34,17 +34,17 @@
     let
       # Target system architecture.
       system = "x86_64-linux";
-      # Package set instance for the defined system.
       pkgs = nixpkgs.legacyPackages.${system};
+      stdenv = pkgs.stdenv;
     in
     {
       # Code formatter triggered by 'nix fmt'.
-      formatter.${system} = pkgs.nixfmt-tree;
+      formatter.${stdenv.hostPlatform.system} = pkgs.nixfmt-tree;
 
       # Home Manager configuration for user 'parinya'.
       homeConfigurations."parinya" = home-manager.lib.homeManagerConfiguration {
         # Pass the package set into the configuration modules.
-        inherit pkgs;
+        pkgs = pkgs;
 
         # Inject additional variables (like flake inputs) into all sub-modules.
         # This is required for modules like home.nix to access 'inputs.claude-code'.

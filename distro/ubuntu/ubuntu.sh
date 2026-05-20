@@ -560,7 +560,8 @@ if [[ "${RESTRICTED_ACTIVE}" == "true" \
     amd64-microcode \
     fwupd \
     fwupd-amd64-signed \
-    thermald
+    thermald \
+    dbus-x11
 
   # Intel microcode is CPU brand dependent, ignore if not applicable
   ok "Base firmware installed."
@@ -838,7 +839,10 @@ if [[ "${RESTRICTED_ACTIVE}" == "true" \
     skip "Docker already installed"
   else
     # Remove conflicting packages
-    apt-get remove -y docker.io docker-compose docker-compose-v2 docker-doc podman-docker 2>/dev/null || true
+    step "Removing conflicting Docker packages..."
+    apt-get remove -y docker.io docker-compose docker-compose-v2 docker-doc podman-docker containerd runc 2>/dev/null || true
+    # Alternative more aggressive removal if needed:
+    # apt-get remove -y $(dpkg --get-selections docker.io docker-compose docker-compose-v2 docker-doc podman-docker containerd runc 2>/dev/null | cut -f1) || true
 
     # Add Docker GPG key
     apt-get install -y ca-certificates curl
@@ -860,13 +864,16 @@ EOF
     apt_install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
     # Enable and start Docker
+    # Enable and start Docker
     systemctl enable --now docker \
       && ok "Docker service enabled & started." \
       || warn "Failed to enable Docker service"
-  fi
 
-  # -----------------------------------------------------------------------
-  # PHASE 11 — Final upgrade & cleanup
+    # Add user to docker group
+    usermod -aG docker parinya && ok "Added parinya to docker group." || warn "Failed to add parinya to docker group"
+
+    # -----------------------------------------------------------------------
+    # PHASE 11 — Final upgrade & cleanup
   # -----------------------------------------------------------------------
   step "[P11] Final upgrade & cleanup..."
   apt-get update -y

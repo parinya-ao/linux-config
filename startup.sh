@@ -44,6 +44,11 @@ need_cmd grep
 need_cmd cut
 SELF_DIR="$(resolve_self_dir)"
 
+# ── root check ──────────────────────────────────────────────────────────────
+if [[ $EUID -ne 0 ]]; then
+  fail "This script must be run as root: sudo bash $0"
+fi
+
 is_atomic() {
   command -v rpm-ostree >/dev/null 2>&1 || return 1
   rpm-ostree status >/dev/null 2>&1 || return 1
@@ -117,7 +122,7 @@ info "Script:    $DISTRO_SCRIPT"
 step "Running distro driver: $(basename "$DISTRO_SCRIPT")"
 # ✅ stdin already closed above — child script cannot block waiting for input
 # Distro driver requires root for package installation, firmware, etc.
-sudo /usr/bin/env bash "$DISTRO_SCRIPT" "$@"
+bash "$DISTRO_SCRIPT" "$@"
 ok "Distro driver finished."
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -154,26 +159,30 @@ info "Nix version: $(nix --version)"
 # ─────────────────────────────────────────────────────────────────────────────
 step "Preparing Home Manager config directory..."
 
-TARGET_DIR="${HOME}/.config/home-manager"
+TARGET_USER="parinya"
+TARGET_HOME="/home/${TARGET_USER}"
+TARGET_DIR="${TARGET_HOME}/.config/home-manager"
 REPO_URL="https://github.com/parinya-ao/linux-config.git"
 
-mkdir -p "$TARGET_DIR"
+mkdir -p "$(dirname "$TARGET_DIR")"
 
 if [ ! -d "${TARGET_DIR}/.git" ]; then
   step "Cloning repo → ${TARGET_DIR}"
   need_cmd git
   # GIT_TERMINAL_PROMPT=0 → ป้องกัน git ถามรหัสผ่าน (repo นี้ public ไม่ต้องการ)
   GIT_TERMINAL_PROMPT=0 git clone "$REPO_URL" "$TARGET_DIR"
-  ok "Repo cloned."
+  chown -R "${TARGET_USER}:${TARGET_USER}" "$TARGET_DIR"
+  ok "Repo cloned and ownership set to ${TARGET_USER}."
 else
   step "Repo exists — syncing to latest..."
   need_cmd git
   # ✅ reset hard แทน stash → ไม่มีทางหยุดรอ input เลย
   # (local changes จะถูก discard — เพราะ source of truth คือ remote)
-  git -C "$TARGET_DIR" fetch --quiet origin
-  git -C "$TARGET_DIR" reset --hard origin/main 2>/dev/null \
-    || git -C "$TARGET_DIR" reset --hard origin/master
-  ok "Repo synced to remote HEAD."
+  # git -C "$TARGET_DIR" fetch --quiet origin
+  # git -C "$TARGET_DIR" reset --hard origin/main 2>/dev/null \
+  #  || git -C "$TARGET_DIR" reset --hard origin/master
+  chown -R "${TARGET_USER}:${TARGET_USER}" "$TARGET_DIR"
+  ok "Repo exists and ownership verified."
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -183,14 +192,20 @@ step "Running Home Manager switch..."
 
 cd "$TARGET_DIR"
 
+# Ensure dbus-run-session is available (it's in dbus-x11 on Fedora/Ubuntu)
+# This is required for dconfSettings activation in a non-interactive shell.
+dnf install -y dbus-x11 2>/dev/null || apt-get install -y dbus-x11 2>/dev/null || zypper --non-interactive install dbus-1-x11 2>/dev/null || true
+
 # ✅ --impure removed (default pure is safer)
 # ✅ -b backup → HM จะ rename file ที่ชนกัน แทนที่จะถาม
-nix --extra-experimental-features "nix-command flakes" \
-    run home-manager/master -- \
-    switch \
-    --flake ".#parinya" \
-    -b backup \
-    --show-trace
+# ✅ dbus-run-session → provides a private D-Bus session for dconf/GSettings
+sudo -u "${TARGET_USER}" -H \
+  dbus-run-session bash -c \
+    "source /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh && \
+     /nix/var/nix/profiles/default/bin/nix \
+       --extra-experimental-features 'nix-command flakes' \
+       run home-manager/master -- \
+       switch --flake '$TARGET_DIR#${TARGET_USER}' -b backup --show-trace"
 
 ok "Home Manager switch complete."
 

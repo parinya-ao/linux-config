@@ -20,15 +20,14 @@ sync_config() {
 
 apply_hm() {
     log_step "Activating Home Manager profile..."
-    cd "$TARGET_DIR"
     
-    if [ -e '/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh' ]; then
-        . '/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh'
-    fi
-
-    nix --extra-experimental-features "nix-command flakes" \
-        run home-manager/master -- \
-        switch --flake ".#parinya" -b backup
+    # Use sudo -u parinya -H to correctly set up the environment and home directory
+    sudo -u parinya -H bash -c \
+      "source /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh && \
+       /nix/var/nix/profiles/default/bin/nix \
+         --extra-experimental-features 'nix-command flakes' \
+         run home-manager/master -- \
+         switch --flake '${TARGET_DIR}#parinya' -b backup --show-trace"
 }
 
 sync_config

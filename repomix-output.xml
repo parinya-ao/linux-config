@@ -1,3 +1,697 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+packages/
+  ai.nix
+  cli.nix
+  dev.nix
+  docs.nix
+  gui.nix
+programs/
+  bash.nix
+  cli-tools.nix
+  fish.nix
+  git.nix
+  gnome.nix
+  neovim.nix
+default.nix
+suites.nix
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="packages/ai.nix">
+# modules/packages/ai.nix
+{
+  config,
+  lib,
+  pkgs,
+  inputs,
+  ...
+}:
+
+let
+  cfg = config.my.packages.ai;
+in
+{
+  options.my.packages.ai = {
+    enable = lib.mkEnableOption "AI Tools (Claude, Gemini)";
+  };
+
+  config = lib.mkIf cfg.enable {
+    home.packages = [
+      inputs.claude-code.packages.${pkgs.stdenv.hostPlatform.system}.default
+      inputs.claude-desktop.packages.${pkgs.stdenv.hostPlatform.system}.claude-desktop-fhs
+    ];
+
+    programs.gemini-cli = {
+      enable = true;
+      package = pkgs.gemini-cli;
+      settings = {
+        security.auth.selectedType = "oauth-personal";
+        general.previewFeatures = true;
+      };
+    };
+  };
+}
+</file>
+
+<file path="packages/cli.nix">
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
+let
+  cfg = config.my.packages.cli;
+in
+{
+  options.my.packages.cli.enable = lib.mkEnableOption "CLI packages";
+
+  config = lib.mkIf cfg.enable {
+    home.packages = with pkgs; [
+      tmux
+      jq
+      curl
+      wget
+      neovim
+      lsd
+      fastfetch
+      tldr
+      p7zip
+      xclip
+      htop
+    ];
+  };
+}
+</file>
+
+<file path="packages/dev.nix">
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
+let
+  cfg = config.my.packages.dev;
+in
+{
+  options.my.packages.dev.enable = lib.mkEnableOption "Development packages";
+
+  config = lib.mkIf cfg.enable {
+    home.packages = with pkgs; [
+      temurin-bin
+      maven
+      gradle
+      # gcc
+      clang
+      go
+      nodejs
+      python3
+      uv
+      bun
+      docker-compose
+      distrobox
+    ];
+  };
+}
+</file>
+
+<file path="packages/docs.nix">
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
+let
+  cfg = config.my.packages.docs;
+in
+{
+  options.my.packages.docs.enable = lib.mkEnableOption "Documentation tools";
+
+  config = lib.mkIf cfg.enable {
+    home.packages = with pkgs; [
+      typst
+      d2
+      pandoc
+    ];
+  };
+}
+</file>
+
+<file path="packages/gui.nix">
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
+let
+  cfg = config.my.packages.gui;
+in
+{
+  options.my.packages.gui.enable = lib.mkEnableOption "GUI packages";
+
+  config = lib.mkIf cfg.enable {
+    fonts.fontconfig.enable = true;
+
+    home.packages = with pkgs; [
+      vlc
+      flameshot
+      kdePackages.okular
+      gnome-tweaks
+
+      noto-fonts
+      noto-fonts-cjk-sans
+      inter
+      intel-one-mono
+      ibm-plex
+      nerd-fonts.jetbrains-mono
+      nerd-fonts.fira-code
+    ];
+  };
+}
+</file>
+
+<file path="programs/bash.nix">
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
+
+let
+  cfg = config.my.programs.bash;
+in
+{
+  options.my.programs.bash = {
+    enable = lib.mkEnableOption "Bash configuration";
+  };
+
+  config = lib.mkIf cfg.enable {
+    programs.bash = {
+      enable = true;
+
+      shellAliases = {
+        ls = "eza --icons=auto --group-directories-first";
+        ll = "eza -lhF --icons=auto --git --group-directories-first";
+        la = "eza -lahF --icons=auto --git";
+        lt = "eza --tree --level=2 --icons=auto";
+        cat = "bat --style=full";
+        find = "fd";
+        grep = "rg --color=auto --smart-case";
+        sed = "sd";
+        awk = "choose";
+        cut = "choose";
+        diff = "delta";
+        man = "batman";
+        tree = "eza --tree";
+        curl = "xh";
+        df = "duf";
+        du = "dust";
+        ps = "procs";
+        top = "btm";
+        htop = "btm";
+        ping = "gping";
+        cd = "z";
+        ".." = "z ..";
+        "..." = "z ../..";
+        ".4" = "z ../../..";
+      };
+
+      initExtra = ''
+        # Add local binary path to PATH
+        export PATH="$HOME/.nix-profile/bin:$PATH"
+
+        # Configure shell history for performance and deduplication
+        export HISTSIZE=100000
+        export HISTFILESIZE=200000
+        export HISTCONTROL=ignoreboth:erasedups
+        shopt -s histappend
+        PROMPT_COMMAND="history -a; $PROMPT_COMMAND"
+
+        # Initialize fzf keybindings and fuzzy completion
+        source ${pkgs.fzf}/share/fzf/key-bindings.bash
+        source ${pkgs.fzf}/share/fzf/completion.bash
+        export FZF_DEFAULT_COMMAND='fd --type f --hidden --follow --exclude .git'
+        export FZF_DEFAULT_OPTS='--height 40% --layout=reverse --border --info=inline'
+
+        # Initialize zoxide (smarter cd)
+        eval "$(zoxide init bash)"
+
+        # Initialize Starship prompt
+        eval "$(starship init bash)"
+
+        # Configure bat as the pager for improved man page readability
+        export LESS='-R --use-color -Dd+r$Du+b'
+        export MANPAGER='bat -l man -p'
+      '';
+
+      historyControl = [
+        "ignoredups"
+        "erasedups"
+      ];
+    };
+  };
+}
+</file>
+
+<file path="programs/cli-tools.nix">
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
+
+let
+  cfg = config.my.programs.cli-tools;
+in
+{
+  options.my.programs.cli-tools = {
+    enable = lib.mkEnableOption "Core CLI tools (eza, bat, fzf, etc.)";
+  };
+
+  config = lib.mkIf cfg.enable {
+    home.packages = with pkgs; [
+      # Rust CLI replacements
+      duf # df replacement
+      dust # du replacement
+      procs # ps replacement
+      bottom # top/htop replacement
+      gping # ping with graph
+      sd # sed replacement (simpler syntax)
+      choose # cut/awk replacement
+      xh # curl/httpie replacement
+      ouch # compress/decompress everything
+      pay-respects
+      mcfly # smart shell history
+      zellij # modern tmux alternative
+
+      # Dev tools
+      tokei # count lines of code
+      hyperfine # benchmarking tool
+      watchexec # auto-run on file change
+      just # modern Makefile (justfile)
+      nix-tree # visualize nix dependencies
+      nvd # nix diff between generations
+    ];
+
+    # eza (ls replacement)
+    programs.eza = {
+      enable = true;
+      enableFishIntegration = true;
+      enableBashIntegration = true;
+      icons = "auto";
+      git = true; # show git status in ls
+      extraOptions = [
+        "--group-directories-first"
+        "--header"
+        "--classify"
+      ];
+    };
+
+    # bat (cat replacement)
+    programs.bat = {
+      enable = true;
+      config = {
+        theme = "TwoDark";
+        style = "full";
+        map-syntax = [
+          "*.nix:Nix"
+          "*.fish:fish"
+        ];
+      };
+      extraPackages = with pkgs.bat-extras; [
+        batdiff # bat-powered git diff
+        batman # bat-powered man pages
+        batgrep # bat + ripgrep
+        batwatch # bat + watch
+      ];
+    };
+
+    # direnv
+    programs.direnv = {
+      enable = true;
+      nix-direnv.enable = true;
+      config = {
+        global = {
+          warn_timeout = "5s";
+          load_dotenv = true;
+        };
+      };
+    };
+
+    # fzf (fuzzy finder)
+    programs.fzf = {
+      enable = true;
+      enableFishIntegration = true;
+      enableBashIntegration = true;
+      defaultCommand = "fd --type f --hidden --follow --exclude .git";
+      defaultOptions = [
+        "--height 40%"
+        "--layout=reverse"
+        "--border"
+        "--info=inline"
+      ];
+      fileWidgetCommand = "fd --type f --hidden --follow --exclude .git";
+      fileWidgetOptions = [ "--preview 'bat --color=always --style=numbers {}'" ];
+      changeDirWidgetCommand = "fd --type d --hidden --follow --exclude .git";
+      historyWidgetOptions = [
+        "--sort"
+        "--exact"
+      ];
+      colors = {
+        fg = "#cdd6f4";
+        "fg+" = "#cdd6f4";
+        bg = "#1e1e2e";
+        "bg+" = "#313244";
+        hl = "#f38ba8";
+        "hl+" = "#f38ba8";
+        info = "#cba6f7";
+        prompt = "#cba6f7";
+        pointer = "#f5e0dc";
+        marker = "#f5e0dc";
+        spinner = "#f5e0dc";
+        header = "#f38ba8";
+      };
+    };
+
+    # zoxide
+    programs.zoxide = {
+      enable = true;
+      enableFishIntegration = true;
+      enableBashIntegration = true;
+      options = [ "--cmd z" ]; # keep z command name
+    };
+  };
+}
+</file>
+
+<file path="programs/fish.nix">
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
+let
+  cfg = config.my.programs.fish;
+in
+{
+  options.my.programs.fish.enable = lib.mkEnableOption "fish shell and starship";
+
+  config = lib.mkIf cfg.enable {
+    programs.fish = {
+      enable = true;
+
+      interactiveShellInit = ''
+        # PATH
+        fish_add_path $HOME/.nix-profile/bin
+
+        # Suppress greeting
+        set -g fish_greeting ""
+
+        # zoxide integration
+        zoxide init fish | source
+
+        # fzf integration
+        fzf --fish | source
+
+        # Keybindings: Ctrl+R → fzf history
+        bind \cr 'history | fzf --tac | read -l cmd; and commandline $cmd'
+
+        pay-respects fish --alias | source
+
+      '';
+
+      shellAliases = {
+        # --- Navigation (with zoxide) ---
+        cd = "z";
+        cdi = "zi"; # interactive jump
+        ".." = "z ..";
+        "..." = "z ../..";
+        ".4" = "z ../../..";
+
+        # --- File tools ---
+        ls = "eza --icons=auto --group-directories-first";
+        ll = "eza -lhF --icons=auto --git --group-directories-first";
+        la = "eza -lahF --icons=auto --git";
+        lt = "eza --tree --level=2 --icons=auto";
+        llt = "eza --tree --level=3 --icons=auto -lh";
+        cat = "bat --style=full";
+        find = "fd";
+        grep = "rg --smart-case";
+        sed = "sd";
+        awk = "choose";
+        cut = "choose";
+        diff = "delta"; # git-delta for beautiful diffs
+        man = "batman";
+        tree = "eza --tree";
+        curl = "xh";
+
+        # --- System ---
+        df = "duf";
+        du = "dust";
+        ps = "procs";
+        top = "btm";
+        htop = "btm";
+        ping = "gping";
+        cp = "cp -v";
+        mv = "mv -v";
+        rm = "rm -Iv"; # capital I = prompt once if removing >3 files
+        mkdir = "mkdir -pv";
+        disk = "lsblk -o NAME,SIZE,FSTYPE,MOUNTPOINT,LABEL";
+
+        # --- Git (power shortcuts) ---
+        g = "git";
+        ga = "git add";
+        gaa = "git add .";
+        gap = "git add -p"; # interactive patch staging
+        gc = "git commit";
+        gcm = "git commit -m";
+        gca = "git commit --amend --no-edit";
+        gst = "git status -sb";
+        gb = "git branch -vv";
+        gch = "git switch"; # modern replacement for checkout
+        gcb = "git switch -c";
+        gp = "git push";
+        gpf = "git push --force-with-lease"; # safe force push
+        gpl = "git pull --rebase";
+        gd = "git diff";
+        gds = "git diff --staged";
+        glog = "git log --oneline --graph --decorate -20";
+        gloga = "git log --oneline --graph --decorate --all";
+        gwip = "git add -A && git commit -m 'wip: checkpoint'";
+        gunwip = "git log -n 1 --pretty=%B | rg -q 'wip' && git reset HEAD~";
+        gclean = "git branch --merged | rg -v main | xargs git branch -d";
+
+        # --- Dev shortcuts ---
+        nix-clean = "nix-collect-garbage -d && sudo nix-collect-garbage -d";
+        nix-update = "nix flake update";
+        nix-rebuild = "sudo nixos-rebuild switch --flake .#";
+        hm-switch = "home-manager switch --flake .#";
+      };
+
+      functions = {
+        # Create dir and cd into it
+        mkcd = {
+          description = "Create directory and enter it";
+          body = "mkdir -p $argv && z $argv";
+        };
+
+        # Quick git commit with ticket prefix
+        gcmt = {
+          description = "Commit with ticket prefix from branch name";
+          body = ''
+            set ticket (git branch --show-current | rg -o -P '[A-Z]+-\d+')
+            git commit -m "$ticket: $argv"
+          '';
+        };
+
+        # fzf-powered branch switcher
+        gbf = {
+          description = "Fuzzy git branch switcher";
+          body = ''
+            git branch -a | fzf --height 40% | string trim | xargs git switch
+          '';
+        };
+
+        # Quick nix shell
+        ns = {
+          description = "nix-shell with package";
+          body = "nix shell nixpkgs#$argv[1]";
+        };
+      };
+    };
+
+    programs.starship = {
+      enable = true;
+      enableFishIntegration = true;
+      settings = {
+        format = "$directory$git_branch$git_status$nix_shell$cmd_duration$line_break$character";
+        add_newline = true;
+        character = {
+          success_symbol = "[❯](bold green)";
+          error_symbol = "[❯](bold red)";
+          vimcmd_symbol = "[❮](bold yellow)";
+        };
+        directory = {
+          style = "bold cyan";
+          truncation_length = 3;
+          truncate_to_repo = true;
+        };
+        git_branch = {
+          symbol = " ";
+          style = "bold purple";
+        };
+        git_status = {
+          ahead = "⇡\${count}";
+          behind = "⇣\${count}";
+          diverged = "⇕⇡\${ahead_count}⇣\${behind_count}";
+          modified = "!";
+          staged = "+";
+          untracked = "?";
+          stashed = "≡";
+        };
+        nix_shell = {
+          symbol = " ";
+          style = "bold blue";
+        };
+        cmd_duration = {
+          min_time = 2000;
+          format = "took [$duration](bold yellow) ";
+        };
+      };
+    };
+  };
+}
+</file>
+
+<file path="programs/git.nix">
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
+let
+  cfg = config.my.programs.git;
+in
+{
+  options.my.programs.git.enable = lib.mkEnableOption "Git and Delta";
+
+  config = lib.mkIf cfg.enable {
+    programs.delta = {
+      enable = true;
+      options = {
+        navigate = true;
+        light = false;
+        side-by-side = true;
+        line-numbers = true;
+        syntax-theme = "TwoDark";
+        minus-style = "syntax \"#450a15\"";
+        plus-style = "syntax \"#0d2a12\"";
+      };
+    };
+
+    programs.git = {
+      enable = true;
+      signing.format = null;
+
+      # Use settings attribute set instead of extraConfig for better modularity
+      settings = {
+        alias = {
+          amend = "commit --amend --no-edit";
+          wip = "!git add -A && git commit -m 'wip: checkpoint'";
+          unwip = "!git log -n 1 --pretty=%B | rg -q 'wip' && git reset HEAD~";
+          undo = "reset --soft HEAD~1";
+          unstage = "restore --staged";
+          lg = "log --oneline --graph --decorate --all";
+          stash-all = "stash push --include-untracked";
+          recent = "branch --sort=-committerdate --format='%(committerdate:relative)%09%(refname:short)'";
+        };
+
+        user = {
+          name = "parinya-ao";
+          email = "flim.parinya.ao@gmail.com";
+        };
+
+        init.defaultBranch = "main";
+
+        pack.threads = 0;
+        checkout.workers = 0;
+        feature.manyFiles = true;
+
+        push.autoSetupRemote = true;
+        push.default = "current";
+        pull.rebase = true;
+        rebase = {
+          autoStash = true;
+          updateRefs = true;
+        };
+        merge.ff = "only";
+
+        color.ui = "auto";
+        rerere.enabled = true;
+        rerere.autoUpdate = true;
+        maintenance.auto = true;
+        help.autocorrect = 10;
+
+        diff.algorithm = "histogram";
+        diff.colorMoved = "default";
+        diff.colorMovedWS = "allow-indentation-change";
+      };
+    };
+  };
+}
+</file>
+
+<file path="programs/gnome.nix">
 # ═══════════════════════════════════════════════════════════════════════════════
 #
 #  Pure GNOME — Maximum Stability Configuration
@@ -417,7 +1111,7 @@ in
 
       "org/gnome/nautilus/list-view" = {
         default-zoom-level = "small";
-        use-tree-view = false; # Disabled to troubleshoot Nautilus hanging issue.
+        use-tree-view = true; # Enables inline folder expansion in list view.
         default-column-order = [
           "name"
           "size"
@@ -435,11 +1129,11 @@ in
         default-zoom-level = "medium";
       };
 
-      # "org/gtk/gtk4/settings/file-chooser" = {
-      #   show-hidden = false;
-      #   sort-directories-first = true;
-      #   show-size-column = true;
-      # };
+      "org/gtk/gtk4/settings/file-chooser" = {
+        show-hidden = false;
+        sort-directories-first = true;
+        show-size-column = true;
+      };
 
       # ════════════════════════════════════════════════════════════════════════════
       #  §12  TEXT EDITOR (GNOME Text Editor)
@@ -507,3 +1201,116 @@ in
     };
   };
 }
+</file>
+
+<file path="programs/neovim.nix">
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
+
+let
+  cfg = config.my.programs.neovim;
+  kickstart = pkgs.fetchFromGitHub {
+    owner = "nvim-lua";
+    repo = "kickstart.nvim";
+    rev = "cfdc17be3ae1607d4427332de0b29d556f9dda13";
+    sha256 = "14bb9x2scbxzvaswcq7lnl868lirn3rjyr8y98rs20di9vhzki10";
+  };
+in
+{
+  options.my.programs.neovim.enable = lib.mkEnableOption "Neovim with kickstart.nvim";
+
+  config = lib.mkIf cfg.enable {
+    # This deploys the kickstart.nvim config to ~/.config/nvim
+    # Neovim will handle plugin installation (lazy.nvim) on its first run.
+    xdg.configFile."nvim" = {
+      source = kickstart;
+      recursive = true;
+    };
+
+    home.packages = with pkgs; [
+      neovim
+      # Required dependencies for kickstart.nvim and its plugins (LSP, Tree-sitter, etc.)
+      ripgrep
+      fd
+      clang
+      nodejs
+      tree-sitter
+      unzip
+      git # Required to clone plugins internally
+    ];
+  };
+}
+</file>
+
+<file path="default.nix">
+{ ... }:
+
+{
+  imports = [
+    ./suites.nix
+    ./packages/ai.nix
+    ./packages/cli.nix
+    ./packages/dev.nix
+    ./packages/docs.nix
+    ./packages/gui.nix
+    ./programs/bash.nix
+    ./programs/cli-tools.nix
+    ./programs/fish.nix
+    ./programs/git.nix
+    ./programs/gnome.nix
+    ./programs/neovim.nix
+
+  ];
+}
+</file>
+
+<file path="suites.nix">
+{ config, lib, ... }:
+
+let
+  cfg = config.my.suites;
+in
+{
+  options.my.suites = {
+    base.enable = lib.mkEnableOption "Base CLI & Shell tools";
+    development.enable = lib.mkEnableOption "Development tools (Editor, Git, compilers)";
+    ai.enable = lib.mkEnableOption "AI Tools & CLIs";
+    desktop.enable = lib.mkEnableOption "GNOME Desktop & GUI apps";
+  };
+
+  config = lib.mkMerge [
+    # Base Suite: What you want on EVERY machine
+    (lib.mkIf cfg.base.enable {
+      my.programs.bash.enable = true;
+      my.programs.fish.enable = true;
+      my.programs.cli-tools.enable = true;
+      my.packages.cli.enable = true;
+    })
+
+    # Development Suite
+    (lib.mkIf cfg.development.enable {
+      my.programs.git.enable = true;
+      my.programs.neovim.enable = true;
+      my.packages.dev.enable = true;
+    })
+
+    # AI Suite
+    (lib.mkIf cfg.ai.enable {
+      my.packages.ai.enable = true;
+    })
+
+    # Desktop Suite
+    (lib.mkIf cfg.desktop.enable {
+      my.programs.gnome.enable = true;
+      my.packages.gui.enable = true;
+      my.packages.docs.enable = true;
+    })
+  ];
+}
+</file>
+
+</files>

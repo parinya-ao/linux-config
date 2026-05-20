@@ -12,3 +12,11 @@ fi
 if [ -e '/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh' ]; then
     . '/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh'
 fi
+
+log_step "Configuring Nix trusted-users..."
+NIX_CONF="/etc/nix/nix.conf"
+if ! grep -q "trusted-users" "$NIX_CONF" 2>/dev/null; then
+  echo "trusted-users = root parinya" >> "$NIX_CONF"
+  systemctl restart nix-daemon || true
+  log_ok "Added parinya to trusted-users."
+fi

@@ -537,7 +537,8 @@ if [[ "${PACKMAN_ACTIVE}" == "true" \
     kernel-firmware-mediatek \
     ucode-intel \
     ucode-amd \
-    fwupd
+    fwupd \
+    dbus-1-x11
 
   ok "Base firmware installed."
 
@@ -806,19 +807,18 @@ if [[ "${PACKMAN_ACTIVE}" == "true" \
   if pkg_installed "docker"; then
     skip "Docker already installed"
   else
-    # Add Docker repository (openSUSE uses community repo or manual)
-    info "Adding Docker repository..."
-    zypper addrepo https://download.docker.com/linux/opensuse/docker.repo 2>/dev/null \
-      || info "Docker repo may already exist or community repo will be used"
-
-    # Refresh and install Docker
+    # Install Docker from official repositories
+    info "Installing Docker Engine..."
     zypper --non-interactive refresh 2>/dev/null || true
-    zypper_install docker docker-compose
+    zypper_install docker docker-compose docker-buildx
 
     # Enable and start Docker
     systemctl enable --now docker \
       && ok "Docker service enabled & started." \
       || warn "Failed to enable Docker service"
+
+    # Add user to docker group
+    usermod -aG docker parinya && ok "Added parinya to docker group." || warn "Failed to add parinya to docker group"
   fi
 
   # -----------------------------------------------------------------------

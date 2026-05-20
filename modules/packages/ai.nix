@@ -17,8 +17,8 @@ in
 
   config = lib.mkIf cfg.enable {
     home.packages = [
-      inputs.claude-code.packages.${pkgs.system}.default
-      inputs.claude-desktop.packages.${pkgs.system}.claude-desktop-fhs
+      inputs.claude-code.packages.${pkgs.stdenv.hostPlatform.system}.default
+      inputs.claude-desktop.packages.${pkgs.stdenv.hostPlatform.system}.claude-desktop-fhs
     ];
 
     programs.gemini-cli = {
