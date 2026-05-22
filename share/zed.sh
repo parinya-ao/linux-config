@@ -57,7 +57,13 @@ cmd_exists() { command -v "$1" >/dev/null 2>&1; }
 
 append_line_if_missing() {
   local file="$1" line="$2"
-  touch "$file"
+  if [[ ! -e "$file" ]]; then
+    touch "$file" 2>/dev/null || { warn "Could not create $file (read-only filesystem?)"; return 0; }
+  fi
+  if [[ ! -w "$file" ]]; then
+    warn "File $file is not writable (managed by Nix?); skipping PATH update."
+    return 0
+  fi
   grep -Fqx "$line" "$file" 2>/dev/null || printf '\n%s\n' "$line" >> "$file"
 }
 
@@ -295,8 +301,8 @@ ensure_vulkan_native() {
   ensure_detection_tools
   detect_gpu_vendor
 
-  check_vulkan_ready
-  local rc=$?
+  local rc=0
+  check_vulkan_ready || rc=$?
   explain_vulkan_state "$rc"
 
   if [[ "$rc" -eq 0 ]]; then
@@ -311,13 +317,14 @@ ensure_vulkan_native() {
   log "Installing native runtime dependencies..."
   ensure_runtime_deps
 
-  check_vulkan_ready
-  rc=$?
+  rc=0
+  check_vulkan_ready || rc=$?
   explain_vulkan_state "$rc"
 
   if [[ "$rc" -eq 0 ]]; then
     return 0
   fi
+
 
   warn "Still not native-ready after dependency install."
   case "$GPU_VENDOR" in
@@ -398,16 +405,6 @@ setup_bash_path() {
   [[ "$touched" -eq 0 ]] && append_line_if_missing "$HOME/.profile" "$export_line"
   export PATH="$HOME/.local/bin:$PATH"
   log "bash-compatible PATH configured."
-}
-
-setup_zsh_path() {
-  local export_line='export PATH="$HOME/.local/bin:$PATH"'
-  if [[ -e "$HOME/.zshrc" ]]; then
-    append_line_if_missing "$HOME/.zshrc" "$export_line"
-    log "zsh PATH configured."
-  else
-    warn "~/.zshrc not found; skipping zsh PATH setup."
-  fi
 }
 
 setup_fish_path() {
@@ -499,7 +496,6 @@ main() {
   install_zed
   write_settings
   setup_bash_path
-  setup_zsh_path
   setup_fish_path
   verify_install
   show_summary
