@@ -1,21 +1,18 @@
 #!/usr/bin/env bash
 # ==============================================================================
 # Script: docker.sh
-# Purpose: Production-grade Docker installer for Fedora
+# Purpose: Production-grade Docker installer for openSUSE
 # Architecture: Modular, Open, KISS. State-validated step-by-step.
 # ==============================================================================
 
-# Fail fast on errors, pipeline failures, and unset variables
 set -eo pipefail
 
 # ------------------------------------------------------------------------------
 # 1. Globals & Configuration
 # ------------------------------------------------------------------------------
-LOG_FILE="/tmp/docker_install_$(date +%s).log"
-# Detect the actual user even if the script was invoked with sudo directly
+LOG_FILE="/tmp/docker_install_opensuse_$(date +%s).log"
 TARGET_USER="${SUDO_USER:-$USER}"
 
-# ANSI Colors
 C_RED='\033[0;31m'
 C_GREEN='\033[0;32m'
 C_YELLOW='\033[1;33m'
@@ -30,11 +27,7 @@ log() {
     local msg="$2"
     local timestamp
     timestamp=$(date "+%Y-%m-%d %H:%M:%S")
-    
-    # Write plain text to log file
     echo "[$timestamp] [$level] $msg" >> "$LOG_FILE"
-    
-    # Write colored text to console
     case "$level" in
         "INFO")  echo -e "${C_BLUE}[*] [$timestamp] INFO:${C_RESET} $msg" ;;
         "OK")    echo -e "${C_GREEN}[+] [$timestamp] SUCCESS:${C_RESET} $msg" ;;
@@ -55,47 +48,23 @@ fail_exit() {
 # ------------------------------------------------------------------------------
 check_prerequisites() {
     log "DEBUG" "Checking system prerequisites..."
-    
-    if ! command -v dnf >/dev/null 2>&1; then
-        fail_exit "'dnf' package manager not found. This script requires Fedora."
+    if ! command -v zypper >/dev/null 2>&1; then
+        fail_exit "'zypper' package manager not found. This script requires openSUSE."
     fi
-
     if ! sudo -v >/dev/null 2>&1; then
         fail_exit "Current user ($TARGET_USER) does not have sudo privileges."
     fi
-    
     log "OK" "Prerequisites verified."
 }
 
 # ------------------------------------------------------------------------------
 # 4. Core Modules
 # ------------------------------------------------------------------------------
-remove_old_versions() {
-    log "DEBUG" "Attempting to remove conflicting/old Docker packages..."
-    
-    local packages=(docker docker-client docker-client-latest docker-common docker-latest docker-latest-logrotate docker-logrotate docker-selinux docker-engine-selinux docker-engine)
-    
-    if sudo dnf remove -y "${packages[@]}" 2>&1 | sudo tee -a "$LOG_FILE" >/dev/null; then
-        log "OK" "Old versions removed or not present."
-    else
-        log "WARN" "Non-fatal issue removing old versions. Proceeding anyway."
-    fi
-}
-
-setup_repository() {
-    log "DEBUG" "Setting up Docker CE repository..."
-    
-    if sudo dnf config-manager addrepo --from-repofile https://download.docker.com/linux/fedora/docker-ce.repo 2>&1 | sudo tee -a "$LOG_FILE" >/dev/null; then
-        log "OK" "Docker repository added successfully."
-    else
-        fail_exit "Failed to add Docker repository."
-    fi
-}
-
 install_docker_packages() {
-    log "DEBUG" "Installing Docker Engine, CLI, Containerd, and Plugins..."
+    log "DEBUG" "Updating system repositories and installing Docker packages..."
     
-    if sudo dnf install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y 2>&1 | sudo tee -a "$LOG_FILE" >/dev/null; then
+    sudo zypper --non-interactive refresh 2>&1 | sudo tee -a "$LOG_FILE" >/dev/null
+    if sudo zypper --non-interactive install docker docker-compose docker-buildx 2>&1 | sudo tee -a "$LOG_FILE" >/dev/null; then
         log "OK" "Docker packages installed successfully."
     else
         fail_exit "Failed to install Docker packages."
@@ -108,23 +77,14 @@ configure_and_start_service() {
     if sudo systemctl enable --now docker 2>&1 | sudo tee -a "$LOG_FILE" >/dev/null; then
         log "OK" "Docker service enabled and started."
     else
-        log "WARN" "Failed to start service normally. Checking alternative iptables-nft..."
-        # Fallback handling based on Fedora docs (iptables-nft issue)
-        sudo alternatives --set iptables /usr/bin/iptables-nft 2>&1 | sudo tee -a "$LOG_FILE" >/dev/null || true
-        if sudo systemctl restart docker 2>&1 | sudo tee -a "$LOG_FILE" >/dev/null; then
-            log "OK" "Docker service started using iptables-nft fallback."
-        else
-            fail_exit "Failed to start Docker service completely."
-        fi
+        fail_exit "Failed to start Docker service."
     fi
 }
 
 configure_user_group() {
     log "DEBUG" "Configuring user permissions for: $TARGET_USER"
     
-    if grep -q "^docker:" /etc/group; then
-        log "INFO" "Docker group already exists."
-    else
+    if ! grep -q "^docker:" /etc/group; then
         sudo groupadd docker 2>&1 | sudo tee -a "$LOG_FILE" >/dev/null || true
     fi
 
@@ -149,12 +109,10 @@ verify_installation() {
 # 5. Main Orchestrator
 # ------------------------------------------------------------------------------
 main() {
-    log "INFO" "Starting Docker installation process on Fedora..."
+    log "INFO" "Starting Docker installation process on openSUSE..."
     log "INFO" "Detailed logs are being written to: $LOG_FILE"
     
     check_prerequisites
-    remove_old_versions
-    setup_repository
     install_docker_packages
     configure_and_start_service
     configure_user_group
@@ -166,7 +124,6 @@ main() {
     echo "======================================================================"
 }
 
-# If the script is executed directly (not sourced), run main.
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     main
 fi

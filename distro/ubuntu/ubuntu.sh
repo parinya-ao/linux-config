@@ -833,47 +833,10 @@ if [[ "${RESTRICTED_ACTIVE}" == "true" \
   # -----------------------------------------------------------------------
   # PHASE 10.7 — Docker Engine (official repo)
   # -----------------------------------------------------------------------
-  step "[P10.7] Docker Engine (official repo)..."
+  bash "$(dirname "$0")/package/docker/docker.sh"
 
-  if pkg_installed "docker-ce"; then
-    skip "Docker already installed"
-  else
-    # Remove conflicting packages
-    step "Removing conflicting Docker packages..."
-    apt-get remove -y docker.io docker-compose docker-compose-v2 docker-doc podman-docker containerd runc 2>/dev/null || true
-    # Alternative more aggressive removal if needed:
-    # apt-get remove -y $(dpkg --get-selections docker.io docker-compose docker-compose-v2 docker-doc podman-docker containerd runc 2>/dev/null | cut -f1) || true
-
-    # Add Docker GPG key
-    apt-get install -y ca-certificates curl
-    install -m 0755 -d /etc/apt/keyrings
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc 2>/dev/null || warn "Failed to download Docker GPG key"
-    chmod a+r /etc/apt/keyrings/docker.asc
-
-    # Add Docker repository
-    tee /etc/apt/sources.list.d/docker.sources <<EOF >/dev/null
-Types: deb
-URIs: https://download.docker.com/linux/ubuntu
-Suites: \$(. /etc/os-release && echo \"\${UBUNTU_CODENAME:-\$VERSION_CODENAME}\")
-Components: stable
-Architectures: \$(dpkg --print-architecture)
-Signed-By: /etc/apt/keyrings/docker.asc
-EOF
-
-    apt-get update -y
-    apt_install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-
-    # Enable and start Docker
-    # Enable and start Docker
-    systemctl enable --now docker \
-      && ok "Docker service enabled & started." \
-      || warn "Failed to enable Docker service"
-
-    # Add user to docker group
-    usermod -aG docker parinya && ok "Added parinya to docker group." || warn "Failed to add parinya to docker group"
-
-    # -----------------------------------------------------------------------
-    # PHASE 11 — Final upgrade & cleanup
+  # -----------------------------------------------------------------------
+  # PHASE 11 — Final upgrade & cleanup
   # -----------------------------------------------------------------------
   step "[P11] Final upgrade & cleanup..."
   apt-get update -y

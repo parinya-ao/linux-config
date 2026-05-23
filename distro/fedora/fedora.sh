@@ -693,40 +693,35 @@ if [[ "${RPM_FUSION_ACTIVE}" == "true" && "${FFMPEG_ACTIVE}" == "false" ]]; then
     || warn "No firmware updates or fwupd issue — skipping."
 
   # -----------------------------------------------------------------------
-  # PHASE 8.7 — Docker Engine (official repo)
+  # PHASE 8.7 — Docker Engine (Modular Script)
   # -----------------------------------------------------------------------
-  step "[P8.7] Docker Engine (official repo)..."
+  step "[P8.7] Docker Engine (Modular Script)..."
+  bash "$(dirname "$0")/package/docker/docker.sh"
 
-  if pkg_installed "docker-ce"; then
-    skip "Docker already installed"
+  # -----------------------------------------------------------------------
+  # PHASE 8.8 — Custom Browsers (Brave Beta & Firefox Dev Edition)
+  # -----------------------------------------------------------------------
+  step "[P8.8] Custom Browsers (Brave Beta & Firefox Dev Edition)..."
+
+  # 1. Brave Browser Beta
+  step "Installing Brave Browser Beta..."
+  dnf install -y dnf-plugins-core
+  if dnf --version 2>/dev/null | grep -qiE "dnf5|libdnf5"; then
+    dnf config-manager addrepo --from-repofile=https://brave-browser-rpm-beta.s3.brave.com/brave-browser-beta.repo
   else
-    # Remove conflicting packages
-    dnf remove -y docker docker-client docker-client-latest docker-common docker-latest \
-      docker-latest-logrotate docker-logrotate docker-selinux docker-engine-selinux \
-      docker-engine 2>/dev/null || true
-
-    # Add Docker repository
-    dnf config-manager addrepo --from-repofile https://download.docker.com/linux/fedora/docker-ce.repo 2>/dev/null \
-      || warn "Failed to add Docker repository"
-
-    # Install Docker packages
-    dnf_install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-
-    # Enable and start Docker
-    systemctl enable --now docker \
-      && ok "Docker service enabled & started." \
-      || warn "Failed to enable Docker service"
-
-    # Add user to docker group
-    usermod -aG docker parinya && ok "Added parinya to docker group." || warn "Failed to add parinya to docker group"
-
-    # Fix iptables if needed
-    if journalctl -u docker 2>/dev/null | grep -q "failed to find iptables"; then
-      info "Fixing iptables configuration..."
-      alternatives --set iptables /usr/bin/iptables-nft 2>/dev/null || true
-      systemctl restart docker
-    fi
+    dnf config-manager --add-repo https://brave-browser-rpm-beta.s3.brave.com/brave-browser-beta.repo
   fi
+  rpm --import https://brave-browser-rpm-beta.s3.brave.com/brave-core-nightly.asc
+  dnf_install brave-browser-beta
+
+  # 2. Firefox Developer Edition
+  step "Installing Firefox Developer Edition..."
+  bash "$(dirname "$0")/package/firefox-dev/firefox-dev.sh"
+
+  # 3. Uninstall Native Firefox
+  step "Uninstalling Native Firefox..."
+  dnf remove -y firefox
+  ok "Native Firefox removed."
 
   # -----------------------------------------------------------------------
   # PHASE 9 — Final upgrade & cleanup
@@ -755,6 +750,7 @@ if [[ "${RPM_FUSION_ACTIVE}" == "true" && "${FFMPEG_ACTIVE}" == "false" ]]; then
   echo -e "| Codecs                    | ffmpeg, gstreamer1-* |"
   echo -e "| Bluetooth                 | bluez, bluez-firmware|"
   echo -e "| Power                     | thermald, ppd        |"
+  echo -e "| Browsers                  | Brave Beta, FF Dev   |"
   echo -e "| Firmware Updates          | fwupd LVFS           |"
   echo -e "| Docker Engine             | docker-ce, docker-compose |"
   echo -e "${BOLD}+---------------------------+----------------------+${RESET}"

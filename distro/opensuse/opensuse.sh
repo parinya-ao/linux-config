@@ -716,9 +716,11 @@ if [[ "${PACKMAN_ACTIVE}" == "true" \
     bluez-auto-enable-devices \
     kernel-firmware-bluetooth
 
-  systemctl enable --now bluetooth \
-    && ok "bluetooth.service enabled & started." \
-    || warn "Failed to enable bluetooth.service"
+  if systemctl enable --now bluetooth; then
+    ok "bluetooth.service enabled & started."
+  else
+    warn "Failed to enable bluetooth.service"
+  fi
 
   ok "Bluetooth stack installed."
 
@@ -802,24 +804,7 @@ if [[ "${PACKMAN_ACTIVE}" == "true" \
   # -----------------------------------------------------------------------
   # PHASE 9 — Docker Engine (official repo)
   # -----------------------------------------------------------------------
-  step "[P9] Docker Engine (official repo)..."
-
-  if pkg_installed "docker"; then
-    skip "Docker already installed"
-  else
-    # Install Docker from official repositories
-    info "Installing Docker Engine..."
-    zypper --non-interactive refresh 2>/dev/null || true
-    zypper_install docker docker-compose docker-buildx
-
-    # Enable and start Docker
-    systemctl enable --now docker \
-      && ok "Docker service enabled & started." \
-      || warn "Failed to enable Docker service"
-
-    # Add user to docker group
-    usermod -aG docker parinya && ok "Added parinya to docker group." || warn "Failed to add parinya to docker group"
-  fi
+  bash "$(dirname "$0")/package/docker/docker.sh"
 
   # -----------------------------------------------------------------------
   # PHASE 10 — Final upgrade & cleanup
