@@ -1,0 +1,11 @@
+[container]
+image = "postgres:15-alpine"
+container_name = "test-db-integration"
+user = "postgres"
+password = "mysecretpassword"
+db_name = "integration_test_db"
+port = 5432
+
+[test_settings]
+connection_timeout = 30
+max_retries = 5

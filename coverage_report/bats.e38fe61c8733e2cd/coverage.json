@@ -1,0 +1,12 @@
+{
+  "files": [
+    {"file": "/home/parinya/.config/home-manager/clean.sh", "percent_covered": "41.79", "covered_lines": "28", "total_lines": "67"}
+  ],
+  "percent_covered": "41.79",
+  "covered_lines": 28,
+  "total_lines": 67,
+  "percent_low": 25,
+  "percent_high": 75,
+  "command": "bats",
+  "date": "2026-05-23 10:22:33"
+}
