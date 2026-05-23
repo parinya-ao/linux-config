@@ -22,6 +22,7 @@ in
       python3
       uv
       bun
+      shellcheck
       docker-compose
       distrobox
     ];
