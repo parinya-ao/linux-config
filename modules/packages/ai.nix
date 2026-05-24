@@ -20,6 +20,8 @@ in
       inputs.claude-code.packages.${pkgs.stdenv.hostPlatform.system}.default
       inputs.claude-desktop.packages.${pkgs.stdenv.hostPlatform.system}.claude-desktop-fhs
       inputs.codex-cli-nix.packages.${pkgs.stdenv.hostPlatform.system}.default
+      pkgs.github-copilot-cli
+      pkgs.bash
     ];
   };
 }
