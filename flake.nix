@@ -19,6 +19,9 @@
 
     # flake claude desktop
     claude-desktop.url = "github:aaddrick/claude-desktop-debian";
+
+    # Third-party flake providing the Codex CLI.
+    codex-cli-nix.url = "github:sadjow/codex-cli-nix";
   };
 
   # Entry point that processes inputs and defines system configurations.
@@ -29,6 +32,7 @@
       home-manager,
       claude-code,
       claude-desktop,
+      codex-cli-nix,
       ...
     }@inputs:
     let
