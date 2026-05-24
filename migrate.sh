@@ -141,6 +141,15 @@ integration_test() {
     print_success "All integrity checks passed."
 }
 
+apply_configuration() {
+    print_step "Applying Configuration..."
+    if ! home-manager switch --flake .; then
+        print_error "Home Manager switch failed."
+        return 1
+    fi
+    print_success "Configuration applied successfully."
+}
+
 cleanup() {
     local backup_path="$1"
     local log_path="$2"
@@ -174,6 +183,7 @@ main() {
     execute_migration "$UPDATE_LOG" "${targets[@]}"
     analyze_changes "$UPDATE_LOG"
     integration_test "${targets[@]}"
+    apply_configuration
     cleanup "$LOCK_BACKUP" "$UPDATE_LOG"
     
     printf "\n${C_BOLD}${C_GREEN}✨ Migration completed perfectly! ✨${C_NC}\n\n"
