@@ -12,7 +12,7 @@ let
 in
 {
   options.my.packages.ai = {
-    enable = lib.mkEnableOption "AI Tools (Claude, Gemini)";
+    enable = lib.mkEnableOption "AI Tools (Claude, Antigravity)";
   };
 
   config = lib.mkIf cfg.enable {
@@ -20,14 +20,5 @@ in
       inputs.claude-code.packages.${pkgs.stdenv.hostPlatform.system}.default
       inputs.claude-desktop.packages.${pkgs.stdenv.hostPlatform.system}.claude-desktop-fhs
     ];
-
-    programs.gemini-cli = {
-      enable = true;
-      package = pkgs.gemini-cli;
-      settings = {
-        security.auth.selectedType = "oauth-personal";
-        general.previewFeatures = true;
-      };
-    };
   };
 }
