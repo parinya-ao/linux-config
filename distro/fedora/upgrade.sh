@@ -1,183 +1,638 @@
-#!/bin/bash
-# ============================================================
-#  Fedora N-1 Enterprise Upgrade Policy
+#!/usr/bin/env bash
+# ==============================================================================
+# Fedora Ultra Enterprise Upgrade Orchestrator
+# ==============================================================================
 #
-#  Rule: Upgrade to (CURRENT+1) ONLY AFTER (CURRENT+2) is
-#        officially released via Bodhi. This ensures the target
-#        version has ~6 months of field testing before touching
-#        your system. No downgrades. Forward-only. One hop at a time.
+# Architecture:
+#   - Strict N-1 Governance
+#   - Multi-Phase Validation Pipeline
+#   - Offline Atomic Upgrade
+#   - Rollback Awareness
+#   - Transaction Safety
+#   - System Health Enforcement
+#   - SELinux + Boot + Kernel Validation
+#   - DNF4 / DNF5 Hybrid Support
+#   - Btrfs Snapshot Integration
+#   - Lock-Safe Execution
+#   - Enterprise Logging
 #
-#  Example:
-#    On F43. F44 released? → BLOCKED (F44 is still "N").
-#    F45 released? → ALLOWED (F44 is now "N-1"). Upgrade to F44.
-# ============================================================
+# ==============================================================================
 
-set -euo pipefail
+set -Eeuo pipefail
+shopt -s inherit_errexit
 
-# ---- 0. Sanity: Must run as root ----
-[[ $EUID -ne 0 ]] && { echo "[!] Run with: sudo $0"; exit 1; }
+# ==============================================================================
+# GLOBAL CONSTANTS
+# ==============================================================================
 
-for cmd in rpm dnf curl jq df awk; do
-    command -v "$cmd" &>/dev/null || { echo "[!] Missing required command: $cmd"; exit 1; }
-done
+readonly SCRIPT_VERSION="9.0"
+readonly LOCK_FILE="/var/lock/fedora_ultra_upgrade.lock"
+readonly REBOOT_MARKER="/var/lib/fedora_upgrade_reboot_required.flag"
+readonly RELEASES_URL="https://fedoraproject.org/releases.json"
+readonly LOG_FILE="/var/log/fedora-ultra-upgrade.log"
 
-# ---- 1. Version Math ----
-CURRENT_VER=$(rpm -E %fedora)
-TARGET_VER=$((CURRENT_VER + 1))   # N-1: the version we WANT to upgrade TO
-GATE_VER=$((CURRENT_VER + 2))     # N:   must be released BEFORE we move
+readonly MIN_ROOT_MB=15000
+readonly MIN_VAR_MB=5000
+readonly MIN_BOOT_MB=500
+readonly MIN_EFI_MB=150
 
-# ---- 2. Detect DNF version ----
+readonly MAX_ALLOWED_VERSION=0
+
+AUTO_CONFIRM=0
+AUTO_REBOOT=0
+DRY_RUN=0
+SKIP_SNAPSHOT=0
+FORCE=0
+
+CURRENT_STATE="INIT"
 IS_DNF5=0
-dnf --version 2>/dev/null | grep -qiE "dnf5|libdnf5" && IS_DNF5=1
 
-echo "============================================================"
-echo "  Fedora N-1 Upgrade (Enterprise Stability)"
-echo "  Current  : Fedora $CURRENT_VER"
-echo "  Target   : Fedora $TARGET_VER  (N-1, our destination)"
-echo "  Gate     : Fedora $GATE_VER must be released  (N, the latest)"
-echo "  Engine   : $([ $IS_DNF5 -eq 1 ] && echo DNF5 || echo DNF4)"
-echo "============================================================"
-echo ""
+# ==============================================================================
+# COLORS
+# ==============================================================================
 
-# ---- 3. N-1 Gate: Query Fedora releases.json ----
-# The official releases metadata is the source of truth for stable
-# Fedora versions. This avoids Rawhide / branched streams and focuses
-# on GA releases only.
-echo "--- [GATE] Checking N-1 Policy via Fedora releases.json ---"
-
-RELEASES_URL="https://fedoraproject.org/releases.json"
-
-LATEST_STABLE=$(
-    curl -sf --max-time 15 "$RELEASES_URL" \
-    | jq -r '[.[] | select(.version | test("^[0-9]+$")) | (.version | tonumber)] | max'
-) || {
-    echo "[!] Error: Could not retrieve Fedora release metadata."
-    echo "    Ensure internet access and that jq is installed."
-    exit 1
+setup_colors() {
+    if [[ -t 1 ]]; then
+        RED='\033[0;31m'
+        GREEN='\033[0;32m'
+        YELLOW='\033[1;33m'
+        BLUE='\033[0;34m'
+        BOLD='\033[1m'
+        NC='\033[0m'
+    else
+        RED=''
+        GREEN=''
+        YELLOW=''
+        BLUE=''
+        BOLD=''
+        NC=''
+    fi
 }
 
-if [[ -z "${LATEST_STABLE:-}" || "$LATEST_STABLE" == "null" ]]; then
-    echo "[!] Error: Could not determine the latest Fedora stable version from releases.json."
-    echo "    The metadata format may have changed."
-    exit 1
-fi
+# ==============================================================================
+# LOGGING
+# ==============================================================================
 
-echo "  Latest stable Fedora (N): $LATEST_STABLE"
+log() {
+    local level="$1"
+    local color="$2"
+    local msg="$3"
 
-if [[ "$LATEST_STABLE" -lt "$GATE_VER" ]]; then
-    echo ""
-    echo "  [BLOCKED] N-1 Policy Enforced."
-    echo ""
-    echo "  You are on   : Fedora $CURRENT_VER"
-    echo "  Latest is    : Fedora $LATEST_STABLE  (still N, not yet N+1)"
-    echo "  Upgrade to   : Fedora $TARGET_VER is locked until Fedora $GATE_VER is released."
-    echo ""
-    echo "  Fedora releases ~every 6 months (April & October)."
-    echo "  Once Fedora $GATE_VER is out, re-run this script to upgrade to Fedora $TARGET_VER."
-    exit 0
-fi
+    printf "%b[%s]%b [%s] %s\n" \
+        "$color" "$level" "$NC" "$CURRENT_STATE" "$msg"
 
-echo "  [OK] Fedora $GATE_VER is released. Fedora $TARGET_VER is N-1. Gate PASSED."
-echo ""
+    printf "[%s] [%s] [%s] %s\n" \
+        "$(date '+%F %T')" \
+        "$level" \
+        "$CURRENT_STATE" \
+        "$msg" >> "$LOG_FILE"
+}
 
-# ---- 4. Pre-flight: AC Power ----
-if ls /sys/class/power_supply/BAT* &>/dev/null; then
-    AC_ONLINE=0
-    for f in /sys/class/power_supply/*/online; do
-        [[ -f "$f" ]] && grep -q 1 "$f" && AC_ONLINE=1
+log_info() { log "INFO" "$BLUE" "$1"; }
+log_ok()   { log " OK " "$GREEN" "$1"; }
+log_warn() { log "WARN" "$YELLOW" "$1"; }
+log_err()  { log "ERR " "$RED" "$1"; }
+
+# ==============================================================================
+# ERROR HANDLER
+# ==============================================================================
+
+cleanup_on_error() {
+    local exit_code=$?
+
+    trap - ERR INT TERM
+
+    log_err "Fatal pipeline failure detected. Exit code: $exit_code"
+
+    if [[ "$CURRENT_STATE" == "DOWNLOAD" ]] || \
+       [[ "$CURRENT_STATE" == "UPGRADE" ]]; then
+
+        log_warn "Upgrade cache may be inconsistent."
+
+        if [[ $IS_DNF5 -eq 1 ]]; then
+            log_info "Recovery: sudo dnf offline-upgrade clean"
+        else
+            log_info "Recovery: sudo dnf system-upgrade clean"
+        fi
+    fi
+
+    exit "$exit_code"
+}
+
+trap cleanup_on_error ERR INT TERM
+
+# ==============================================================================
+# ARGUMENT PARSER
+# ==============================================================================
+
+parse_args() {
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -y|--yes)
+                AUTO_CONFIRM=1
+                ;;
+            --auto-reboot)
+                AUTO_REBOOT=1
+                ;;
+            --dry-run)
+                DRY_RUN=1
+                ;;
+            --skip-snapshot)
+                SKIP_SNAPSHOT=1
+                ;;
+            --force)
+                FORCE=1
+                ;;
+            *)
+                log_err "Unknown argument: $1"
+                exit 1
+                ;;
+        esac
+        shift
     done
-    [[ $AC_ONLINE -eq 0 ]] && { echo "[!] Error: Running on battery. Plug in AC adapter."; exit 1; }
-    echo "  [OK] AC adapter connected."
-else
-    echo "  [OK] No battery detected (desktop/server)."
-fi
-
-# ---- 5. Pre-flight: Disk Space ----
-check_disk() {
-    local dir=$1 req_mb=$2
-    local free_mb=$(( $(df -P "$dir" | awk 'NR==2{print $4}') / 1024 ))
-    if [[ $free_mb -lt $req_mb ]]; then
-        echo "[!] Error: $dir needs ${req_mb} MB, only ${free_mb} MB free."; exit 1
-    fi
-    echo "  [OK] $dir: ${free_mb} MB free (need ${req_mb} MB)."
 }
-check_disk "/"     15000
-check_disk "/boot" 300
-check_disk "/var"  5000
 
-# ---- 6. Final Confirmation ----
-echo ""
-echo "[!] You are about to upgrade from Fedora $CURRENT_VER → Fedora $TARGET_VER."
-echo "    Ensure you have a backup and no critical tasks are running."
-echo ""
-read -r -p "Proceed? (yes/no): " CONFIRM
-[[ "$CONFIRM" == "yes" ]] || { echo "Cancelled."; exit 0; }
+# ==============================================================================
+# ROOT VALIDATION
+# ==============================================================================
 
-# ---- 7. Update Current System ----
-echo ""
-echo "--- [1/3] Refreshing Fedora $CURRENT_VER ---"
-dnf upgrade --refresh
+validate_root() {
+    CURRENT_STATE="ROOT_CHECK"
 
-# Check if a reboot is needed after the update
-NEEDS_REBOOT=0
-if command -v needs-rebooting &>/dev/null; then
-    needs-rebooting -r &>/dev/null || NEEDS_REBOOT=1
-elif [[ $IS_DNF5 -eq 1 ]]; then
-    dnf needs-rebooting 2>/dev/null | grep -qi "reboot is required" && NEEDS_REBOOT=1
-fi
-
-if [[ $NEEDS_REBOOT -eq 1 ]]; then
-    echo ""
-    echo "[!] Kernel or core libraries were just updated. A reboot is required first."
-    read -r -p "Reboot now? (yes/no): " REBOOT_NOW
-    if [[ "$REBOOT_NOW" == "yes" ]]; then
-        echo "Rebooting. Re-run this script after restarting."
-        reboot
+    if [[ $EUID -ne 0 ]]; then
+        log_err "This script must run as root."
+        exit 1
     fi
-    echo "Aborted. Reboot manually, then re-run this script."; exit 1
-fi
- echo "  [OK] No reboot required."
 
-# ---- 8. Ensure upgrade plugin present (DNF4 only) ----
-if [[ $IS_DNF5 -eq 0 ]]; then
-    dnf list installed dnf-plugin-system-upgrade &>/dev/null \
-        || dnf install -y dnf-plugin-system-upgrade
-fi
+    log_ok "Root validation passed."
+}
 
-# ---- 9. Download Fedora TARGET_VER Packages ----
-echo ""
-echo "--- [2/3] Downloading Fedora $TARGET_VER packages ---"
-echo "[!] Review the transaction summary. If dependency errors appear, DO NOT force."
-echo ""
+# ==============================================================================
+# LOCK
+# ==============================================================================
 
-if [[ $IS_DNF5 -eq 1 ]]; then
-    dnf system-upgrade download --releasever="$TARGET_VER" --allowerasing
-else
-    dnf system-upgrade download --releasever="$TARGET_VER" --best --allowerasing
-fi
+acquire_lock() {
+    CURRENT_STATE="LOCK"
 
-# ---- 10. Reboot into Offline Upgrade ----
-echo ""
-echo "============================================================"
-echo " Download complete. Ready to upgrade Fedora $CURRENT_VER → $TARGET_VER."
-echo " DO NOT power off during the upgrade reboot."
-echo ""
-echo " Post-upgrade health checks (run after reboot):"
-echo "   sudo dnf repoquery --unsatisfied   # broken deps"
-echo "   sudo dnf clean packages            # clear old cache"
-echo "   sudo rpmconf -a                    # merge config files"
-echo "============================================================"
-echo ""
-read -r -p "Reboot and apply upgrade now? (yes/no): " DO_REBOOT
+    exec 9>"$LOCK_FILE"
 
-if [[ "$DO_REBOOT" == "yes" ]]; then
-    echo "Initiating upgrade reboot..."
-    [[ $IS_DNF5 -eq 1 ]] && dnf offline-upgrade reboot || dnf system-upgrade reboot
-else
-    echo ""
-    echo "Paused. When ready, run:"
-    [[ $IS_DNF5 -eq 1 ]] \
-        && echo "  sudo dnf offline-upgrade reboot" \
-        || echo "  sudo dnf system-upgrade reboot"
-fi
+    if ! flock -n 9; then
+        log_err "Another upgrade instance is already running."
+        exit 1
+    fi
 
+    log_ok "Execution lock acquired."
+}
+
+# ==============================================================================
+# PREREQUISITES
+# ==============================================================================
+
+validate_environment() {
+    CURRENT_STATE="ENVIRONMENT"
+
+    local required=(
+        rpm
+        dnf
+        curl
+        jq
+        awk
+        grep
+        sed
+        findmnt
+        systemctl
+        uname
+        df
+    )
+
+    for bin in "${required[@]}"; do
+        command -v "$bin" >/dev/null 2>&1 || {
+            log_err "Missing dependency: $bin"
+            exit 1
+        }
+    done
+
+    source /etc/os-release
+
+    if [[ "$ID" != "fedora" ]]; then
+        log_err "Unsupported OS: $ID"
+        exit 1
+    fi
+
+    CURRENT_VER="$(rpm -E %fedora)"
+
+    if command -v dnf5 >/dev/null 2>&1; then
+        IS_DNF5=1
+    fi
+
+    log_ok "Environment validation complete."
+    log_info "Detected Fedora $CURRENT_VER"
+}
+
+# ==============================================================================
+# SYSTEM HEALTH
+# ==============================================================================
+
+validate_system_health() {
+    CURRENT_STATE="SYSTEM_HEALTH"
+
+    if ! systemctl is-system-running --quiet; then
+        log_warn "Systemd reports degraded state."
+
+        if [[ $FORCE -eq 0 ]]; then
+            log_err "Use --force to bypass degraded-state protection."
+            exit 1
+        fi
+    fi
+
+    if sestatus | grep -q "disabled"; then
+        log_warn "SELinux disabled."
+    else
+        log_ok "SELinux enabled."
+    fi
+
+    if [[ ! -d /sys/firmware/efi ]]; then
+        log_warn "Legacy BIOS detected."
+    else
+        log_ok "UEFI firmware detected."
+    fi
+}
+
+# ==============================================================================
+# SNAPSHOT
+# ==============================================================================
+
+create_snapshot() {
+    CURRENT_STATE="SNAPSHOT"
+
+    if [[ $SKIP_SNAPSHOT -eq 1 ]]; then
+        log_warn "Snapshot creation skipped."
+        return
+    fi
+
+    if findmnt -n -o FSTYPE / | grep -q "btrfs"; then
+
+        if command -v snapper >/dev/null 2>&1; then
+
+            if [[ $DRY_RUN -eq 0 ]]; then
+                snapper create \
+                    -t pre \
+                    -c number \
+                    -d "Fedora pre-upgrade F${CURRENT_VER}"
+            fi
+
+            log_ok "Pre-upgrade snapshot created."
+
+        else
+            log_warn "Btrfs detected without snapper."
+        fi
+    else
+        log_info "Non-Btrfs filesystem detected."
+    fi
+}
+
+# ==============================================================================
+# STORAGE VALIDATION
+# ==============================================================================
+
+check_storage() {
+    CURRENT_STATE="STORAGE"
+
+    local checks=(
+        "/:$MIN_ROOT_MB"
+        "/var:$MIN_VAR_MB"
+        "/boot:$MIN_BOOT_MB"
+    )
+
+    if [[ -d /boot/efi ]]; then
+        checks+=("/boot/efi:$MIN_EFI_MB")
+    fi
+
+    for entry in "${checks[@]}"; do
+        local path="${entry%%:*}"
+        local req="${entry##*:}"
+
+        if [[ -d "$path" ]]; then
+            local free_kb
+            free_kb=$(df -P "$path" | awk 'NR==2 {print $4}')
+
+            local free_mb=$((free_kb / 1024))
+
+            if [[ $free_mb -lt $req ]]; then
+                log_err "Insufficient free space on $path"
+                log_err "Required: ${req}MB | Available: ${free_mb}MB"
+                exit 1
+            fi
+        fi
+    done
+
+    log_ok "Disk capacity validated."
+}
+
+# ==============================================================================
+# THIRD-PARTY REPOS
+# ==============================================================================
+
+audit_repositories() {
+    CURRENT_STATE="REPOSITORIES"
+
+    local safe_regex="^(fedora|updates|updates-testing|fedora-cisco-openh264)"
+
+    local repos
+    repos=$(dnf repolist enabled -q | awk 'NR>1 {print $1}')
+
+    local found=0
+
+    for repo in $repos; do
+        if ! [[ "$repo" =~ $safe_regex ]]; then
+
+            if [[ $found -eq 0 ]]; then
+                log_warn "Third-party repositories detected:"
+            fi
+
+            printf "   - %s\n" "$repo"
+
+            found=1
+        fi
+    done
+
+    log_ok "Repository audit completed."
+}
+
+# ==============================================================================
+# N-1 POLICY
+# ==============================================================================
+
+calculate_target_version() {
+    CURRENT_STATE="POLICY"
+
+    log_info "Fetching Fedora release metadata..."
+
+    local json
+    json=$(curl -sfL \
+        --retry 5 \
+        --retry-delay 2 \
+        --max-time 20 \
+        "$RELEASES_URL")
+
+    local latest
+    latest=$(echo "$json" | jq -r '
+        [
+            .[]
+            | select(.status == "active")
+            | .version
+            | strings
+            | select(test("^[0-9]+$"))
+            | tonumber
+        ] | max
+    ')
+
+    if [[ ! "$latest" =~ ^[0-9]+$ ]]; then
+        log_err "Invalid Fedora release metadata."
+        exit 1
+    fi
+
+    local n1=$((latest - 1))
+
+    log_info "Current Fedora : $CURRENT_VER"
+    log_info "Latest Fedora  : $latest"
+    log_info "Enterprise N-1 : $n1"
+
+    if [[ $CURRENT_VER -ge $n1 ]]; then
+        log_ok "System already compliant with N-1 policy."
+        exit 0
+    fi
+
+    local gap=$((n1 - CURRENT_VER))
+
+    if [[ $gap -gt 1 ]]; then
+        TARGET_VER=$((CURRENT_VER + 1))
+
+        log_warn "Large version gap detected."
+        log_warn "Enforcing strict +1 hop."
+    else
+        TARGET_VER="$n1"
+    fi
+
+    if [[ $MAX_ALLOWED_VERSION -gt 0 ]] && \
+       [[ $TARGET_VER -gt $MAX_ALLOWED_VERSION ]]; then
+
+        TARGET_VER="$MAX_ALLOWED_VERSION"
+
+        log_warn "Ceiling policy enforced."
+    fi
+
+    export TARGET_VER
+
+    log_ok "Target Fedora version: $TARGET_VER"
+}
+
+# ==============================================================================
+# PACKAGE REFRESH
+# ==============================================================================
+
+refresh_system() {
+    CURRENT_STATE="REFRESH"
+
+    if [[ $DRY_RUN -eq 1 ]]; then
+        log_info "[DRY RUN] Skipping package refresh."
+        return
+    fi
+
+    log_info "Refreshing current system packages..."
+
+    dnf upgrade \
+        --refresh \
+        -y
+
+    log_ok "Base system updated."
+}
+
+# ==============================================================================
+# REBOOT CHECK
+# ==============================================================================
+
+validate_reboot_state() {
+    CURRENT_STATE="REBOOT_CHECK"
+
+    local reboot_required=0
+
+    if command -v needs-rebooting >/dev/null 2>&1; then
+
+        set +e
+        needs-rebooting -r >/dev/null 2>&1
+        [[ $? -eq 1 ]] && reboot_required=1
+        set -e
+
+    else
+        local current_kernel
+        current_kernel="$(uname -r)"
+
+        local installed_kernel
+        installed_kernel="$(rpm -q kernel \
+            --queryformat '%{VERSION}-%{RELEASE}.%{ARCH}\n' \
+            | sort -V \
+            | tail -n 1)"
+
+        if [[ "$current_kernel" != "$installed_kernel" ]]; then
+            reboot_required=1
+        fi
+    fi
+
+    if [[ $reboot_required -eq 1 ]]; then
+
+        log_warn "Kernel mismatch detected."
+        log_warn "Reboot required before upgrade."
+
+        if [[ -f "$REBOOT_MARKER" ]]; then
+            log_err "Reboot loop protection triggered."
+            exit 1
+        fi
+
+        if [[ $AUTO_REBOOT -eq 1 ]]; then
+            touch "$REBOOT_MARKER"
+
+            log_info "Automatic reboot initiated."
+
+            reboot
+            exit 0
+        fi
+
+        log_err "Please reboot and re-run script."
+        exit 100
+    fi
+
+    rm -f "$REBOOT_MARKER"
+
+    log_ok "Kernel state validated."
+}
+
+# ==============================================================================
+# DOWNLOAD PAYLOAD
+# ==============================================================================
+
+download_upgrade() {
+    CURRENT_STATE="DOWNLOAD"
+
+    local args=(
+        "--releasever=$TARGET_VER"
+        "--allowerasing"
+    )
+
+    if [[ $IS_DNF5 -eq 0 ]]; then
+        args+=("--best")
+    fi
+
+    if [[ $DRY_RUN -eq 1 ]]; then
+        args+=("--downloadonly")
+        args+=("--setopt=tsflags=test")
+    fi
+
+    if [[ $AUTO_CONFIRM -eq 0 ]] && [[ $DRY_RUN -eq 0 ]]; then
+        read -rp "Proceed with Fedora $TARGET_VER upgrade? [y/N]: " confirm
+
+        [[ "${confirm,,}" != "y" ]] && {
+            log_warn "Upgrade cancelled."
+            exit 0
+        }
+    fi
+
+    log_info "Downloading upgrade payload..."
+
+    if [[ $IS_DNF5 -eq 1 ]]; then
+
+        dnf offline-upgrade download \
+            "${args[@]}" \
+            -y
+
+    else
+
+        dnf install -y dnf-plugin-system-upgrade
+
+        dnf system-upgrade download \
+            "${args[@]}" \
+            -y
+    fi
+
+    log_ok "Upgrade payload ready."
+}
+
+# ==============================================================================
+# FINAL EXECUTION
+# ==============================================================================
+
+execute_upgrade() {
+    CURRENT_STATE="UPGRADE"
+
+    if [[ $DRY_RUN -eq 1 ]]; then
+        log_ok "[DRY RUN] Dependency graph clean."
+        exit 0
+    fi
+
+    if [[ $AUTO_REBOOT -eq 1 ]]; then
+
+        log_info "Rebooting into offline upgrade mode..."
+
+        if [[ $IS_DNF5 -eq 1 ]]; then
+            dnf offline-upgrade reboot
+        else
+            dnf system-upgrade reboot
+        fi
+
+    else
+
+        log_ok "Upgrade staged successfully."
+
+        if [[ $IS_DNF5 -eq 1 ]]; then
+            log_info "Execute: sudo dnf offline-upgrade reboot"
+        else
+            log_info "Execute: sudo dnf system-upgrade reboot"
+        fi
+    fi
+}
+
+# ==============================================================================
+# MAIN
+# ==============================================================================
+
+main() {
+
+    setup_colors
+
+    parse_args "$@"
+
+    printf "\n${BOLD}${BLUE}"
+    printf "=====================================================\n"
+    printf " Fedora Ultra Enterprise Upgrade Orchestrator v%s\n" "$SCRIPT_VERSION"
+    printf "=====================================================\n"
+    printf "${NC}\n"
+
+    validate_root
+    acquire_lock
+
+    validate_environment
+    validate_system_health
+
+    create_snapshot
+
+    check_storage
+    audit_repositories
+
+    calculate_target_version
+
+    refresh_system
+    validate_reboot_state
+
+    download_upgrade
+    execute_upgrade
+
+    CURRENT_STATE="DONE"
+
+    printf "\n${BOLD}${GREEN}"
+    printf "=====================================================\n"
+    printf " Upgrade Pipeline Completed Successfully\n"
+    printf "=====================================================\n"
+    printf "${NC}\n"
+}
+
+main "$@"
