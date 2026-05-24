@@ -20,5 +20,4 @@
   programs.home-manager.enable = true;
 
   # Disable noisy news notifications
-  news.display = "silent";
 }

@@ -32,6 +32,8 @@ in
 
         pay-respects fish --alias | source
 
+        # uv 
+        set -gx LD_LIBRARY_PATH ${lib.makeLibraryPath [ pkgs.stdenv.cc.cc.lib pkgs.zlib pkgs.zstd ]}:$LD_LIBRARY_PATH
       '';
 
       shellAliases = {
