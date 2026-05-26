@@ -37,6 +37,7 @@ in
       my.programs.gnome.enable = true;
       my.packages.gui.enable = true;
       my.packages.docs.enable = true;
+      my.packages.fonts.enable = true;
     })
   ];
 }
