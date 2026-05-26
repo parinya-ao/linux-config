@@ -201,7 +201,7 @@ detect_gpu_vendor() {
     case "$pci" in
       *Intel*) GPU_VENDOR="intel" ;;
       *AMD*|*Radeon*) GPU_VENDOR="amd" ;;
-      *NVIDIA*|*NVIDIA\ Corporation*) GPU_VENDOR="nvidia" ;;
+      *NVIDIA*) GPU_VENDOR="nvidia" ;;
     esac
   fi
 

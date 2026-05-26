@@ -10,7 +10,15 @@ let
 
   # Helper function to create font derivations cleanly
   # This reduces code duplication and improves maintainability
-  mkFont = { pname, version, url, hash, isZip ? true, stripRoot ? false }: 
+  mkFont =
+    {
+      pname,
+      version,
+      url,
+      hash,
+      isZip ? true,
+      stripRoot ? false,
+    }:
     pkgs.stdenvNoCC.mkDerivation {
       inherit pname version;
 
@@ -63,7 +71,7 @@ let
     pname = "th-sarabun-new";
     version = "1.0";
     url = "https://www.f0nt.com/?dl_name=sipafonts/THSarabunNew.zip";
-    hash = "sha256-VLiGhYiKPoB4q+DnwlfEqqOP8Q7WqlAQYhB54bIS+Gg="; 
+    hash = "sha256-VLiGhYiKPoB4q+DnwlfEqqOP8Q7WqlAQYhB54bIS+Gg=";
     stripRoot = false;
   };
 
@@ -72,7 +80,7 @@ let
     pname = "firacode-nerd-font";
     version = "3.4.0";
     url = "https://github.com/ryanoasis/nerd-fonts/releases/download/v3.4.0/FiraCode.zip";
-    hash = "sha256-cz+8zV+I2RBfAVmAiUGyIXRk2rZ7zM/Z2vQrOtbrP6Y="; 
+    hash = "sha256-cz+8zV+I2RBfAVmAiUGyIXRk2rZ7zM/Z2vQrOtbrP6Y=";
     stripRoot = false;
   };
 

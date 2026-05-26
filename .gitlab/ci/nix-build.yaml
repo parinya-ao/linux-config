@@ -5,7 +5,7 @@ nix-build:
   extends: .nix-setup                         # inherit image + before_script (Cachix)
   script:
     # ── Fail Fast: เร็วที่สุด → ช้าที่สุด ──────────
-    - nix fmt -- --check
+    - nix fmt -- --fail-on-change
     - nix run nixpkgs#statix -- check .
     - nix run nixpkgs#deadnix -- --fail .
     - nix flake check --no-build

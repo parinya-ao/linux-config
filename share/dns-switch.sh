@@ -20,10 +20,8 @@ set -Eeuo pipefail
 # - Avoid editing /etc/resolv.conf directly unless you truly own resolver generation.
 # - This script tries native backend first for persistence.
 
-PROGRAM="${0##*/}"
 STATE_DIR="/etc/dns-switch"
 BACKUP_DIR="${STATE_DIR}/backup"
-LOG_TAG="dns-switch"
 
 mkdir -p "$STATE_DIR" "$BACKUP_DIR"
 
@@ -125,7 +123,7 @@ default_provider_data() {
 backup_file() {
   local src="$1"
   [[ -e "$src" ]] || return 0
-  local dst="${BACKUP_DIR}/$(echo "$src" | sed 's#/#_#g').bak"
+  local dst="${BACKUP_DIR}/${src//\//_}.bak"
   cp -a "$src" "$dst"
 }
 
@@ -223,7 +221,7 @@ netplan_pick_iface() {
 netplan_apply_dns() {
   local dns4="$1"
   local dns6="$2"
-  local file iface tmp indent2 indent4 indent6 dns4_yaml dns6_yaml
+  local file iface tmp dns4_yaml dns6_yaml
   file="$(netplan_pick_file)"
   iface="$(netplan_pick_iface "$file")"
   tmp="$(mktemp)"
