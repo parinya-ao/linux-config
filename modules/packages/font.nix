@@ -91,6 +91,9 @@ in
       inter
       ibm-plex
       fira-code
+      nerd-fonts.jetbrains-mono
+      nerd-fonts.meslo-lg
+      cascadia-code
 
       # --- Custom Font Derivations ---
       grabInter
