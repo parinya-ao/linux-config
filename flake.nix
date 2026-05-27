@@ -19,32 +19,32 @@
 
     # flake claude desktop
     claude-desktop.url = "github:aaddrick/claude-desktop-debian";
+
+    # Third-party flake providing the Codex CLI.
+    codex-cli-nix.url = "github:sadjow/codex-cli-nix";
   };
 
   # Entry point that processes inputs and defines system configurations.
   outputs =
-    {
-      self,
-      nixpkgs,
-      home-manager,
-      claude-code,
-      claude-desktop,
-      ...
-    }@inputs:
+    { nixpkgs, home-manager, ... }@inputs:
     let
       # Target system architecture.
       system = "x86_64-linux";
-      pkgs = nixpkgs.legacyPackages.${system};
-      stdenv = pkgs.stdenv;
+      pkgs = import nixpkgs {
+        inherit system;
+        config = {
+          allowUnfree = true;
+        };
+      };
     in
     {
       # Code formatter triggered by 'nix fmt'.
-      formatter.${stdenv.hostPlatform.system} = pkgs.nixfmt-tree;
+      formatter.${pkgs.stdenv.hostPlatform.system} = pkgs.nixfmt-tree;
 
       # Home Manager configuration for user 'parinya'.
       homeConfigurations."parinya" = home-manager.lib.homeManagerConfiguration {
         # Pass the package set into the configuration modules.
-        pkgs = pkgs;
+        inherit pkgs;
 
         # Inject additional variables (like flake inputs) into all sub-modules.
         # This is required for modules like home.nix to access 'inputs.claude-code'.
@@ -53,6 +53,25 @@
         # List of configuration modules to apply.
         modules = [
           ./home.nix
+
+          (
+            { pkgs, ... }:
+            {
+              programs.fish.shellAliases = {
+                uv = "env LD_LIBRARY_PATH=${
+                  pkgs.lib.makeLibraryPath (
+                    with pkgs;
+                    [
+                      pkgs.stdenv.cc.cc.lib
+                      zlib
+                      zstd
+                      glib
+                    ]
+                  )
+                } uv";
+              };
+            }
+          )
         ];
       };
     };

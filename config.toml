@@ -1,0 +1,48 @@
+# Centralized Configuration for the Home Manager Bootstrap and Testing Suite
+
+[global]
+# Project application metadata
+app_name = "linux-config"
+# Logging paths
+log_file = "/tmp/dast_security_scan.log"
+# Enable ANSI color codes in console output (true/false)
+enable_colors = true
+
+[cleanup]
+# Flag to enable garbage collection during cleanup
+run_gc = true
+# Enable Nix store optimization
+optimize_store = true
+# Number of generations to retain in backup
+backup_retention = 5
+
+[test.unit]
+# Directory path containing BATS test files
+test_dir = "./tests/unit"
+# Minimum required code coverage percentage
+coverage_threshold = 80
+# Directory for coverage reports
+report_dir = "./coverage_report"
+
+[test.integration]
+# Docker container settings for component/database testing
+db_image = "postgres:15-alpine"
+db_port = 5432
+db_name = "testdb"
+db_user = "admin"
+db_password = "password123"
+# Connection timeout in seconds
+timeout = 30
+# Max retries for health checks
+max_retries = 5
+
+[test.security]
+# Target URL for DAST scanning
+target_url = "http://localhost:8080"
+# Default scan mode: "zap-baseline.py" or "zap-api-scan.py"
+scan_mode = "zap-baseline.py"
+# Directory for storing ZAP scan reports
+report_dir = "./tests/security/reports"
+# Fail build if vulnerabilities of these levels are found (true/false)
+fail_on_high = true
+fail_on_medium = true

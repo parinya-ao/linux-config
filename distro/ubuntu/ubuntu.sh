@@ -12,11 +12,17 @@ set -euo pipefail
 # ------------------------------------------
 # COLORS
 # ------------------------------------------
+BOLD=''
 BOLD=$'\033[1m'
+RESET=''
 RESET=$'\033[0m'
+YELLOW=''
 YELLOW=$'\033[1;33m'
+GREEN=''
 GREEN=$'\033[1;32m'
+BLUE=''
 BLUE=$'\033[1;34m'
+RED=''
 RED=$'\033[1;31m'
 
 # ------------------------------------------
@@ -29,9 +35,14 @@ fail()  { echo -e "${RED}[FAIL]${RESET} $*"; exit 1; }
 info()  { echo -e "${YELLOW}[INFO]${RESET} $*"; }
 
 apt_install() {
-  DEBIAN_FRONTEND=noninteractive apt-get install -y "$@" \
-    && ok "Installed: $*" \
-    || warn "Some packages in [$*] unavailable or already present — continuing"
+  local exit_code=0
+  DEBIAN_FRONTEND=noninteractive apt-get install -y "$@" || exit_code=$?
+  if [[ $exit_code -eq 0 ]]; then
+    ok "Installed: $*"
+  else
+    warn "Some packages in [$*] unavailable or already present — continuing"
+  fi
+  return $exit_code
 }
 
 # ------------------------------------------
@@ -54,14 +65,16 @@ skip() {
 # NVIDIA GPU Series Detection (by Device ID hex)
 detect_nvidia_series() {
   # Extract NVIDIA Device ID from lspci output: [10de:XXXX]
-  local device_id=$(lspci -nn 2>/dev/null | grep -i "10de:" | grep -i "vga\|3d\|display" | head -1 | grep -oP '\[10de:\K[0-9a-f]{4}' || echo "")
+  local device_id
+  device_id=$(lspci -nn 2>/dev/null | grep -i "10de:" | grep -i "vga\|3d\|display" | head -1 | grep -oP '\[10de:\K[0-9a-f]{4}' || echo "")
 
   if [[ -z "$device_id" ]]; then
     return 1
   fi
 
   # Convert hex to decimal for range comparison
-  local device_dec=$((16#$device_id))
+  local device_dec
+  device_dec=$((16#$device_id))
 
   # GPU Series mapping by Device ID ranges
   if (( device_dec >= 0x2200 )); then
@@ -98,13 +111,15 @@ detect_nvidia_series() {
 # Intel GPU Generation Detection (by Device ID)
 detect_intel_generation() {
   # Extract Intel Device ID: [8086:XXXX]
-  local device_id=$(lspci -nn 2>/dev/null | grep -i "8086:" | grep -i "vga\|3d\|display" | head -1 | grep -oP '\[8086:\K[0-9a-f]{4}' || echo "")
+  local device_id
+  device_id=$(lspci -nn 2>/dev/null | grep -i "8086:" | grep -i "vga\|3d\|display" | head -1 | grep -oP '\[8086:\K[0-9a-f]{4}' || echo "")
 
   if [[ -z "$device_id" ]]; then
     return 1
   fi
 
-  local device_dec=$((16#$device_id))
+  local device_dec
+  device_dec=$((16#$device_id))
 
   # Intel GPU generation by Device ID
   if (( device_dec >= 0x7600 && device_dec <= 0x7FFF )); then
@@ -152,13 +167,15 @@ detect_intel_generation() {
 
 # AMD GPU Detection (RDNA awareness)
 detect_amd_gpu() {
-  local device_id=$(lspci -nn 2>/dev/null | grep -i "1002:" | grep -i "vga\|3d\|display" | head -1 | grep -oP '\[1002:\K[0-9a-f]{4}' || echo "")
+  local device_id
+  device_id=$(lspci -nn 2>/dev/null | grep -i "1002:" | grep -i "vga\|3d\|display" | head -1 | grep -oP '\[1002:\K[0-9a-f]{4}' || echo "")
 
   if [[ -z "$device_id" ]]; then
     return 1
   fi
 
-  local device_dec=$((16#$device_id))
+  local device_dec
+  device_dec=$((16#$device_id))
 
   if (( device_dec >= 0x7300 )); then
     echo "RDNA (RX 5000+) OpenCL capable"
@@ -172,7 +189,8 @@ detect_amd_gpu() {
 # Main Hardware Detection
 detect_nvidia_gpu() {
   # Detect NVIDIA GPU via Vendor ID 10de
-  local nvidia_devices=$(lspci -nn 2>/dev/null | grep -i "10de:" | grep -i "vga\|3d\|display" || echo "")
+  local nvidia_devices
+  nvidia_devices=$(lspci -nn 2>/dev/null | grep -i "10de:" | grep -i "vga\|3d\|display" || echo "")
   if [[ -n "$nvidia_devices" ]]; then
     echo "$nvidia_devices"
     return 0
@@ -182,7 +200,8 @@ detect_nvidia_gpu() {
 
 detect_intel_gpu() {
   # Detect Intel GPU via Vendor ID 8086
-  local intel_devices=$(lspci -nn 2>/dev/null | grep -i "8086:" | grep -i "vga\|3d\|display" || echo "")
+  local intel_devices
+  intel_devices=$(lspci -nn 2>/dev/null | grep -i "8086:" | grep -i "vga\|3d\|display" || echo "")
   if [[ -n "$intel_devices" ]]; then
     echo "$intel_devices"
     return 0
@@ -192,7 +211,8 @@ detect_intel_gpu() {
 
 detect_amd_discrete_gpu() {
   # Detect discrete AMD GPU (non-iGPU)
-  local amd_devices=$(lspci -nn 2>/dev/null | grep -i "1002:" | grep -i "vga\|3d" | grep -v "00:02" || echo "")
+  local amd_devices
+  amd_devices=$(lspci -nn 2>/dev/null | grep -i "1002:" | grep -i "vga\|3d" | grep -v "00:02" || echo "")
   if [[ -n "$amd_devices" ]]; then
     echo "$amd_devices"
     return 0
@@ -280,6 +300,7 @@ INTEL_DRIVER=""
 AMD_DETECTED=false
 AMD_SERIES=""
 
+# shellcheck disable=SC2034
 WIFI_DRIVER="generic"
 
 HYBRID_MODE=false
@@ -306,7 +327,7 @@ fi
 # AMD Discrete GPU Detection
 if detect_amd_discrete_gpu >/dev/null 2>&1; then
   AMD_DETECTED=true
-  AMD_SERIES=$(detect_amd_gpu | head -1)
+AMD_SERIES=$(detect_amd_gpu | head -1)
   info "✓ AMD GPU: $AMD_SERIES"
   detect_amd_discrete_gpu | sed 's/^/    /'
 fi
@@ -337,10 +358,12 @@ GRAPHICS_PPA_ACTIVE=false
 RESTRICTED_ACTIVE=false
 FFMPEG_ACTIVE=false
 GSTREAMER_ACTIVE=false
+# shellcheck disable=SC2034
 PPD_ACTIVE=false
 NVIDIA_DRIVER_ACTIVE=false
 INTEL_DRIVER_ACTIVE=false
 AMD_DRIVER_ACTIVE=false
+# shellcheck disable=SC2034
 DOCKER_ACTIVE=false
 
 VAINFO_OUTPUT=$(get_vainfo_output)
@@ -352,6 +375,7 @@ apt-cache policy 2>/dev/null | grep -q "ppa:oibaf/graphics-drivers" && GRAPHICS_
 pkg_installed "ubuntu-restricted-extras" && RESTRICTED_ACTIVE=true
 pkg_installed "ffmpeg" && FFMPEG_ACTIVE=true
 pkg_installed "gstreamer1.0-plugins-ugly" && GSTREAMER_ACTIVE=true
+# shellcheck disable=SC2034
 pkg_installed "power-profiles-daemon" && PPD_ACTIVE=true
 
 # Check GPU drivers
@@ -384,6 +408,7 @@ fi
 
 # Check Docker
 if pkg_installed "docker-ce"; then
+  # shellcheck disable=SC2034
   DOCKER_ACTIVE=true
   info "  ✓ Docker already installed"
 fi
@@ -833,47 +858,10 @@ if [[ "${RESTRICTED_ACTIVE}" == "true" \
   # -----------------------------------------------------------------------
   # PHASE 10.7 — Docker Engine (official repo)
   # -----------------------------------------------------------------------
-  step "[P10.7] Docker Engine (official repo)..."
+  bash "$(dirname "$0")/package/docker/docker.sh"
 
-  if pkg_installed "docker-ce"; then
-    skip "Docker already installed"
-  else
-    # Remove conflicting packages
-    step "Removing conflicting Docker packages..."
-    apt-get remove -y docker.io docker-compose docker-compose-v2 docker-doc podman-docker containerd runc 2>/dev/null || true
-    # Alternative more aggressive removal if needed:
-    # apt-get remove -y $(dpkg --get-selections docker.io docker-compose docker-compose-v2 docker-doc podman-docker containerd runc 2>/dev/null | cut -f1) || true
-
-    # Add Docker GPG key
-    apt-get install -y ca-certificates curl
-    install -m 0755 -d /etc/apt/keyrings
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc 2>/dev/null || warn "Failed to download Docker GPG key"
-    chmod a+r /etc/apt/keyrings/docker.asc
-
-    # Add Docker repository
-    tee /etc/apt/sources.list.d/docker.sources <<EOF >/dev/null
-Types: deb
-URIs: https://download.docker.com/linux/ubuntu
-Suites: \$(. /etc/os-release && echo \"\${UBUNTU_CODENAME:-\$VERSION_CODENAME}\")
-Components: stable
-Architectures: \$(dpkg --print-architecture)
-Signed-By: /etc/apt/keyrings/docker.asc
-EOF
-
-    apt-get update -y
-    apt_install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-
-    # Enable and start Docker
-    # Enable and start Docker
-    systemctl enable --now docker \
-      && ok "Docker service enabled & started." \
-      || warn "Failed to enable Docker service"
-
-    # Add user to docker group
-    usermod -aG docker parinya && ok "Added parinya to docker group." || warn "Failed to add parinya to docker group"
-
-    # -----------------------------------------------------------------------
-    # PHASE 11 — Final upgrade & cleanup
+  # -----------------------------------------------------------------------
+  # PHASE 11 — Final upgrade & cleanup
   # -----------------------------------------------------------------------
   step "[P11] Final upgrade & cleanup..."
   apt-get update -y

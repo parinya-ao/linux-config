@@ -67,6 +67,7 @@ OS_RELEASE="/etc/os-release"
 [ -r "$OS_RELEASE" ] || fail "Cannot read $OS_RELEASE"
 
 # shellcheck disable=SC1091
+# shellcheck disable=SC1090
 . "$OS_RELEASE"
 
 OS_ID="${ID:-}"

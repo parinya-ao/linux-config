@@ -81,7 +81,8 @@ jobs:
 
       # ── Fail Fast: Lint ก่อน Build (เร็วกว่า build) ──
       - name: Format check (nixfmt)
-        run: nix fmt -- --check
+        # flake formatter = nixfmt-tree (treefmt) which uses --fail-on-change for CI checks
+        run: nix fmt -- --fail-on-change
 
       - name: Lint anti-patterns (statix)
         run: nix run nixpkgs#statix -- check .

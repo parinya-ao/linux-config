@@ -61,14 +61,16 @@ skip() {
 # NVIDIA GPU Series Detection (by Device ID hex)
 detect_nvidia_series() {
   # Extract NVIDIA Device ID from lspci output: [10de:XXXX]
-  local device_id=$(lspci -nn 2>/dev/null | grep -i "10de:" | grep -i "vga\|3d\|display" | head -1 | grep -oP '\[10de:\K[0-9a-f]{4}' || echo "")
+  local device_id
+  device_id=$(lspci -nn 2>/dev/null | grep -i "10de:" | grep -i "vga\|3d\|display" | head -1 | grep -oP '\[10de:\K[0-9a-f]{4}' || echo "")
 
   if [[ -z "$device_id" ]]; then
     return 1
   fi
 
   # Convert hex to decimal for range comparison
-  local device_dec=$((16#$device_id))
+  local device_dec
+  device_dec=$((16#$device_id))
 
   # GPU Series mapping by Device ID ranges + openSUSE G-Series mapping
   if (( device_dec >= 0x2200 )); then
@@ -105,13 +107,15 @@ detect_nvidia_series() {
 # Intel GPU Generation Detection (by Device ID)
 detect_intel_generation() {
   # Extract Intel Device ID: [8086:XXXX]
-  local device_id=$(lspci -nn 2>/dev/null | grep -i "8086:" | grep -i "vga\|3d\|display" | head -1 | grep -oP '\[8086:\K[0-9a-f]{4}' || echo "")
+  local device_id
+  device_id=$(lspci -nn 2>/dev/null | grep -i "8086:" | grep -i "vga\|3d\|display" | head -1 | grep -oP '\[8086:\K[0-9a-f]{4}' || echo "")
 
   if [[ -z "$device_id" ]]; then
     return 1
   fi
 
-  local device_dec=$((16#$device_id))
+  local device_dec
+  device_dec=$((16#$device_id))
 
   # Intel GPU generation by Device ID
   if (( device_dec >= 0x7600 && device_dec <= 0x7FFF )); then
@@ -159,13 +163,15 @@ detect_intel_generation() {
 
 # AMD GPU Detection (RDNA awareness)
 detect_amd_gpu() {
-  local device_id=$(lspci -nn 2>/dev/null | grep -i "1002:" | grep -i "vga\|3d\|display" | head -1 | grep -oP '\[1002:\K[0-9a-f]{4}' || echo "")
+  local device_id
+  device_id=$(lspci -nn 2>/dev/null | grep -i "1002:" | grep -i "vga\|3d\|display" | head -1 | grep -oP '\[1002:\K[0-9a-f]{4}' || echo "")
 
   if [[ -z "$device_id" ]]; then
     return 1
   fi
 
-  local device_dec=$((16#$device_id))
+  local device_dec
+  device_dec=$((16#$device_id))
 
   if (( device_dec >= 0x7300 )); then
     echo "RDNA (RX 5000+) OpenCL capable"
@@ -179,7 +185,8 @@ detect_amd_gpu() {
 # Main Hardware Detection
 detect_nvidia_gpu() {
   # Detect NVIDIA GPU via Vendor ID 10de
-  local nvidia_devices=$(lspci -nn 2>/dev/null | grep -i "10de:" | grep -i "vga\|3d\|display" || echo "")
+  local nvidia_devices
+  nvidia_devices=$(lspci -nn 2>/dev/null | grep -i "10de:" | grep -i "vga\|3d\|display" || echo "")
   if [[ -n "$nvidia_devices" ]]; then
     echo "$nvidia_devices"
     return 0
@@ -189,7 +196,8 @@ detect_nvidia_gpu() {
 
 detect_intel_gpu() {
   # Detect Intel GPU via Vendor ID 8086
-  local intel_devices=$(lspci -nn 2>/dev/null | grep -i "8086:" | grep -i "vga\|3d\|display" || echo "")
+  local intel_devices
+  intel_devices=$(lspci -nn 2>/dev/null | grep -i "8086:" | grep -i "vga\|3d\|display" || echo "")
   if [[ -n "$intel_devices" ]]; then
     echo "$intel_devices"
     return 0
@@ -199,7 +207,8 @@ detect_intel_gpu() {
 
 detect_amd_discrete_gpu() {
   # Detect discrete AMD GPU (non-iGPU)
-  local amd_devices=$(lspci -nn 2>/dev/null | grep -i "1002:" | grep -i "vga\|3d" | grep -v "00:02" || echo "")
+  local amd_devices
+  amd_devices=$(lspci -nn 2>/dev/null | grep -i "1002:" | grep -i "vga\|3d" | grep -v "00:02" || echo "")
   if [[ -n "$amd_devices" ]]; then
     echo "$amd_devices"
     return 0
@@ -337,10 +346,12 @@ step "[STATE] Checking current installation state..."
 PACKMAN_ACTIVE=false
 FFMPEG_ACTIVE=false
 GSTREAMER_UGLY_ACTIVE=false
+# shellcheck disable=SC2034
 PPD_ACTIVE=false
 NVIDIA_DRIVER_ACTIVE=false
 INTEL_DRIVER_ACTIVE=false
 AMD_DRIVER_ACTIVE=false
+# shellcheck disable=SC2034
 DOCKER_ACTIVE=false
 
 VAINFO_OUTPUT=$(get_vainfo_output)
@@ -351,6 +362,7 @@ zypper repos 2>/dev/null | grep -qi "packman" && PACKMAN_ACTIVE=true
 # Check package state via rpm
 pkg_installed "ffmpeg" && FFMPEG_ACTIVE=true
 pkg_installed "gstreamer-plugins-ugly" && GSTREAMER_UGLY_ACTIVE=true
+# shellcheck disable=SC2034
 pkg_installed "power-profiles-daemon" && PPD_ACTIVE=true
 
 # Check GPU drivers
@@ -383,6 +395,7 @@ fi
 
 # Check Docker
 if pkg_installed "docker"; then
+  # shellcheck disable=SC2034
   DOCKER_ACTIVE=true
   info "  ✓ Docker already installed"
 fi
@@ -716,9 +729,11 @@ if [[ "${PACKMAN_ACTIVE}" == "true" \
     bluez-auto-enable-devices \
     kernel-firmware-bluetooth
 
-  systemctl enable --now bluetooth \
-    && ok "bluetooth.service enabled & started." \
-    || warn "Failed to enable bluetooth.service"
+  if systemctl enable --now bluetooth; then
+    ok "bluetooth.service enabled & started."
+  else
+    warn "Failed to enable bluetooth.service"
+  fi
 
   ok "Bluetooth stack installed."
 
@@ -802,24 +817,7 @@ if [[ "${PACKMAN_ACTIVE}" == "true" \
   # -----------------------------------------------------------------------
   # PHASE 9 — Docker Engine (official repo)
   # -----------------------------------------------------------------------
-  step "[P9] Docker Engine (official repo)..."
-
-  if pkg_installed "docker"; then
-    skip "Docker already installed"
-  else
-    # Install Docker from official repositories
-    info "Installing Docker Engine..."
-    zypper --non-interactive refresh 2>/dev/null || true
-    zypper_install docker docker-compose docker-buildx
-
-    # Enable and start Docker
-    systemctl enable --now docker \
-      && ok "Docker service enabled & started." \
-      || warn "Failed to enable Docker service"
-
-    # Add user to docker group
-    usermod -aG docker parinya && ok "Added parinya to docker group." || warn "Failed to add parinya to docker group"
-  fi
+  bash "$(dirname "$0")/package/docker/docker.sh"
 
   # -----------------------------------------------------------------------
   # PHASE 10 — Final upgrade & cleanup

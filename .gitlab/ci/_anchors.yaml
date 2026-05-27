@@ -23,7 +23,7 @@
 # ── Nix lint steps (ใช้ !reference ดึงใน job อื่น) ──
 .nix-lint-script:
   script:
-    - nix fmt -- --check
+    - nix fmt -- --fail-on-change
     - nix run nixpkgs#statix -- check .
     - nix run nixpkgs#deadnix -- --fail .
     - nix flake check --no-build

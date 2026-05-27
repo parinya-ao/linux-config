@@ -38,47 +38,49 @@ in
       nvd # nix diff between generations
     ];
 
-    # eza (ls replacement)
-    programs.eza = {
-      enable = true;
-      enableFishIntegration = true;
-      enableBashIntegration = true;
-      icons = "auto";
-      git = true; # show git status in ls
-      extraOptions = [
-        "--group-directories-first"
-        "--header"
-        "--classify"
-      ];
-    };
-
-    # bat (cat replacement)
-    programs.bat = {
-      enable = true;
-      config = {
-        theme = "TwoDark";
-        style = "full";
-        map-syntax = [
-          "*.nix:Nix"
-          "*.fish:fish"
+    programs = {
+      # eza (ls replacement)
+      eza = {
+        enable = true;
+        enableFishIntegration = true;
+        enableBashIntegration = true;
+        icons = "auto";
+        git = true; # show git status in ls
+        extraOptions = [
+          "--group-directories-first"
+          "--header"
+          "--classify"
         ];
       };
-      extraPackages = with pkgs.bat-extras; [
-        batdiff # bat-powered git diff
-        batman # bat-powered man pages
-        batgrep # bat + ripgrep
-        batwatch # bat + watch
-      ];
-    };
 
-    # direnv
-    programs.direnv = {
-      enable = true;
-      nix-direnv.enable = true;
-      config = {
-        global = {
-          warn_timeout = "5s";
-          load_dotenv = true;
+      # bat (cat replacement)
+      bat = {
+        enable = true;
+        config = {
+          theme = "TwoDark";
+          style = "full";
+          map-syntax = [
+            "*.nix:Nix"
+            "*.fish:fish"
+          ];
+        };
+        extraPackages = with pkgs.bat-extras; [
+          batdiff # bat-powered git diff
+          batman # bat-powered man pages
+          batgrep # bat + ripgrep
+          batwatch # bat + watch
+        ];
+      };
+
+      # direnv
+      direnv = {
+        enable = true;
+        nix-direnv.enable = true;
+        config = {
+          global = {
+            warn_timeout = "5s";
+            load_dotenv = true;
+          };
         };
       };
     };
