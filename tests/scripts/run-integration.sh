@@ -33,12 +33,18 @@ spin_up() {
     CURRENT_STATE="SPIN_UP"
     log_info "Starting container..."
     
-    local image=$(get_toml_val "image")
-    local name=$(get_toml_val "container_name")
-    local user=$(get_toml_val "user")
-    local pass=$(get_toml_val "password")
-    local db=$(get_toml_val "db_name")
-    local port=$(get_toml_val "port")
+    local image
+    image=$(get_toml_val "image")
+    local name
+    name=$(get_toml_val "container_name")
+    local user
+    user=$(get_toml_val "user")
+    local pass
+    pass=$(get_toml_val "password")
+    local db
+    db=$(get_toml_val "db_name")
+    local port
+    port=$(get_toml_val "port")
 
     docker run --rm --name "$name" \
         -e POSTGRES_USER="$user" -e POSTGRES_PASSWORD="$pass" -e POSTGRES_DB="$db" \
@@ -52,9 +58,12 @@ health_check() {
     CURRENT_STATE="HEALTH_CHECK"
     log_info "Waiting for DB to become ready..."
     
-    local timeout=$(get_toml_val "connection_timeout")
-    local retries=$(get_toml_val "max_retries")
-    local name=$(get_toml_val "container_name")
+    local timeout
+    timeout=$(get_toml_val "connection_timeout")
+    local retries
+    retries=$(get_toml_val "max_retries")
+    local name
+    name=$(get_toml_val "container_name")
     
     for i in $(seq 1 "$retries"); do
         if docker exec "$name" pg_isready -U postgres >/dev/null 2>&1; then
@@ -74,14 +83,17 @@ transaction_test() {
     CURRENT_STATE="TRANSACTION_TEST"
     log_info "Running transaction tests..."
     
-    local name=$(get_toml_val "container_name")
-    local db=$(get_toml_val "db_name")
+    local name
+    name=$(get_toml_val "container_name")
+    local db
+    db=$(get_toml_val "db_name")
     
     # Simple table creation and insertion
     docker exec "$name" psql -U postgres -d "$db" -c "CREATE TABLE test_table (id INT, val TEXT);"
     docker exec "$name" psql -U postgres -d "$db" -c "INSERT INTO test_table VALUES (1, 'hello');"
     
-    local result=$(docker exec "$name" psql -U postgres -d "$db" -t -c "SELECT val FROM test_table WHERE id=1;")
+    local result
+    result=$(docker exec "$name" psql -U postgres -d "$db" -t -c "SELECT val FROM test_table WHERE id=1;")
     
     if [[ "$result" == *"hello"* ]]; then
         log_success "Transaction test passed!"

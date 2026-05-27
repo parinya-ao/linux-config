@@ -26,15 +26,7 @@
 
   # Entry point that processes inputs and defines system configurations.
   outputs =
-    {
-      self,
-      nixpkgs,
-      home-manager,
-      claude-code,
-      claude-desktop,
-      codex-cli-nix,
-      ...
-    }@inputs:
+    { nixpkgs, home-manager, ... }@inputs:
     let
       # Target system architecture.
       system = "x86_64-linux";
@@ -44,16 +36,15 @@
           allowUnfree = true;
         };
       };
-      stdenv = pkgs.stdenv;
     in
     {
       # Code formatter triggered by 'nix fmt'.
-      formatter.${stdenv.hostPlatform.system} = pkgs.nixfmt-tree;
+      formatter.${pkgs.stdenv.hostPlatform.system} = pkgs.nixfmt-tree;
 
       # Home Manager configuration for user 'parinya'.
       homeConfigurations."parinya" = home-manager.lib.homeManagerConfiguration {
         # Pass the package set into the configuration modules.
-        pkgs = pkgs;
+        inherit pkgs;
 
         # Inject additional variables (like flake inputs) into all sub-modules.
         # This is required for modules like home.nix to access 'inputs.claude-code'.
@@ -71,7 +62,7 @@
                   pkgs.lib.makeLibraryPath (
                     with pkgs;
                     [
-                      stdenv.cc.cc.lib
+                      pkgs.stdenv.cc.cc.lib
                       zlib
                       zstd
                       glib

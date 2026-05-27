@@ -101,8 +101,10 @@ evaluate_security_gate() {
 
     # Simplified check using grep to find "High" or "Medium" risk items in ZAP JSON
     # Note: A real implementation would use jq for robust parsing.
-    local high=$(grep -o '"risk": "High"' "$report_json" | wc -l)
-    local med=$(grep -o '"risk": "Medium"' "$report_json" | wc -l)
+    local high
+    high=$(grep -o '"risk": "High"' "$report_json" | wc -l)
+    local med
+    med=$(grep -o '"risk": "Medium"' "$report_json" | wc -l)
 
     echo "Vulnerabilities found: High: $high, Medium: $med"
     if [ "$high" -gt 0 ] || [ "$med" -gt 0 ]; then

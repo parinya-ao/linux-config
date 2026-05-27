@@ -6,10 +6,12 @@ export DEBIAN_FRONTEND=noninteractive
 export GIT_TERMINAL_PROMPT=0
 
 LOG_FILE="$HOME/startup_$(date +%Y%m%d_%H%M%S).log"
-TARGET_DIR="${HOME}/.config/home-manager"
-REPO_URL="https://github.com/parinya-ao/linux-config.git"
+# shellcheck disable=SC2034
+export TARGET_DIR="${HOME}/.config/home-manager"
+# shellcheck disable=SC2034
+export REPO_URL="https://github.com/parinya-ao/linux-config.git"
 
-BOLD='\033[1m' ; RESET='\033[0m' ; RED='\033[1;31m' ; GREEN='\033[1;32m' ; BLUE='\033[1;34m' ; YELLOW='\033[1;33m'
+RESET='\033[0m' ; RED='\033[1;31m' ; GREEN='\033[1;32m' ; BLUE='\033[1;34m' ; YELLOW='\033[1;33m'
 
 log_step() { log "STEP" "$@"; }
 log_info() { log "INFO" "$@"; }

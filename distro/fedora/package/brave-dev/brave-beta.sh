@@ -11,7 +11,6 @@ set -euo pipefail
 # --- Configuration & Logging ---
 LOG_FILE="/var/log/brave_install_debug.log"
 CURRENT_STATE="INIT"
-TARGET_USER="${SUDO_USER:-$USER}"
 
 # --- Colors ---
 RED='\033[0;31m'

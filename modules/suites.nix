@@ -11,33 +11,22 @@ in
     desktop.enable = lib.mkEnableOption "GNOME Desktop & GUI apps";
   };
 
-  config = lib.mkMerge [
-    # Base Suite: What you want on EVERY machine
-    (lib.mkIf cfg.base.enable {
-      my.programs.bash.enable = true;
-      my.programs.fish.enable = true;
-      my.programs.cli-tools.enable = true;
-      my.packages.cli.enable = true;
-    })
-
-    # Development Suite
-    (lib.mkIf cfg.development.enable {
-      my.programs.git.enable = true;
-      my.programs.neovim.enable = true;
-      my.packages.dev.enable = true;
-    })
-
-    # AI Suite
-    (lib.mkIf cfg.ai.enable {
-      my.packages.ai.enable = true;
-    })
-
-    # Desktop Suite
-    (lib.mkIf cfg.desktop.enable {
-      my.programs.gnome.enable = true;
-      my.packages.gui.enable = true;
-      my.packages.docs.enable = true;
-      my.packages.fonts.enable = true;
-    })
-  ];
+  config = {
+    my.programs = {
+      bash = lib.mkIf cfg.base.enable { enable = true; };
+      fish = lib.mkIf cfg.base.enable { enable = true; };
+      cli-tools = lib.mkIf cfg.base.enable { enable = true; };
+      git = lib.mkIf cfg.development.enable { enable = true; };
+      neovim = lib.mkIf cfg.development.enable { enable = true; };
+      gnome = lib.mkIf cfg.desktop.enable { enable = true; };
+    };
+    my.packages = {
+      cli = lib.mkIf cfg.base.enable { enable = true; };
+      dev = lib.mkIf cfg.development.enable { enable = true; };
+      ai = lib.mkIf cfg.ai.enable { enable = true; };
+      gui = lib.mkIf cfg.desktop.enable { enable = true; };
+      docs = lib.mkIf cfg.desktop.enable { enable = true; };
+      fonts = lib.mkIf cfg.desktop.enable { enable = true; };
+    };
+  };
 }

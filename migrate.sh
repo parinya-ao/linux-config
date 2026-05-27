@@ -20,7 +20,7 @@ setup_colors() {
     if [[ -t 1 ]]; then
         C_RED='\033[0;31m'
         C_GREEN='\033[0;32m'
-        C_YELLOW='\033[0;33m'
+        C_YELLOW='\033[1;33m'
         C_BLUE='\033[0;34m'
         C_CYAN='\033[0;36m'
         C_BOLD='\033[1m'
@@ -30,6 +30,8 @@ setup_colors() {
         C_RED=''; C_GREEN=''; C_YELLOW=''; C_BLUE=''; C_CYAN=''; C_BOLD=''; C_NC=''
     fi
 }
+
+print_warning() { printf "  ${C_YELLOW}⚠ WARNING:${C_NC} %s\n" "$1"; }
 
 print_step()    { printf "\n${C_BLUE}${C_BOLD}▶ %s${C_NC}\n" "$1"; }
 print_success() { printf "  ${C_GREEN}✔ SUCCESS:${C_NC} %s\n" "$1"; }
