@@ -19,6 +19,8 @@ in
       git = lib.mkIf cfg.development.enable { enable = true; };
       neovim = lib.mkIf cfg.development.enable { enable = true; };
       gnome = lib.mkIf cfg.desktop.enable { enable = true; };
+      react-doctor = lib.mkIf cfg.ai.enable { enable = true; };
+      opencode = lib.mkIf cfg.ai.enable { enable = true; };
     };
     my.packages = {
       cli = lib.mkIf cfg.base.enable { enable = true; };

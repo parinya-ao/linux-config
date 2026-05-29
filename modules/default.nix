@@ -14,6 +14,8 @@
     ./programs/git.nix
     ./programs/gnome.nix
     ./programs/neovim.nix
+    ./programs/react-doctor.nix
+    ./programs/opencode.nix
     ./packages/font.nix
   ];
 }
