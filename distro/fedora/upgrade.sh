@@ -339,7 +339,7 @@ audit_repositories() {
     local safe_regex="^(fedora|updates|updates-testing|fedora-cisco-openh264)"
 
     local repos
-    repos=$(dnf repolist enabled -q | awk 'NR>1 {print $1}')
+    repos=$(timeout 30s dnf repolist enabled -q | awk 'NR>1 {print $1}' || echo "")
 
     local found=0
 
@@ -379,7 +379,6 @@ calculate_target_version() {
     latest=$(echo "$json" | jq -r '
         [
             .[]
-            | select(.status == "active")
             | .version
             | strings
             | select(test("^[0-9]+$"))
@@ -399,19 +398,24 @@ calculate_target_version() {
     log_info "Enterprise N-1 : $n1"
 
     if [[ $CURRENT_VER -ge $n1 ]]; then
-        log_ok "System already compliant with N-1 policy."
-        exit 0
-    fi
+        log_warn "System already compliant with N-1 policy (Current: $CURRENT_VER)."
+        log_warn "Upgrading to Latest ($latest) violates policy. Forcing DRY RUN."
 
-    local gap=$((n1 - CURRENT_VER))
-
-    if [[ $gap -gt 1 ]]; then
-        TARGET_VER=$((CURRENT_VER + 1))
-
-        log_warn "Large version gap detected."
-        log_warn "Enforcing strict +1 hop."
+        TARGET_VER="$latest"
+        DRY_RUN=1
     else
-        TARGET_VER="$n1"
+        local gap=$((n1 - CURRENT_VER))
+
+        if [[ $gap -gt 1 ]]; then
+            TARGET_VER=$((CURRENT_VER + 1))
+            log_warn "Large version gap detected."
+            log_warn "Enforcing strict +1 hop."
+        else
+            TARGET_VER="$n1"
+        fi
+
+        log_ok "Compliant upgrade path. Auto-confirming upgrade."
+        AUTO_CONFIRM=1
     fi
 
     if [[ $MAX_ALLOWED_VERSION -gt 0 ]] && \
@@ -454,6 +458,11 @@ refresh_system() {
 
 validate_reboot_state() {
     CURRENT_STATE="REBOOT_CHECK"
+
+    if [[ $DRY_RUN -eq 1 ]]; then
+        log_info "[DRY RUN] Skipping kernel reboot checks."
+        return
+    fi
 
     local reboot_required=0
 
