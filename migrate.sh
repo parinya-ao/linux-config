@@ -132,13 +132,15 @@ integration_test() {
         return 1
     fi
     
-    # Verify every requested target exists in the new lockfile
-    for target in "${targets[@]}"; do
-        if ! grep -q "\"$target\"" flake.lock; then
-            print_error "Target '$target' is missing from flake.lock."
-            return 1
-        fi
-    done
+    # Verify every requested target exists in the new lockfile (if specific targets were given)
+    if [[ ${#targets[@]} -gt 0 ]]; then
+        for target in "${targets[@]}"; do
+            if ! grep -q "\"$target\"" flake.lock; then
+                print_error "Target '$target' is missing from flake.lock."
+                return 1
+            fi
+        done
+    fi
     
     print_success "All integrity checks passed."
 }
@@ -167,8 +169,8 @@ cleanup() {
 main() {
     setup_colors
     
-    # Accept user arguments or default to 'nixpkgs'
-    local targets=("${@:-nixpkgs}")
+    # Accept user arguments (empty means update ALL)
+    local targets=("$@")
     
     # Secure variables initialized ONLY upon execution
     LOCK_BACKUP="flake.lock.bak"
