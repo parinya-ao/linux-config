@@ -72,9 +72,12 @@ run_garbage_collection() {
     log_debug "Executing: nix-store --gc"
     
     # Run GC and capture the output to extract freed space info
-    local gc_output
     if gum spin --spinner globe --title "Cleaning up Nix store..." -- \
         bash -c "gc_output=\$(nix-store --gc 2>&1); echo \"\$gc_output\" >> \"$LOG_FILE\"; echo \"\$gc_output\""; then
+        # Capture the output from the subshell
+        local gc_output
+        gc_output=$(gum spin --spinner globe --title "Cleaning up Nix store..." -- \
+            bash -c "nix-store --gc 2>&1")
         echo "$gc_output" >> "$LOG_FILE"
         local bytes_freed
         bytes_freed=$(echo "$gc_output" | grep -oP '\d+(?= bytes freed)' || echo "Unknown")
