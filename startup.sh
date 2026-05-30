@@ -1,31 +1,36 @@
 #!/usr/bin/env bash
 # =============================================================================
 #  startup.sh  — Universal Bootstrap for parinya-ao/linux-config
-#  1. Detects distro via /etc/os-release (ID / ID_LIKE)
-#  2. Dispatches to the per-distro driver script (apt / dnf / zypper)
-#  3. Installs Nix (Determinate Systems, multi-user, no-confirm)
-#  4. Clones / pulls the Home Manager config repo
-#  5. Runs `home-manager switch` via Nix flakes
+#  Architecture: Gum-powered, 100% Non-interactive, OOTB
+#  1. Bootstraps gum (if missing) via universal binary download
+#  2. Detects distro via /etc/os-release
+#  3. Dispatches per-distro driver script (apt / dnf / zypper)
+#  4. Installs Nix (Determinate Systems, multi-user, no-confirm)
+#  5. Clones / pulls the Home Manager config repo
+#  6. Runs `home-manager switch` via Nix flakes
 # =============================================================================
 set -Eeuo pipefail
 umask 022
 
-# ── Color / logging ──────────────────────────────────────────────────────────
-BOLD=$'\033[1m'
-RESET=$'\033[0m'
-BLUE=$'\033[1;34m'
-GREEN=$'\033[1;32m'
-YELLOW=$'\033[1;33m'
-RED=$'\033[1;31m'
+# ── Bootstrap gum (OOTB: works on any distro, no sudo, no package manager) ──
+if ! command -v gum &>/dev/null; then
+  GUM_VERSION="0.14.0"
+  mkdir -p /tmp/gum-bin
+  curl -fsSL "https://github.com/charmbracelet/gum/releases/download/v${GUM_VERSION}/gum_${GUM_VERSION}_linux_x86_64.tar.gz" \
+    | tar -xz -C /tmp/gum-bin --strip-components=1 "gum_${GUM_VERSION}_linux_x86_64/gum"
+  chmod +x /tmp/gum-bin/gum
+  export PATH="/tmp/gum-bin:$PATH"
+fi
 
-step() { printf '%s[STEP]%s %s\n' "$BLUE"  "$RESET" "$*"; }
-ok()   { printf '%s[ OK ]%s %s\n' "$GREEN" "$RESET" "$*"; }
-warn() { printf '%s[WARN]%s %s\n' "$YELLOW" "$RESET" "$*" >&2; }
-fail() { printf '%s[FAIL]%s %s\n' "$RED"   "$RESET" "$*" >&2; exit 1; }
-info() { printf '%s[INFO]%s %s\n' "$YELLOW" "$RESET" "$*"; }
+# ── Gum-based UI (no raw ANSI codes) ────────────────────────────────────────
+step() { gum style --foreground "#00BFFF" --bold "▶ $*"; }
+ok()   { gum style --foreground "#04B575" "  ✔ $*"; }
+warn() { gum style --foreground "#FFA500" "  ⚠ $*" >&2; }
+info() { gum style --foreground "#FFA500" "  ℹ $*"; }
+fail() { gum style --foreground "#FF4500" --bold "  ✖ $*" >&2; exit 1; }
 
 # ── Trap ─────────────────────────────────────────────────────────────────────
-trap 'fail "Unexpected error at line $LINENO: $BASH_COMMAND"' ERR
+trap 'fail "Unexpected error at line $LINENO"' ERR
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 need_cmd() { command -v "$1" >/dev/null 2>&1 || fail "Required command not found: $1"; }
@@ -56,8 +61,6 @@ is_atomic() {
 }
 
 # ── stdin guard: ปิด interactive input ทุกอย่าง ──────────────────────────────
-# ถ้ารันแบบ pipe (curl | bash) stdin อาจเป็น pipe ไม่ใช่ terminal
-# บังคับ close stdin เพื่อให้ทุก child process ไม่รอ keyboard
 exec </dev/null
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -66,8 +69,7 @@ exec </dev/null
 OS_RELEASE="/etc/os-release"
 [ -r "$OS_RELEASE" ] || fail "Cannot read $OS_RELEASE"
 
-# shellcheck disable=SC1091
-# shellcheck disable=SC1090
+# shellcheck disable=SC1091,SC1090
 . "$OS_RELEASE"
 
 OS_ID="${ID:-}"
@@ -114,33 +116,34 @@ esac
 [ -f "$DISTRO_SCRIPT" ] || fail "Distro script not found: $DISTRO_SCRIPT"
 [ -r "$DISTRO_SCRIPT" ] || fail "Distro script not readable: $DISTRO_SCRIPT"
 
-info "Detected:  ${BOLD}${OS_PRETTY}${RESET}"
+gum style --bold --foreground "#00BFFF" "  Detected:  $(gum style --italic "$OS_PRETTY")"
 info "Script:    $DISTRO_SCRIPT"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # PART 1 — Run distro-specific driver
 # ─────────────────────────────────────────────────────────────────────────────
-step "Running distro driver: $(basename "$DISTRO_SCRIPT")"
-# ✅ stdin already closed above — child script cannot block waiting for input
-# Distro driver requires root for package installation, firmware, etc.
-bash "$DISTRO_SCRIPT" "$@"
-ok "Distro driver finished."
+if gum spin --spinner line --title "Running distro driver: $(basename "$DISTRO_SCRIPT")" -- \
+  bash "$DISTRO_SCRIPT" "$@"; then
+  ok "Distro driver finished."
+else
+  fail "Distro driver failed."
+fi
 
 # ─────────────────────────────────────────────────────────────────────────────
-# PART 2 — Install Nix (Determinate Systems, no-confirm = fully non-interactive)
+# PART 2 — Install Nix (Determinate Systems, no-confirm)
 # ─────────────────────────────────────────────────────────────────────────────
-step "Checking Nix installation..."
-
 if command -v nix >/dev/null 2>&1; then
   NIX_VER="$(nix --version 2>/dev/null || echo 'unknown')"
-  info "Nix already installed: ${BOLD}${NIX_VER}${RESET} — skipping."
+  info "Nix already installed: $(gum style --bold "$NIX_VER") — skipping."
 else
-  step "Installing Nix via Determinate Systems installer..."
   need_cmd curl
-  # --no-confirm removes ALL interactive prompts (confirmed by Determinate docs)
-  curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix \
-    | sh -s -- install --no-confirm
-  ok "Nix installed."
+  if gum spin --spinner globe --title "Installing Nix package manager..." -- \
+    curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix \
+      | sh -s -- install --no-confirm; then
+    ok "Nix installed."
+  else
+    fail "Nix installation failed."
+  fi
 fi
 
 NIX_PROFILE='/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh'
@@ -158,8 +161,6 @@ info "Nix version: $(nix --version)"
 # ─────────────────────────────────────────────────────────────────────────────
 # PART 3 — Clone / update Home Manager config repo (fully non-interactive)
 # ─────────────────────────────────────────────────────────────────────────────
-step "Preparing Home Manager config directory..."
-
 TARGET_USER="parinya"
 TARGET_HOME="/home/${TARGET_USER}"
 TARGET_DIR="${TARGET_HOME}/.config/home-manager"
@@ -168,20 +169,16 @@ REPO_URL="https://github.com/parinya-ao/linux-config.git"
 mkdir -p "$(dirname "$TARGET_DIR")"
 
 if [ ! -d "${TARGET_DIR}/.git" ]; then
-  step "Cloning repo → ${TARGET_DIR}"
   need_cmd git
-  # GIT_TERMINAL_PROMPT=0 → ป้องกัน git ถามรหัสผ่าน (repo นี้ public ไม่ต้องการ)
-  GIT_TERMINAL_PROMPT=0 git clone "$REPO_URL" "$TARGET_DIR"
-  chown -R "${TARGET_USER}:${TARGET_USER}" "$TARGET_DIR"
-  ok "Repo cloned and ownership set to ${TARGET_USER}."
+  if gum spin --spinner points --title "Cloning repo → ${TARGET_DIR}" -- \
+    GIT_TERMINAL_PROMPT=0 git clone "$REPO_URL" "$TARGET_DIR"; then
+    chown -R "${TARGET_USER}:${TARGET_USER}" "$TARGET_DIR"
+    ok "Repo cloned and ownership set to ${TARGET_USER}."
+  else
+    fail "Git clone failed."
+  fi
 else
-  step "Repo exists — syncing to latest..."
   need_cmd git
-  # ✅ reset hard แทน stash → ไม่มีทางหยุดรอ input เลย
-  # (local changes จะถูก discard — เพราะ source of truth คือ remote)
-  # git -C "$TARGET_DIR" fetch --quiet origin
-  # git -C "$TARGET_DIR" reset --hard origin/main 2>/dev/null \
-  #  || git -C "$TARGET_DIR" reset --hard origin/master
   chown -R "${TARGET_USER}:${TARGET_USER}" "$TARGET_DIR"
   ok "Repo exists and ownership verified."
 fi
@@ -189,33 +186,29 @@ fi
 # ─────────────────────────────────────────────────────────────────────────────
 # PART 4 — Home Manager switch (fully non-interactive)
 # ─────────────────────────────────────────────────────────────────────────────
-step "Running Home Manager switch..."
-
 cd "$TARGET_DIR"
 
-# Ensure dbus-run-session is available (it's in dbus-x11 on Fedora/Ubuntu)
-# This is required for dconfSettings activation in a non-interactive shell.
 dnf install -y dbus-x11 2>/dev/null || apt-get install -y dbus-x11 2>/dev/null || zypper --non-interactive install dbus-1-x11 2>/dev/null || true
 
-# ✅ --impure removed (default pure is safer)
-# ✅ -b backup → HM จะ rename file ที่ชนกัน แทนที่จะถาม
-# ✅ dbus-run-session → provides a private D-Bus session for dconf/GSettings
-sudo -u "${TARGET_USER}" -H \
-  dbus-run-session bash -c \
-    "source /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh && \
-     /nix/var/nix/profiles/default/bin/nix \
-       --extra-experimental-features 'nix-command flakes' \
-       run home-manager/master -- \
-       switch --flake '$TARGET_DIR#${TARGET_USER}' -b backup --show-trace"
+if gum spin --spinner dot --title "Building Home Manager environment..." -- \
+  sudo -u "${TARGET_USER}" -H \
+    dbus-run-session bash -c \
+      "source /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh && \
+       /nix/var/nix/profiles/default/bin/nix \
+         --extra-experimental-features 'nix-command flakes' \
+         run home-manager/master -- \
+         switch --flake '$TARGET_DIR#${TARGET_USER}' -b backup --show-trace"; then
+  ok "Home Manager switch complete."
+else
+  fail "Home Manager switch failed."
+fi
 
-ok "Home Manager switch complete."
-
-echo
-echo -e "${BOLD}--------------------------------------------------${RESET}"
-echo -e "${BOLD}  ALL DONE  ${RESET}"
-echo -e "${BOLD}--------------------------------------------------${RESET}"
-echo -e "  Distro driver    $(basename "$DISTRO_SCRIPT")"
-echo -e "  Nix              $(nix --version 2>/dev/null || echo 'installed')"
-echo -e "  Home Manager     switched → .#parinya"
-echo -e "${BOLD}--------------------------------------------------${RESET}"
-warn "Open a new terminal (or reboot) for all PATH changes to take effect."
+# ── Summary ──────────────────────────────────────────────────────────────────
+gum style --border rounded --margin "1 2" --padding "1 2" --border-foreground "#04B575" \
+  "$(gum style --bold --foreground "#04B575" "🎉 ALL DONE")" \
+  "" \
+  "Distro driver    $(basename "$DISTRO_SCRIPT")" \
+  "Nix              $(nix --version 2>/dev/null || echo 'installed')" \
+  "Home Manager     switched → .#parinya" \
+  "" \
+  "$(gum style --italic --foreground "#FFA500" "Open a new terminal (or reboot) for all PATH changes to take effect.")"

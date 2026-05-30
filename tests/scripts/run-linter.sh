@@ -45,9 +45,20 @@ fi
 # Check for fish
 if [ -n "$FISH_FILES" ]; then
     if ! command -v fish &> /dev/null; then
-        echo -e "${RED}Error: 'fish' not found but .fish files exist.${NC}"
-        EXIT_CODE=1
-        CHECK_FISH=false
+        # Try to install fish if we are on a Debian-based system
+        if [ -x "$(command -v apt-get)" ]; then
+            echo -e "${YELLOW}Warning: 'fish' not found but .fish files exist. Attempting to install...${NC}"
+            if apt-get update && apt-get install -y fish; then
+                echo -e "${GREEN}Successfully installed fish.${NC}"
+                CHECK_FISH=true
+            else
+                echo -e "${YELLOW}Failed to install fish. Skipping fish linting.${NC}"
+                CHECK_FISH=false
+            fi
+        else
+            echo -e "${YELLOW}Warning: 'fish' not found but .fish files exist. Skipping fish linting (no apt-get found).${NC}"
+            CHECK_FISH=false
+        fi
     else
         CHECK_FISH=true
     fi

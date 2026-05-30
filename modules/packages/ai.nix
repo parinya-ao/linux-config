@@ -18,9 +18,10 @@ in
   config = lib.mkIf cfg.enable {
     home.packages = [
       inputs.claude-code.packages.${pkgs.stdenv.hostPlatform.system}.default
-      inputs.claude-desktop.packages.${pkgs.stdenv.hostPlatform.system}.claude-desktop-fhs
+      # inputs.claude-desktop.packages.${pkgs.stdenv.hostPlatform.system}.claude-desktop-fhs  # broken upstream
       inputs.codex-cli-nix.packages.${pkgs.stdenv.hostPlatform.system}.default
       pkgs.github-copilot-cli
+      pkgs.rtk
       pkgs.bash
     ];
   };

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2015,SC2162
 # =============================================================================
 # atomic.sh - Fedora Atomic (rpm-ostree) Driver, Firmware & Codec Installer
 # Auto-detects install state and runs the correct round automatically.

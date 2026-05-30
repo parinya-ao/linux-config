@@ -201,6 +201,7 @@ nmcli_apply_dns() {
 
 netplan_pick_file() {
   local file=""
+  # shellcheck disable=SC2012
   file="$(ls -1 /etc/netplan/*.yaml 2>/dev/null | head -n1 || true)"
   [[ -n "$file" ]] || die "No netplan YAML found in /etc/netplan/"
   printf '%s\n' "$file"
@@ -233,12 +234,14 @@ netplan_apply_dns() {
   dns6_yaml=""
 
   if [[ -n "$dns4" ]]; then
+    # shellcheck disable=SC2086
     while read -r ip; do
       [[ -n "$ip" ]] && dns4_yaml="${dns4_yaml}          - ${ip}"$'\n'
     done <<< "$(printf '%s\n' $dns4)"
   fi
 
   if [[ -n "$dns6" ]]; then
+    # shellcheck disable=SC2086
     while read -r ip; do
       [[ -n "$ip" ]] && dns6_yaml="${dns6_yaml}          - ${ip}"$'\n'
     done <<< "$(printf '%s\n' $dns6)"

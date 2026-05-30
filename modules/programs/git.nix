@@ -38,11 +38,16 @@ in
           lg = "log --oneline --graph --decorate --all";
           stash-all = "stash push --include-untracked";
           recent = "branch --sort=-committerdate --format='%(committerdate:relative)%09%(refname:short)'";
+          pushf = "push --force-with-lease";
+          pushforce = "push --force-with-lease --force-if-includes";
+          fixup = "commit --fixup";
+          squash = "commit --squash";
         };
 
         user = {
           name = "parinya-ao";
           email = "flim.parinya.ao@gmail.com";
+          signingkey = "~/.ssh/id_ed25519";
         };
 
         init.defaultBranch = "main";
@@ -70,6 +75,14 @@ in
           algorithm = "histogram";
           colorMoved = "default";
           colorMovedWS = "allow-indentation-change";
+        };
+
+        gpg = {
+          format = "ssh";
+        };
+
+        commit = {
+          gpgsign = true;
         };
       };
     };

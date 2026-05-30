@@ -1,43 +1,45 @@
-#!/usr/bin/env bash
+#!/usr/bin/env nix-shell
+# shellcheck shell=bash
+#!nix-shell -i bash -p gum
 # ==============================================================================
 # Script: clean.sh (Nix System Cleanup)
 # Description: Production-grade automated cleanup for Nix environments.
 # Architecture: Modular, KISS, State-driven, Open Architecture, Integration Tested
+# UI: Gum-powered, Minimalist, 100% Non-interactive
 # ==============================================================================
 
-# Strict mode: fail on undefined vars, and pipe failures
-set -uo pipefail
-
-# --- Global Configurations ---
+# ── Global Configurations ─────────────────────────────────────────────────────
 readonly LOG_FILE="/tmp/nix_system_cleanup.log"
-CURRENT_STATE="INIT"
 
-# --- ANSI Color Codes ---
-readonly C_RED='\033[0;31m'
-readonly C_GREEN='\033[0;32m'
-readonly C_YELLOW='\033[0;33m'
-readonly C_BLUE='\033[0;34m'
-readonly C_MAGENTA='\033[0;35m'
-readonly C_CYAN='\033[0;36m'
-readonly C_NC='\033[0m' # No Color
+# Track current pipeline state (used externally by test_clean.bats)
+export CURRENT_STATE
 
-# --- Logging Framework ---
-log() { echo -e "[$(date +'%Y-%m-%dT%H:%M:%S%z')] $1" | tee -a "$LOG_FILE"; }
-log_info()    { log "${C_BLUE}[INFO]${C_NC} $1"; }
-log_success() { log "${C_GREEN}[SUCCESS]${C_NC} $1"; }
-log_error()   { log "${C_RED}[ERROR]${C_NC} $1"; }
-log_debug()   { log "${C_YELLOW}[DEBUG]${C_NC} [STATE: ${C_MAGENTA}${CURRENT_STATE}${C_NC}] $1"; }
+# ── Gum-based UI (no raw ANSI codes) ─────────────────────────────────────────
+step() { gum style --foreground "#00BFFF" --bold "▶ $*"; }
+ok()   { gum style --foreground "#04B575" "  ✔ $*"; }
+warn() { gum style --foreground "#FFA500" "  ⚠ $*" >&2; }
+fail() { gum style --foreground "#FF4500" --bold "  ✖ $*" >&2; exit 1; }
 
-# --- Error Handler Trap ---
+# ── Logging Framework (to file only) ─────────────────────────────────────────
+log() { echo "[$(date +'%Y-%m-%dT%H:%M:%S%z')] $1" >> "$LOG_FILE"; }
+log_info()    { log "[INFO] $1"; }
+log_success() { log "[SUCCESS] $1"; }
+log_error()   { log "[ERROR] $1"; }
+log_debug()   { log "[DEBUG] $1"; }
+
+# ── Error Handler Trap ───────────────────────────────────────────────────────
 error_handler() {
     # Don't trigger if we are inside a BATS test environment
     if [ "${BATS_TEST_NAME:-unset}" != "unset" ]; then
         return
     fi
-    log_error "Script failed during state: ${CURRENT_STATE}. Please check ${LOG_FILE} for details."
-    exit 1
+    log_error "Script failed. Please check ${LOG_FILE} for details."
+    fail "Cleanup failed. See $LOG_FILE for details."
 }
-# trap 'error_handler' ERR
+trap 'error_handler' ERR
+
+# ── Helpers ──────────────────────────────────────────────────────────────────
+need_cmd() { command -v "$1" >/dev/null 2>&1 || fail "Required command not found: $1"; }
 
 # ==============================================================================
 # MODULAR FUNCTIONS
@@ -60,8 +62,10 @@ remove_old_generations() {
     CURRENT_STATE="REMOVE_OLD_GENERATIONS"
     log_debug "Executing: nix-env --delete-generations old"
     
-    if nix-env --delete-generations old >> "$LOG_FILE" 2>&1; then
+    if gum spin --spinner line --title "Removing old generations..." -- \
+        nix-env --delete-generations old >> "$LOG_FILE" 2>&1; then
         log_success "Old generations removed successfully."
+        ok "Old generations removed"
     else
         log_error "Failed to remove old generations."
         return 1
@@ -69,16 +73,21 @@ remove_old_generations() {
 }
 
 run_garbage_collection() {
-    CURRENT_STATE="GARBAGE_COLLECTION"
+    CURRENT_STATE="RUN_GARBAGE_COLLECTION"
     log_debug "Executing: nix-store --gc"
     
     # Run GC and capture the output to extract freed space info
-    local gc_output
-    if gc_output=$(nix-store --gc 2>&1); then
+    if gum spin --spinner globe --title "Cleaning up Nix store..." -- \
+        bash -c "gc_output=\$(nix-store --gc 2>&1); echo \"\$gc_output\" >> \"$LOG_FILE\"; echo \"\$gc_output\""; then
+        # Capture the output from the subshell
+        local gc_output
+        gc_output=$(gum spin --spinner globe --title "Cleaning up Nix store..." -- \
+            bash -c "nix-store --gc 2>&1")
         echo "$gc_output" >> "$LOG_FILE"
         local bytes_freed
         bytes_freed=$(echo "$gc_output" | grep -oP '\d+(?= bytes freed)' || echo "Unknown")
-        log_success "Garbage collection completed. Freed: ${C_CYAN}${bytes_freed} bytes${C_NC}."
+        log_success "Garbage collection completed. Freed: ${bytes_freed} bytes."
+        ok "Garbage collection completed"
     else
         log_error "Garbage collection failed."
         return 1
@@ -86,11 +95,13 @@ run_garbage_collection() {
 }
 
 optimize_nix_store() {
-    CURRENT_STATE="OPTIMIZE_STORE"
+    CURRENT_STATE="OPTIMIZE_NIX_STORE"
     log_debug "Executing: nix-store --optimize"
     
-    if nix-store --optimize >> "$LOG_FILE" 2>&1; then
+    if gum spin --spinner points --title "Optimizing Nix store..." -- \
+        nix-store --optimize >> "$LOG_FILE" 2>&1; then
         log_success "Nix store optimization completed (hardlinks created)."
+        ok "Nix store optimized"
     else
         log_error "Nix store optimization failed."
         return 1
@@ -115,13 +126,15 @@ integration_test() {
     
     # Test 2: Verify Nix store health after GC and Optimization
     log_debug "Test 2: Verifying Nix store paths..."
-    if nix-store --verify --check-contents >> "$LOG_FILE" 2>&1; then
+    if gum spin --spinner dot --title "Verifying Nix store integrity..." -- \
+        nix-store --verify --check-contents >> "$LOG_FILE" 2>&1; then
         log_success "[Test 2 Passed] Nix store integrity verified successfully."
+        ok "Nix store verified"
     else
         log_error "[Test 2 Failed] Nix store verification failed. Corrupted paths detected."
         exit 1
     fi
-
+    
     log_success "All system integration tests passed flawlessly."
 }
 
@@ -129,10 +142,12 @@ integration_test() {
 # MAIN EXECUTION (Open Architecture)
 # ==============================================================================
 main() {
-    # สร้างไฟล์ log อย่างปลอดภัย
-    touch "$LOG_FILE" || { echo -e "${C_RED}[ERROR]${C_NC} Cannot write to ${LOG_FILE}. Exiting." >&2; exit 1; }
+    # Create log file safely
+    touch "$LOG_FILE" || { echo "Cannot write to ${LOG_FILE}. Exiting." >&2; exit 1; }
     
     log_info "Starting Nix Environment Cleanup Pipeline"
+    gum style --border double --margin "1" --padding "1 2" --border-foreground "#00BFFF" \
+        "$(gum style --bold --foreground "#00BFFF" "🧹 Nix System Cleanup")"
     
     verify_dependencies
     remove_old_generations
@@ -142,11 +157,18 @@ main() {
     # Run self-check at the end
     integration_test
     
-    CURRENT_STATE="DONE"
     log_info "Cleanup pipeline executed and verified successfully."
+    
+    echo ""
+    gum format -- "✅ **Cleanup Complete!** Your Nix environment is now pristine." \
+        "" \
+        "📋 Log file: $LOG_FILE" \
+        "" \
+        "$(gum style --italic --foreground "#FFA500" "Run \`nix-env --list-generations\` to see current generations.")"
 }
 
-# รัน Main เฉพาะในกรณีที่ถูกเรียกเป็น Script (ไม่รันตอนถูกนำไป source)
+# Run Main only when script is executed (not when sourced)
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    set -euo pipefail
     main "$@"
 fi

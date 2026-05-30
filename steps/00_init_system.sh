@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/core.sh"
+# shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/system.sh"
 
 dispatch_distro() {
     log_step "Detecting OS Architecture..."
     if [ ! -f /etc/os-release ]; then abort "OS release info missing"; fi
+    # shellcheck disable=SC1091
     . /etc/os-release
 
     local script_path=""

@@ -9,7 +9,8 @@
 
     # Tool for managing user environment and dotfiles.
     home-manager = {
-      url = "github:nix-community/home-manager";
+      # Use master branch to match nixos-unstable nixpkgs.
+      url = "github:nix-community/home-manager/master";
       # Ensure home-manager uses the same nixpkgs version to save space.
       inputs.nixpkgs.follows = "nixpkgs";
     };
@@ -26,20 +27,60 @@
 
   # Entry point that processes inputs and defines system configurations.
   outputs =
-    { nixpkgs, home-manager, ... }@inputs:
+    {
+      self,
+      nixpkgs,
+      home-manager,
+      ...
+    }@inputs:
     let
       # Target system architecture.
       system = "x86_64-linux";
+
+      # ── Custom overlay: make agent-skills available as pkgs.agent-skills ──
+      agentSkillsOverlay = _final: prev: {
+        agent-skills = prev.callPackage ./pkgs/agent-skills { };
+      };
+
       pkgs = import nixpkgs {
         inherit system;
         config = {
           allowUnfree = true;
         };
+        overlays = [ agentSkillsOverlay ];
       };
     in
     {
+      # Expose agent-skills as a flake package so anyone can build and use it:
+      #   nix build .#agent-skills
+      #   nix build github:user/repo#agent-skills
+      packages.${system}.agent-skills = pkgs.agent-skills;
+
       # Code formatter triggered by 'nix fmt'.
       formatter.${pkgs.stdenv.hostPlatform.system} = pkgs.nixfmt-tree;
+
+      # ── Flake checks — run with `nix flake check` ──
+      checks.${system} = {
+        # 1. Build the package (includes installCheckPhase)
+        agent-skills-build = pkgs.agent-skills;
+
+        # 2. Formatting check
+        formatting =
+          pkgs.runCommand "check-formatting"
+            {
+              nativeBuildInputs = [ pkgs.nixfmt ];
+            }
+            ''
+              cd ${self}
+              echo "=== Checking Nix formatting ==="
+              nixfmt --check $(find . -name "*.nix" -type f) 2>&1 || {
+                echo ""
+                echo "Run 'nix fmt' to fix formatting issues."
+                exit 1
+              }
+              touch $out
+            '';
+      };
 
       # Home Manager configuration for user 'parinya'.
       homeConfigurations."parinya" = home-manager.lib.homeManagerConfiguration {
@@ -58,7 +99,7 @@
             { pkgs, ... }:
             {
               programs.fish.shellAliases = {
-                uv = "env LD_LIBRARY_PATH=${
+                uv = "env LD_LIBRARY_PATH=/usr/lib64:${
                   pkgs.lib.makeLibraryPath (
                     with pkgs;
                     [

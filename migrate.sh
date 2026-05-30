@@ -1,197 +1,110 @@
-#!/usr/bin/env bash
+#!/usr/bin/env nix-shell
+# shellcheck shell=bash
+#!nix-shell -i bash -p gum git
 # ==============================================================================
-# Script: mirate.sh
-# Description: Pure-Modular Nix Flake Updater (KISS, Open Architecture, CI/CD Ready)
+# Script: migrate.sh
+# Description: Pure-Modular Nix Flake Updater (100% Auto-fixes, Gum UI)
+# Architecture: KISS, State-driven, Out-of-the-box
 # ==============================================================================
 
 set -euo pipefail
 
 # ------------------------------------------------------------------------------
-# 1. State Variables (Initialized empty, populated only upon execution)
+# 1. UI Helpers (Powered by Gum) - Standardized across all scripts
 # ------------------------------------------------------------------------------
-LOCK_BACKUP=""
-UPDATE_LOG=""
+step() { gum style --foreground "#00BFFF" --bold "▶ $*"; }
+ok()   { gum style --foreground "#04B575" "  ✔ $*"; }
+warn() { gum style --foreground "#FFA500" "  ⚠ $*" >&2; }
+info() { gum style --foreground "#00BFFF" "  ℹ $*"; }
+fail() { gum style --foreground "#FF4500" --bold "  ✖ $*" >&2; exit 1; }
 
 # ------------------------------------------------------------------------------
-# 2. UI & Logging Modules (CI/CD Compliant)
+# 2. Resiliency & Rollback
 # ------------------------------------------------------------------------------
-setup_colors() {
-    # Check if standard output is a terminal (TTY)
-    if [[ -t 1 ]]; then
-        C_RED='\033[0;31m'
-        C_GREEN='\033[0;32m'
-        C_YELLOW='\033[1;33m'
-        C_BLUE='\033[0;34m'
-        C_CYAN='\033[0;36m'
-        C_BOLD='\033[1m'
-        C_NC='\033[0m'
-    else
-        # Disable colors for raw log files or CI/CD environments
-        C_RED=''; C_GREEN=''; C_YELLOW=''; C_BLUE=''; C_CYAN=''; C_BOLD=''; C_NC=''
-    fi
-}
-
-print_warning() { printf "  ${C_YELLOW}⚠ WARNING:${C_NC} %s\n" "$1"; }
-
-print_step()    { printf "\n${C_BLUE}${C_BOLD}▶ %s${C_NC}\n" "$1"; }
-print_success() { printf "  ${C_GREEN}✔ SUCCESS:${C_NC} %s\n" "$1"; }
-print_info()    { printf "  ${C_CYAN}ℹ INFO:${C_NC} %s\n" "$1"; }
-print_error()   { printf "\n  ${C_RED}✖ ERROR:${C_NC} %s\n" "$1" >&2; }
-
-# ------------------------------------------------------------------------------
-# 3. Resiliency Module (File-State based Rollback)
-# ------------------------------------------------------------------------------
+# shellcheck disable=SC2317
 rollback_on_error() {
     local exit_code=$?
-    trap - ERR INT TERM # Prevent recursive trap calls
-
-    print_error "Process interrupted or failed. Initiating rollback sequence..."
-
-    # Rely entirely on File-System state (KISS Principle)
-    if [[ -n "${LOCK_BACKUP:-}" && -f "$LOCK_BACKUP" ]]; then
-        print_info "Restoring stable flake.lock from backup..."
-        mv "$LOCK_BACKUP" flake.lock
-        print_success "Rollback complete. System integrity secured."
-    fi
-
-    if [[ -n "${UPDATE_LOG:-}" && -f "$UPDATE_LOG" ]]; then
-        rm -f "$UPDATE_LOG"
-    fi
-
+    trap - ERR INT TERM
+    fail "Process interrupted! Rolling back..."
+    [[ -f "flake.lock.bak" ]] && mv "flake.lock.bak" "flake.lock" && ok "Lockfile restored."
     exit "$exit_code"
 }
 
 # ------------------------------------------------------------------------------
-# 4. Core Business Logic (Pure Functions, No Global State Dependencies)
+# 3. 100% Automation & Auto-Fixes
 # ------------------------------------------------------------------------------
-verify_environment() {
-    print_step "Verifying Environment..."
-    if ! command -v nix >/dev/null 2>&1; then
-        print_error "Nix package manager is not installed."
-        return 1
-    fi
-    if [[ ! -f "flake.nix" ]]; then
-        print_error "flake.nix not found in $(pwd)."
-        return 1
-    fi
-    print_success "Environment is valid."
-}
-
-backup_lockfile() {
-    local backup_path="$1"
-    print_step "Securing Lockfile..."
-    if [[ -f "flake.lock" ]]; then
-        cp flake.lock "$backup_path"
-        print_success "Lockfile backed up to ${backup_path}"
-    else
-        print_info "No existing lockfile. Proceeding with fresh generation."
+fix_git_state() {
+    if ! git diff-index --quiet HEAD -- || git ls-files --others --exclude-standard | grep -q "."; then
+        gum spin --spinner line --title "Staging untracked files to Git..." -- git add -A
+        ok "Git tree is clean and ready for Flake."
     fi
 }
 
-execute_migration() {
-    local log_path="$1"
-    shift
-    local targets=("$@") # Can handle multiple inputs natively
-    
-    print_step "Updating Targets: ${targets[*]}"
-    print_info "Fetching updates from upstream..."
-
-    # Pass all targets directly to the Nix command
-    nix --extra-experimental-features "nix-command flakes" \
-        flake update "${targets[@]}" > "$log_path" 2>&1 || return 1
-        
-    print_success "Update command executed."
-}
-
-analyze_changes() {
-    local log_path="$1"
-    print_step "Migration Summary"
-    
-    local changes
-    changes=$(grep -vE "^warning:|^$" "$log_path" || true)
-    
-    if [[ -n "$changes" ]]; then
-        printf "%s\n" "$changes" | sed 's/^/      /'
-        print_info "Dependencies advanced successfully."
-    else
-        print_info "No changes. All inputs are up-to-date."
-    fi
-}
-
-integration_test() {
-    local targets=("$@")
-    print_step "Running Integration Tests..."
-    
-    if [[ ! -f "flake.lock" ]]; then
-        print_error "flake.lock is missing."
-        return 1
-    fi
-    
-    if ! nix --extra-experimental-features "nix-command flakes" flake metadata >/dev/null 2>&1; then
-        print_error "Flake metadata verification failed. Corrupted JSON."
-        return 1
-    fi
-    
-    # Verify every requested target exists in the new lockfile
-    for target in "${targets[@]}"; do
-        if ! grep -q "\"$target\"" flake.lock; then
-            print_error "Target '$target' is missing from flake.lock."
-            return 1
+fix_trusted_user() {
+    local conf_file="/etc/nix/nix.conf"
+    if [[ -f "$conf_file" ]] && ! grep -qE "^trusted-users\s*=.*(\b$USER\b|\b@wheel\b)" "$conf_file"; then
+        warn "Untrusted user detected. Fixing /etc/nix/nix.conf (Requires sudo)..."
+        if sudo bash -c "echo 'trusted-users = root @wheel $USER' >> $conf_file"; then
+            gum spin --spinner points --title "Restarting nix-daemon..." -- sudo systemctl restart nix-daemon || true
+            ok "Added $USER to trusted-users. Cache warnings resolved."
+        else
+            fail "Could not modify nix.conf."
         fi
-    done
-    
-    print_success "All integrity checks passed."
-}
-
-apply_configuration() {
-    print_step "Applying Configuration..."
-    if ! home-manager switch --flake .; then
-        print_error "Home Manager switch failed."
-        return 1
     fi
-    print_success "Configuration applied successfully."
 }
 
-cleanup() {
-    local backup_path="$1"
-    local log_path="$2"
-    print_step "Cleaning Up..."
-    
-    rm -f "$backup_path" "$log_path"
-    print_success "Temporary files removed."
+auto_fix_versions() {
+    if grep -qE 'github:nixos/nixpkgs/.*unstable' flake.nix; then
+        gum spin --spinner minidot --title "Aligning Home Manager branch to Master..." -- \
+            sed -i -E "s|(github:nix-community/home-manager/)[a-zA-Z0-9._-]+|\1master|g" flake.nix
+    else
+        local nix_ver
+        nix_ver=$(grep -E 'github:nixos/nixpkgs/' flake.nix | grep -oE '[0-9]+\.[0-9]+' | head -n1 || true)
+        if [[ -n "$nix_ver" ]]; then
+            gum spin --spinner minidot --title "Aligning Home Manager branch to release-${nix_ver}..." -- \
+                sed -i -E "s|(github:nix-community/home-manager/)[a-zA-Z0-9._-]+|\1release-${nix_ver}|g" flake.nix
+        fi
+    fi
 }
 
 # ------------------------------------------------------------------------------
-# 5. Main Orchestrator (Open-Closed Principle)
+# 4. Core Business Logic
 # ------------------------------------------------------------------------------
 main() {
-    setup_colors
-    
-    # Accept user arguments or default to 'nixpkgs'
-    local targets=("${@:-nixpkgs}")
-    
-    # Secure variables initialized ONLY upon execution
-    LOCK_BACKUP="flake.lock.bak"
-    UPDATE_LOG="$(mktemp /tmp/nix_update_XXXXXX.log)"
-
-    # Attach trap to main workflow
     trap 'rollback_on_error' ERR INT TERM
 
-    printf "\n${C_BOLD}${C_CYAN}=== Nix Flake Migration Assistant ===${C_NC}\n"
-    
-    # Dependency Injection pattern: passing parameters instead of reading globals
-    verify_environment
-    backup_lockfile "$LOCK_BACKUP"
-    execute_migration "$UPDATE_LOG" "${targets[@]}"
-    analyze_changes "$UPDATE_LOG"
-    integration_test "${targets[@]}"
-    apply_configuration
-    cleanup "$LOCK_BACKUP" "$UPDATE_LOG"
-    
-    printf "\n${C_BOLD}${C_GREEN}✨ Migration completed perfectly! ✨${C_NC}\n\n"
+    clear
+    gum style --border double --margin "1" --padding "1 2" --border-foreground "#00BFFF" "❄️  Nix Flake Migration Assistant"
+
+    step "Pre-flight Checks & Auto-Fixes"
+    fix_trusted_user
+    auto_fix_versions
+    fix_git_state
+
+    step "Securing Environment"
+    [[ -f "flake.lock" ]] && cp flake.lock flake.lock.bak && ok "Lockfile backed up."
+
+    step "Fetching Updates (Showing inner details...)"
+    if nix --extra-experimental-features "nix-command flakes" flake update; then
+        ok "Flake lockfile updated successfully."
+    else
+        fail "Failed to update flake inputs."
+    fi
+
+    step "Applying Configuration (Showing inner details...)"
+    if home-manager switch --flake . --verbose --show-trace -b backup; then
+        ok "System configured beautifully."
+    else
+        fail "Home Manager switch failed."
+    fi
+
+    rm -f flake.lock.bak
+
+    echo ""
+    gum format -- "- **Migration Complete!** Your environment is now up-to-date and pristine." "- Run \`home-manager news\` if you want to check recent changes."
+    echo ""
 }
 
-# Only execute main if the script is invoked directly
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     main "$@"
 fi

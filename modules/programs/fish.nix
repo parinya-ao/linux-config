@@ -33,7 +33,7 @@ in
         pay-respects fish --alias | source
 
         # uv 
-        set -gx LD_LIBRARY_PATH ${
+        set -gx LD_LIBRARY_PATH /usr/lib64:${
           lib.makeLibraryPath [
             pkgs.stdenv.cc.cc.lib
             pkgs.zlib

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/core.sh"
 
 if command -v nix >/dev/null 2>&1; then
@@ -10,6 +11,7 @@ else
     curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install --no-confirm
 fi
 if [ -e '/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh' ]; then
+    # shellcheck disable=SC1091
     . '/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh'
 fi
 

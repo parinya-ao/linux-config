@@ -23,6 +23,7 @@ in
       p7zip
       xclip
       htop
+      gum
     ];
   };
 }

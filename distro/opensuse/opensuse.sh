@@ -1,11 +1,9 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2015,SC2162
 # =============================================================================
-# 06-drivers-comprehensive-opensuse.sh
-# openSUSE (zypper) — Comprehensive Driver, Firmware & Codec Installer
-# Enhanced with Hardware Detection, GPU Architecture Awareness, Secure Boot
-# Supports: openSUSE Leap 15.x / Tumbleweed / Slowroll
-# Auto-detects distro type and install state, runs correct phase automatically.
-# Usage: sudo bash 06-drivers-comprehensive-opensuse.sh
+# opensuse.sh - openSUSE (zypper) Driver for OS Setup
+# Auto-detects install state and runs the correct round automatically.
+# Usage: sudo bash opensuse.sh   (or bash opensuse.sh; sudo being used if needed)
 # =============================================================================
 set -euo pipefail
 

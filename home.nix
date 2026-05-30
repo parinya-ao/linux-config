@@ -5,6 +5,7 @@
     username = "parinya";
     homeDirectory = "/home/parinya";
     stateVersion = "24.11";
+    enableNixpkgsReleaseCheck = false;
   };
 
   imports = [
