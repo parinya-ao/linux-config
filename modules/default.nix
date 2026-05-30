@@ -10,6 +10,7 @@
     ./packages/gui.nix
     ./programs/agent-skills.nix
     ./programs/bash.nix
+    ./programs/mcp.nix
     ./programs/cli-tools.nix
     ./programs/fish.nix
     ./programs/git.nix

@@ -50,6 +50,8 @@ The content is organized as follows:
       references/
         gum-commands.md
       SKILL.md
+    nix-backup/
+      SKILL.md
     react-doctor/
       SKILL.md
 .github/
@@ -133,6 +135,7 @@ modules/
     gui-apps.nix
     shells.nix
   programs/
+    agent-skills.nix
     autoskills.nix
     bash.nix
     cli-tools.nix
@@ -191,533 +194,6 @@ task.md
 
 <files>
 This section contains the contents of the repository's files.
-
-<file path=".claude/skills/gum-bash/references/gum-commands.md">
-# Gum Command Reference
-
-Quick lookup for all gum commands, flags, and patterns used in this skill.
-
----
-
-## gum style — Inline styling
-
-```bash
-gum style [OPTIONS] TEXT...
-
-Key flags:
-  --foreground "#HEX"          Text color
-  --background "#HEX"          Background color
-  --border none|normal|rounded|thick|double|hidden
-  --border-foreground "#HEX"   Border color
-  --padding "V H"              Inner space (e.g. "1 2")
-  --margin "V H"               Outer space
-  --width N                    Fixed width (important for gum join alignment)
-  --align left|center|right
-  --bold
-  --italic
-  --faint                      Dimmed/secondary text
-```
-
----
-
-## gum join — Layout
-
-```bash
-gum join --horizontal BLOCK1 BLOCK2 ...   # Side-by-side
-gum join --vertical   BLOCK1 BLOCK2 ...   # Stacked
-  --align left|center|right               # Alignment of shorter blocks
-```
-
-**Critical**: always double-quote styled block variables before passing to `gum join`:
-```bash
-left="$(gum style --width 20 'Label')"
-right="$(gum style 'Value')"
-gum join --horizontal "$left" "$right"   # ✔ correct
-gum join --horizontal $left $right       # ✗ newlines get stripped
-```
-
----
-
-## gum spin — Spinner
-
-```bash
-gum spin --spinner TYPE --title "Message..." -- COMMAND [ARGS...]
-
-Spinner types: line dot minidot jump pulse points globe moon monkey meter hamburger
-
-Key flags:
-  --show-output   Pass through command stdout (useful for debug mode)
-  --spinner.foreground "#HEX"
-  --title.foreground "#HEX"
-```
-
----
-
-## gum log — Structured logging
-
-```bash
-gum log [OPTIONS] MESSAGE [KEY VALUE ...]
-
-  --level debug|info|warn|error|fatal
-  --structured        Show key=value pairs after message
-  --time rfc822       Prepend timestamp
-  --prefix STRING     Label log source (e.g. "INSTALL")
-```
-
----
-
-## gum format — Markdown in terminal
-
-```bash
-gum format -t markdown <<'EOF'
-# Heading
-- **bold item**
-- *italic item*
-`code snippet`
-EOF
-
-Modes: -t markdown  (default)
-       -t code      (syntax highlighting)
-       -t template  (Go templates, {{ Bold "text" }})
-       -t emoji     (:rocket: :check: :warning:)
-```
-
----
-
-## gum confirm — Yes/No prompt (interactive only)
-
-```bash
-gum confirm "Proceed with deletion?" && rm -rf /tmp/junk || info "Aborted"
-# exit 0 = yes, exit 1 = no
-```
-
----
-
-## gum choose — Selection list (interactive only)
-
-```bash
-DISTRO=$(echo -e "ubuntu\nfedora\narch" | gum choose)
-```
-
----
-
-## gum input — Text input (interactive only)
-
-```bash
-REPO=$(gum input --placeholder "https://github.com/user/repo")
-```
-
----
-
-## gum table — Tabular display
-
-```bash
-printf "Name,Version,Status\ngum,0.14,ok\nbash,5.2,ok\n" | gum table
-```
-
----
-
-## Environment Variable Defaults
-
-These set global defaults for all gum calls in the script:
-
-```bash
-# Spinner
-export GUM_SPIN_SPINNER="line"
-export GUM_SPIN_SPINNER_FOREGROUND="#00BFFF"
-export GUM_SPIN_TITLE_FOREGROUND="#666666"
-
-# Log
-export GUM_LOG_LEVEL="info"           # minimum level shown
-export GUM_LOG_TIME="rfc822"          # timestamp format
-
-# Style defaults
-export GUM_STYLE_BORDER="normal"
-export GUM_STYLE_BORDER_FOREGROUND="#04B575"
-```
-</file>
-
-<file path=".claude/skills/gum-bash/SKILL.md">
----
-name: gum-bash
-description: >
-  Design and write beautiful, modular, production-grade bash scripts using the `gum`
-  CLI tool from Charmbracelet (Bubbles + Lip Gloss in the terminal). Use this skill
-  whenever a user asks to write a shell script with terminal UI, wants to beautify or
-  refactor an existing bash script, needs progress spinners, colored output, structured
-  logging, interactive prompts, or summary boxes. Also trigger when the user says things
-  like "make my script look nice", "add a UI to my bash script", "I want a progress bar",
-  "format my shell output", "gum script", or "glamorous shell" — even without mentioning
-  gum by name. This skill provides a complete design system: color tokens, 4-layer
-  architecture, spinner conventions, open pipeline pattern, and automation-safe guards.
----
-
-# Gum Bash Design System
-
-`gum` is a composable CLI tool (think: CSS + layout + interaction, but in the terminal).
-Every gum command is a standalone binary — pipe them, substitute them, chain them.
-Your job is to produce scripts that feel polished, are easy to maintain, and run
-completely non-interactively unless the user explicitly wants prompts.
-
-See `references/gum-commands.md` for a full command reference with flags.
-
----
-
-## Step 0 — Always Start with a Design Pass
-
-Before writing any code, mentally (or visibly) map:
-1. What are the stages/parts of this script?
-2. Which stages are long-running? (→ need spinners)
-3. What does the user need to see at the end? (→ summary box)
-4. Should it be interactive or fully automated?
-
----
-
-## Step 1 — Config Block (Top of Every Script)
-
-Always open with this block, right after `set -Eeuo pipefail`. Colors go here as
-`readonly` constants — **never hardcode hex values inside functions**.
-
-```bash
-#!/usr/bin/env bash
-set -Eeuo pipefail
-
-# ── CONFIG ──────────────────────────────────────────────────────────────────
-# Semantic color tokens — change theme here, nowhere else
-readonly C_PRIMARY="#00BFFF"    # Deep Sky Blue  — headers, step indicators
-readonly C_SUCCESS="#04B575"    # Mint Green     — ok, done, verified
-readonly C_WARNING="#FFA500"    # Amber          — advisory, skipped steps
-readonly C_DANGER="#FF4500"     # Red-Orange     — errors, abort
-readonly C_MUTED="#666666"      # Dim Gray       — secondary text, labels
-readonly C_ACCENT="#C678DD"     # Soft Purple    — version numbers, paths
-readonly C_HIGHLIGHT="#98C379"  # Soft Green     — filenames, commands
-
-# Gum defaults — override per-call with --flag if needed
-export GUM_SPIN_SPINNER="line"
-export GUM_LOG_LEVEL="info"
-export GUM_LOG_TIME="rfc822"
-```
-
----
-
-## Step 2 — Layer 1: UI Primitives
-
-These functions are **pure formatting — zero logic**. They take text, return styled output.
-Write them early, use them everywhere.
-
-```bash
-# ── LAYER 1: UI PRIMITIVES ──────────────────────────────────────────────────
-
-banner() {
-  # Full-width header splash. Use once at script start.
-  gum style \
-    --border double --border-foreground "$C_PRIMARY" \
-    --align center --padding "1 4" --bold \
-    "$*"
-}
-
-step() {
-  # Announce the start of a numbered stage.
-  # Usage: step 2 "Installing Nix"
-  gum style --foreground "$C_PRIMARY" --bold "▶  Step ${1}: ${2}"
-}
-
-ok() {
-  gum style --foreground "$C_SUCCESS" "  ✔  $*"
-}
-
-warn() {
-  gum style --foreground "$C_WARNING" "  ⚠  $*"
-}
-
-fail() {
-  # Print error box then exit. Use for unrecoverable failures.
-  gum style \
-    --border thick --border-foreground "$C_DANGER" \
-    --foreground "$C_DANGER" --bold \
-    --padding "0 2" \
-    "✖  ERROR: $*"
-  exit 1
-}
-
-info() {
-  gum style --foreground "$C_MUTED" "  ℹ  $*"
-}
-
-kv() {
-  # Key-value row, label left-padded to fixed width for alignment.
-  # Usage: kv "OS" "Ubuntu 24.04"
-  local label value
-  label=$(gum style --foreground "$C_MUTED"   --width 14 "$1")
-  value=$(gum style --foreground "$C_ACCENT"           "$2")
-  gum join --horizontal "$label" "$value"
-}
-```
-
----
-
-## Step 3 — Spinner Wrapper
-
-Create one `run_step` helper. Every long-running command goes through it —
-this keeps stdout clean and gives every operation the same visual treatment.
-
-```bash
-# ── LAYER 2: RUNNER HELPER ──────────────────────────────────────────────────
-
-run_step() {
-  # Usage: run_step <spinner> "Human title" command [args...]
-  # Exit contract: propagates command exit code.
-  local spinner="$1" title="$2"
-  shift 2
-  if gum spin --spinner "$spinner" --title "  ${title}..." -- "$@"; then
-    ok "$title"
-  else
-    local code=$?
-    fail "$title (exit $code)"
-  fi
-}
-```
-
-**Spinner → Operation mapping** (pick the one that feels right for the task):
-
-| Spinner   | Use for                              |
-|-----------|--------------------------------------|
-| `line`    | Package installs, apt/dnf/brew       |
-| `dot`     | File processing, compilation         |
-| `jump`    | git clone, network fetch             |
-| `pulse`   | Health checks, connectivity tests    |
-| `points`  | Nix store, database operations       |
-| `globe`   | curl downloads, internet operations  |
-| `moon`    | Long builds, overnight tasks         |
-| `monkey`  | Cleanup, garbage collection          |
-| `meter`   | Progress-like operations             |
-
-Only wrap commands in `run_step` when they take more than ~1 second. For quick reads
-(`/proc/stat`, `df`, `git status`) just call the command inline — a spinner that
-flashes off instantly creates noise, not polish.
-
----
-
-## Step 4 — Layer 3: Task Functions
-
-Each task function does **one thing**. It returns:
-- `0` → success (pipeline continues)
-- `1` → skipped / soft failure (pipeline warns and continues)
-- `2` → fatal (pipeline aborts)
-
-Pattern for a task function:
-
-```bash
-install_nix() {
-  # Idempotent guard — check before acting, skip if already done
-  if command -v nix >/dev/null 2>&1; then
-    info "Nix already installed ($(nix --version)), skipping"
-    return 0
-  fi
-
-  step 2 "Installing Nix"
-  run_step globe "Fetching Nix installer" \
-    curl -fsSL https://install.determinate.systems/nix -o /tmp/nix-installer
-
-  run_step points "Running Nix installer" \
-    bash /tmp/nix-installer install --no-confirm
-
-  ok "Nix installed: $(nix --version)"
-}
-```
-
----
-
-## Step 5 — Open Architecture: Pipeline in main()
-
-The pipeline is just an array of function names. Adding a new stage = appending one
-string. No existing logic changes.
-
-Choose between two pipeline variants based on the script's purpose:
-- **Fail-fast pipeline** (`PIPELINE`): stop on first failure. Use for install/setup scripts.
-- **Aggregate pipeline** (`CHECKS`): run all, collect the worst exit code. Use for health checks and audits.
-
-```bash
-# ── LAYER 4: ORCHESTRATION ──────────────────────────────────────────────────
-
-main() {
-  banner "MY SETUP SCRIPT v1.0"
-
-  local PIPELINE=(
-    "check_dependencies"
-    "install_tools"
-    "configure_environment"
-    "run_healthcheck"
-  )
-
-  local step_num=1
-  for task in "${PIPELINE[@]}"; do
-    step "$step_num" "$task"
-    if ! "$task"; then
-      warn "Task '${task}' did not complete cleanly — continuing"
-    fi
-    (( step_num++ ))
-  done
-
-  show_summary
-}
-```
-
-**Aggregate variant** (health checks, audits — run everything, report overall status):
-
-```bash
-main() {
-  local CHECKS=("check_cpu" "check_memory" "check_disk")
-  local worst=0
-  for check in "${CHECKS[@]}"; do
-    set +e; "$check"; code=$?; set -e
-    (( code > worst )) && worst=$code
-  done
-  # 0=ok 1=warning 2=critical
-  show_summary "$worst"
-  exit "$worst"
-}
-
-main "$@"
-```
-
----
-
-## Step 6 — Summary Box
-
-The summary is the last thing the user sees — make it count.
-Use `gum join` to build a two-column table, then wrap in a styled border.
-
-Always double-quote styled blocks before passing to `gum join` — unquoted newlines
-get stripped.
-
-```bash
-show_summary() {
-  local os="${1:-unknown}" tool_ver="${2:-?}" repo="${3:-~}"
-
-  local title
-  title=$(gum style --foreground "$C_SUCCESS" --bold "🎉  ALL DONE")
-
-  local r1 r2 r3
-  r1=$(kv "OS"      "$os")
-  r2=$(kv "Version" "$tool_ver")
-  r3=$(kv "Repo"    "$repo")
-
-  local hint
-  hint=$(gum style --foreground "$C_WARNING" "  ⚠  Open a new terminal for PATH changes")
-
-  local body
-  body=$(gum join --vertical --align left \
-    "$title" "" "$r1" "$r2" "$r3" "" "$hint")
-
-  gum style \
-    --border rounded --border-foreground "$C_SUCCESS" \
-    --padding "1 3" \
-    "$body"
-}
-```
-
----
-
-## Step 7 — Automation-Safe Guards (Non-Interactive)
-
-Three pillars — apply all three to every task function:
-
-**Pillar 1 — Idempotent Guards**: check before executing.
-```bash
-[ -d "$HOME/.config/my-tool" ] && { info "Config exists, skipping setup"; return 0; }
-```
-
-**Pillar 2 — Cascading Fallback**: always have an alternative.
-```bash
-install_package() {
-  dnf install -y "$1" 2>/dev/null \
-  || apt-get install -y "$1" 2>/dev/null \
-  || brew install "$1" 2>/dev/null \
-  || warn "Could not install $1 — skipping"
-}
-```
-
-**Pillar 3 — Trap-Based Error Recovery**: catch unexpected exits.
-```bash
-trap 'gum log --level error "Unexpected failure" line="$LINENO" exit="$?"' ERR
-```
-
----
-
-## Structured Logging with `gum log`
-
-Replace all raw `echo`/`printf` with `gum log` for machine-readable, leveled output:
-
-```bash
-gum log --level info  "Task started"  stage="install" target="nix"
-gum log --level warn  "Step skipped"  reason="already installed"
-gum log --level error "Command failed" cmd="apt-get"  code="$?"
-```
-
-Levels: `debug` · `info` · `warn` · `error` · `fatal`
-Key options: `--structured` (key=value pairs) · `--time rfc822` · `--prefix "STAGE"`
-
----
-
-## Border Conventions
-
-| Context                  | Border type | Color       |
-|--------------------------|-------------|-------------|
-| Script header splash     | `double`    | C_PRIMARY   |
-| Section separators       | `normal`    | C_MUTED     |
-| Info / tip boxes         | `rounded`   | C_WARNING   |
-| Final success banner     | `rounded`   | C_SUCCESS   |
-| Critical warnings        | `thick`     | C_WARNING   |
-| Error box (before exit)  | `thick`     | C_DANGER    |
-
----
-
-## Checklist Before Finishing
-
-Before returning any script:
-- [ ] `readonly` color constants at top, none in function bodies
-- [ ] `set -Eeuo pipefail` present
-- [ ] All long-running commands wrapped in `run_step`
-- [ ] Every task function has an idempotent guard
-- [ ] `main()` uses a PIPELINE array, not hardcoded calls
-- [ ] `gum join` blocks always double-quoted
-- [ ] `show_summary` called at end of `main()`
-- [ ] `trap ERR` handler present
-- [ ] `need_cmd gum` check near top of `main()`
-</file>
-
-<file path="modules/programs/rtk.nix">
-{
-  config,
-  lib,
-  pkgs,
-  ...
-}:
-
-let
-  cfg = config.my.programs.rtk;
-  initMarker = "$HOME/.config/rtk/.opencode-init-done";
-in
-{
-  options.my.programs.rtk = {
-    enable = lib.mkEnableOption "RTK — LLM token optimizer (auto-init with OpenCode)";
-  };
-
-  config = lib.mkIf cfg.enable {
-    home.activation = {
-      rtkInitOpenCode = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-        if [ ! -f "${initMarker}" ]; then
-          echo "n" | $DRY_RUN_CMD env RTK_TELEMETRY_DISABLED=1 ${lib.getExe pkgs.rtk} init -g --opencode
-          $DRY_RUN_CMD ${lib.getExe pkgs.rtk} telemetry disable >/dev/null 2>&1 || true
-          mkdir -p "$(dirname "${initMarker}")"
-          touch "${initMarker}"
-        fi
-      '';
-    };
-  };
-}
-</file>
 
 <file path=".agents/skills/bash-defensive-patterns/SKILL.md">
 ---
@@ -1253,6 +729,720 @@ check_dependencies
 12. **Test error paths** - Ensure error handling works correctly
 13. **Use `command -v`** - Safer than `which` for checking executables
 14. **Prefer printf over echo** - More predictable across systems
+</file>
+
+<file path=".claude/skills/gum-bash/references/gum-commands.md">
+# Gum Command Reference
+
+Quick lookup for all gum commands, flags, and patterns used in this skill.
+
+---
+
+## gum style — Inline styling
+
+```bash
+gum style [OPTIONS] TEXT...
+
+Key flags:
+  --foreground "#HEX"          Text color
+  --background "#HEX"          Background color
+  --border none|normal|rounded|thick|double|hidden
+  --border-foreground "#HEX"   Border color
+  --padding "V H"              Inner space (e.g. "1 2")
+  --margin "V H"               Outer space
+  --width N                    Fixed width (important for gum join alignment)
+  --align left|center|right
+  --bold
+  --italic
+  --faint                      Dimmed/secondary text
+```
+
+---
+
+## gum join — Layout
+
+```bash
+gum join --horizontal BLOCK1 BLOCK2 ...   # Side-by-side
+gum join --vertical   BLOCK1 BLOCK2 ...   # Stacked
+  --align left|center|right               # Alignment of shorter blocks
+```
+
+**Critical**: always double-quote styled block variables before passing to `gum join`:
+```bash
+left="$(gum style --width 20 'Label')"
+right="$(gum style 'Value')"
+gum join --horizontal "$left" "$right"   # ✔ correct
+gum join --horizontal $left $right       # ✗ newlines get stripped
+```
+
+---
+
+## gum spin — Spinner
+
+```bash
+gum spin --spinner TYPE --title "Message..." -- COMMAND [ARGS...]
+
+Spinner types: line dot minidot jump pulse points globe moon monkey meter hamburger
+
+Key flags:
+  --show-output   Pass through command stdout (useful for debug mode)
+  --spinner.foreground "#HEX"
+  --title.foreground "#HEX"
+```
+
+---
+
+## gum log — Structured logging
+
+```bash
+gum log [OPTIONS] MESSAGE [KEY VALUE ...]
+
+  --level debug|info|warn|error|fatal
+  --structured        Show key=value pairs after message
+  --time rfc822       Prepend timestamp
+  --prefix STRING     Label log source (e.g. "INSTALL")
+```
+
+---
+
+## gum format — Markdown in terminal
+
+```bash
+gum format -t markdown <<'EOF'
+# Heading
+- **bold item**
+- *italic item*
+`code snippet`
+EOF
+
+Modes: -t markdown  (default)
+       -t code      (syntax highlighting)
+       -t template  (Go templates, {{ Bold "text" }})
+       -t emoji     (:rocket: :check: :warning:)
+```
+
+---
+
+## gum confirm — Yes/No prompt (interactive only)
+
+```bash
+gum confirm "Proceed with deletion?" && rm -rf /tmp/junk || info "Aborted"
+# exit 0 = yes, exit 1 = no
+```
+
+---
+
+## gum choose — Selection list (interactive only)
+
+```bash
+DISTRO=$(echo -e "ubuntu\nfedora\narch" | gum choose)
+```
+
+---
+
+## gum input — Text input (interactive only)
+
+```bash
+REPO=$(gum input --placeholder "https://github.com/user/repo")
+```
+
+---
+
+## gum table — Tabular display
+
+```bash
+printf "Name,Version,Status\ngum,0.14,ok\nbash,5.2,ok\n" | gum table
+```
+
+---
+
+## Environment Variable Defaults
+
+These set global defaults for all gum calls in the script:
+
+```bash
+# Spinner
+export GUM_SPIN_SPINNER="line"
+export GUM_SPIN_SPINNER_FOREGROUND="#00BFFF"
+export GUM_SPIN_TITLE_FOREGROUND="#666666"
+
+# Log
+export GUM_LOG_LEVEL="info"           # minimum level shown
+export GUM_LOG_TIME="rfc822"          # timestamp format
+
+# Style defaults
+export GUM_STYLE_BORDER="normal"
+export GUM_STYLE_BORDER_FOREGROUND="#04B575"
+```
+</file>
+
+<file path=".claude/skills/gum-bash/SKILL.md">
+---
+name: gum-bash
+description: >
+  Design and write beautiful, modular, production-grade bash scripts using the `gum`
+  CLI tool from Charmbracelet (Bubbles + Lip Gloss in the terminal). Use this skill
+  whenever a user asks to write a shell script with terminal UI, wants to beautify or
+  refactor an existing bash script, needs progress spinners, colored output, structured
+  logging, interactive prompts, or summary boxes. Also trigger when the user says things
+  like "make my script look nice", "add a UI to my bash script", "I want a progress bar",
+  "format my shell output", "gum script", or "glamorous shell" — even without mentioning
+  gum by name. This skill provides a complete design system: color tokens, 4-layer
+  architecture, spinner conventions, open pipeline pattern, and automation-safe guards.
+---
+
+# Gum Bash Design System
+
+`gum` is a composable CLI tool (think: CSS + layout + interaction, but in the terminal).
+Every gum command is a standalone binary — pipe them, substitute them, chain them.
+Your job is to produce scripts that feel polished, are easy to maintain, and run
+completely non-interactively unless the user explicitly wants prompts.
+
+See `references/gum-commands.md` for a full command reference with flags.
+
+---
+
+## Step 0 — Always Start with a Design Pass
+
+Before writing any code, mentally (or visibly) map:
+1. What are the stages/parts of this script?
+2. Which stages are long-running? (→ need spinners)
+3. What does the user need to see at the end? (→ summary box)
+4. Should it be interactive or fully automated?
+
+---
+
+## Step 1 — Config Block (Top of Every Script)
+
+Always open with this block, right after `set -Eeuo pipefail`. Colors go here as
+`readonly` constants — **never hardcode hex values inside functions**.
+
+```bash
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+# ── CONFIG ──────────────────────────────────────────────────────────────────
+# Semantic color tokens — change theme here, nowhere else
+readonly C_PRIMARY="#00BFFF"    # Deep Sky Blue  — headers, step indicators
+readonly C_SUCCESS="#04B575"    # Mint Green     — ok, done, verified
+readonly C_WARNING="#FFA500"    # Amber          — advisory, skipped steps
+readonly C_DANGER="#FF4500"     # Red-Orange     — errors, abort
+readonly C_MUTED="#666666"      # Dim Gray       — secondary text, labels
+readonly C_ACCENT="#C678DD"     # Soft Purple    — version numbers, paths
+readonly C_HIGHLIGHT="#98C379"  # Soft Green     — filenames, commands
+
+# Gum defaults — override per-call with --flag if needed
+export GUM_SPIN_SPINNER="line"
+export GUM_LOG_LEVEL="info"
+export GUM_LOG_TIME="rfc822"
+```
+
+---
+
+## Step 2 — Layer 1: UI Primitives
+
+These functions are **pure formatting — zero logic**. They take text, return styled output.
+Write them early, use them everywhere.
+
+```bash
+# ── LAYER 1: UI PRIMITIVES ──────────────────────────────────────────────────
+
+banner() {
+  # Full-width header splash. Use once at script start.
+  gum style \
+    --border double --border-foreground "$C_PRIMARY" \
+    --align center --padding "1 4" --bold \
+    "$*"
+}
+
+step() {
+  # Announce the start of a numbered stage.
+  # Usage: step 2 "Installing Nix"
+  gum style --foreground "$C_PRIMARY" --bold "▶  Step ${1}: ${2}"
+}
+
+ok() {
+  gum style --foreground "$C_SUCCESS" "  ✔  $*"
+}
+
+warn() {
+  gum style --foreground "$C_WARNING" "  ⚠  $*"
+}
+
+fail() {
+  # Print error box then exit. Use for unrecoverable failures.
+  gum style \
+    --border thick --border-foreground "$C_DANGER" \
+    --foreground "$C_DANGER" --bold \
+    --padding "0 2" \
+    "✖  ERROR: $*"
+  exit 1
+}
+
+info() {
+  gum style --foreground "$C_MUTED" "  ℹ  $*"
+}
+
+kv() {
+  # Key-value row, label left-padded to fixed width for alignment.
+  # Usage: kv "OS" "Ubuntu 24.04"
+  local label value
+  label=$(gum style --foreground "$C_MUTED"   --width 14 "$1")
+  value=$(gum style --foreground "$C_ACCENT"           "$2")
+  gum join --horizontal "$label" "$value"
+}
+```
+
+---
+
+## Step 3 — Spinner Wrapper
+
+Create one `run_step` helper. Every long-running command goes through it —
+this keeps stdout clean and gives every operation the same visual treatment.
+
+```bash
+# ── LAYER 2: RUNNER HELPER ──────────────────────────────────────────────────
+
+run_step() {
+  # Usage: run_step <spinner> "Human title" command [args...]
+  # Exit contract: propagates command exit code.
+  local spinner="$1" title="$2"
+  shift 2
+  if gum spin --spinner "$spinner" --title "  ${title}..." -- "$@"; then
+    ok "$title"
+  else
+    local code=$?
+    fail "$title (exit $code)"
+  fi
+}
+```
+
+**Spinner → Operation mapping** (pick the one that feels right for the task):
+
+| Spinner   | Use for                              |
+|-----------|--------------------------------------|
+| `line`    | Package installs, apt/dnf/brew       |
+| `dot`     | File processing, compilation         |
+| `jump`    | git clone, network fetch             |
+| `pulse`   | Health checks, connectivity tests    |
+| `points`  | Nix store, database operations       |
+| `globe`   | curl downloads, internet operations  |
+| `moon`    | Long builds, overnight tasks         |
+| `monkey`  | Cleanup, garbage collection          |
+| `meter`   | Progress-like operations             |
+
+Only wrap commands in `run_step` when they take more than ~1 second. For quick reads
+(`/proc/stat`, `df`, `git status`) just call the command inline — a spinner that
+flashes off instantly creates noise, not polish.
+
+---
+
+## Step 4 — Layer 3: Task Functions
+
+Each task function does **one thing**. It returns:
+- `0` → success (pipeline continues)
+- `1` → skipped / soft failure (pipeline warns and continues)
+- `2` → fatal (pipeline aborts)
+
+Pattern for a task function:
+
+```bash
+install_nix() {
+  # Idempotent guard — check before acting, skip if already done
+  if command -v nix >/dev/null 2>&1; then
+    info "Nix already installed ($(nix --version)), skipping"
+    return 0
+  fi
+
+  step 2 "Installing Nix"
+  run_step globe "Fetching Nix installer" \
+    curl -fsSL https://install.determinate.systems/nix -o /tmp/nix-installer
+
+  run_step points "Running Nix installer" \
+    bash /tmp/nix-installer install --no-confirm
+
+  ok "Nix installed: $(nix --version)"
+}
+```
+
+---
+
+## Step 5 — Open Architecture: Pipeline in main()
+
+The pipeline is just an array of function names. Adding a new stage = appending one
+string. No existing logic changes.
+
+Choose between two pipeline variants based on the script's purpose:
+- **Fail-fast pipeline** (`PIPELINE`): stop on first failure. Use for install/setup scripts.
+- **Aggregate pipeline** (`CHECKS`): run all, collect the worst exit code. Use for health checks and audits.
+
+```bash
+# ── LAYER 4: ORCHESTRATION ──────────────────────────────────────────────────
+
+main() {
+  banner "MY SETUP SCRIPT v1.0"
+
+  local PIPELINE=(
+    "check_dependencies"
+    "install_tools"
+    "configure_environment"
+    "run_healthcheck"
+  )
+
+  local step_num=1
+  for task in "${PIPELINE[@]}"; do
+    step "$step_num" "$task"
+    if ! "$task"; then
+      warn "Task '${task}' did not complete cleanly — continuing"
+    fi
+    (( step_num++ ))
+  done
+
+  show_summary
+}
+```
+
+**Aggregate variant** (health checks, audits — run everything, report overall status):
+
+```bash
+main() {
+  local CHECKS=("check_cpu" "check_memory" "check_disk")
+  local worst=0
+  for check in "${CHECKS[@]}"; do
+    set +e; "$check"; code=$?; set -e
+    (( code > worst )) && worst=$code
+  done
+  # 0=ok 1=warning 2=critical
+  show_summary "$worst"
+  exit "$worst"
+}
+
+main "$@"
+```
+
+---
+
+## Step 6 — Summary Box
+
+The summary is the last thing the user sees — make it count.
+Use `gum join` to build a two-column table, then wrap in a styled border.
+
+Always double-quote styled blocks before passing to `gum join` — unquoted newlines
+get stripped.
+
+```bash
+show_summary() {
+  local os="${1:-unknown}" tool_ver="${2:-?}" repo="${3:-~}"
+
+  local title
+  title=$(gum style --foreground "$C_SUCCESS" --bold "🎉  ALL DONE")
+
+  local r1 r2 r3
+  r1=$(kv "OS"      "$os")
+  r2=$(kv "Version" "$tool_ver")
+  r3=$(kv "Repo"    "$repo")
+
+  local hint
+  hint=$(gum style --foreground "$C_WARNING" "  ⚠  Open a new terminal for PATH changes")
+
+  local body
+  body=$(gum join --vertical --align left \
+    "$title" "" "$r1" "$r2" "$r3" "" "$hint")
+
+  gum style \
+    --border rounded --border-foreground "$C_SUCCESS" \
+    --padding "1 3" \
+    "$body"
+}
+```
+
+---
+
+## Step 7 — Automation-Safe Guards (Non-Interactive)
+
+Three pillars — apply all three to every task function:
+
+**Pillar 1 — Idempotent Guards**: check before executing.
+```bash
+[ -d "$HOME/.config/my-tool" ] && { info "Config exists, skipping setup"; return 0; }
+```
+
+**Pillar 2 — Cascading Fallback**: always have an alternative.
+```bash
+install_package() {
+  dnf install -y "$1" 2>/dev/null \
+  || apt-get install -y "$1" 2>/dev/null \
+  || brew install "$1" 2>/dev/null \
+  || warn "Could not install $1 — skipping"
+}
+```
+
+**Pillar 3 — Trap-Based Error Recovery**: catch unexpected exits.
+```bash
+trap 'gum log --level error "Unexpected failure" line="$LINENO" exit="$?"' ERR
+```
+
+---
+
+## Structured Logging with `gum log`
+
+Replace all raw `echo`/`printf` with `gum log` for machine-readable, leveled output:
+
+```bash
+gum log --level info  "Task started"  stage="install" target="nix"
+gum log --level warn  "Step skipped"  reason="already installed"
+gum log --level error "Command failed" cmd="apt-get"  code="$?"
+```
+
+Levels: `debug` · `info` · `warn` · `error` · `fatal`
+Key options: `--structured` (key=value pairs) · `--time rfc822` · `--prefix "STAGE"`
+
+---
+
+## Border Conventions
+
+| Context                  | Border type | Color       |
+|--------------------------|-------------|-------------|
+| Script header splash     | `double`    | C_PRIMARY   |
+| Section separators       | `normal`    | C_MUTED     |
+| Info / tip boxes         | `rounded`   | C_WARNING   |
+| Final success banner     | `rounded`   | C_SUCCESS   |
+| Critical warnings        | `thick`     | C_WARNING   |
+| Error box (before exit)  | `thick`     | C_DANGER    |
+
+---
+
+## Checklist Before Finishing
+
+Before returning any script:
+- [ ] `readonly` color constants at top, none in function bodies
+- [ ] `set -Eeuo pipefail` present
+- [ ] All long-running commands wrapped in `run_step`
+- [ ] Every task function has an idempotent guard
+- [ ] `main()` uses a PIPELINE array, not hardcoded calls
+- [ ] `gum join` blocks always double-quoted
+- [ ] `show_summary` called at end of `main()`
+- [ ] `trap ERR` handler present
+- [ ] `need_cmd gum` check near top of `main()`
+</file>
+
+<file path=".claude/skills/nix-backup/SKILL.md">
+---
+name: nix-backup
+description: >
+  Backup, restore, and recover Nix-based systems using Home Manager and Nix Flakes.
+  Use when the user asks to backup their Nix config, roll back a generation, recover
+  from a broken home-manager switch, migrate configs to a new machine, or audit
+  their Nix store. Covers Git-based backup, generation snapshots, flake.lock
+  pinning, store GC, and bootstrap recovery.
+---
+
+# Nix Backup & Recovery
+
+This repo **is the backup** — your Nix Flake is a declarative, version-controlled
+snapshot of your entire environment. This skill covers how to use it for recovery,
+rollback, and audit.
+
+---
+
+## Step 1 — Git-Based Backup (Primary)
+
+The Nix Flake repo at `~/.config/home-manager/` is the single source of truth.
+Every `home-manager switch` is reproducible from its contents + `flake.lock`.
+
+```bash
+# Daily snapshot — commit & push after every successful switch
+cd ~/.config/home-manager
+git add -A
+git commit -m "chore: snapshot $(date +%Y-%m-%d)"
+git push
+```
+
+**What to commit:**
+- `flake.nix` + `flake.lock` — pin every input version
+- `home.nix` — top-level suite toggles
+- `modules/` — all Nix module definitions
+- `.claude/skills/` — agent skills (these files)
+- `startup.sh` + `steps/` — bootstrap pipeline
+- `config.toml` — central config
+
+**What NOT to commit** (add to `.gitignore`):
+- `result/` — Nix build symlinks
+- `repomix-output.*` — generated exports
+- `flake.lock` exceptions — keep it committed! It's your pinning mechanism.
+
+---
+
+## Step 2 — Generation Management
+
+Home Manager keeps a history of every `switch`. Use generations for rollback.
+
+```bash
+# List all generations
+home-manager generations
+
+# Rollback to a specific generation (N — generation number)
+home-manager switch --flake . --switch-generation <N>
+
+# Remove old generations to free space
+home-manager expire-generations "-30 days"
+
+# Check current generation path (symlink to active config)
+readlink ~/.local/state/home-manager/generation
+```
+
+**Generation anatomy:**
+```
+~/.local/state/home-manager/
+├── generations/
+│   ├── 1 -> /nix/store/...-home-manager-generation  # initial
+│   ├── 2 -> ...                                      # after first change
+│   └── 3 -> ...                                      # current
+└── home-manager.json                                 # metadata
+```
+
+---
+
+## Step 3 — Flake Lock Management
+
+`flake.lock` pins every input revision. Update or roll back individual inputs.
+
+```bash
+# Update ALL inputs to latest
+nix flake update
+
+# Update a single input
+nix flake update home-manager
+
+# Roll back a single input to a known-good revision
+nix flake lock --update-input nixpkgs
+
+# Pin all inputs to current — no changes until explicit update
+nix flake lock
+
+# Check what changed
+nix flake diff
+```
+
+**Lock hygiene:**
+- Commit `flake.lock` to every backup commit — never `.gitignore` it
+- Before a risky update, commit the current lock:
+  ```bash
+  git commit -m "chore: checkpoint before nix flake update"
+  ```
+- After updating, test with `home-manager switch --flake .` before pushing
+
+---
+
+## Step 4 — Nix Store Maintenance
+
+```bash
+# Report store usage
+nix store du --human-readable
+
+# Find unused paths (dry-run GC)
+nix store gc --print-dead
+
+# Actual garbage collection
+nix store gc
+
+# Auto-GC with time limit (removes paths older than N days)
+nix store gc --max-freed 10GB
+
+# Full store optimization (dedup identical files)
+nix store optimise
+```
+
+**Store safety rules:**
+- Never manually delete from `/nix/store/` — always use `nix store gc`
+- A generation keeps its entire closure alive — expire generations first
+- GC roots: `home-manager generations`, `nix profile`, `/run/current-system`
+
+---
+
+## Step 5 — Full Machine Recovery
+
+When setting up a fresh machine or recovering from disaster:
+
+### A — Bootstrap from Scratch
+
+```bash
+# 1. Clone the repo
+git clone <repo-url> ~/.config/home-manager
+cd ~/.config/home-manager
+
+# 2. Run the bootstrap (installs Nix + Home Manager + applies config)
+bash startup.sh
+```
+
+### B — Manual Recovery (if bootstrap fails)
+
+```bash
+# 1. Install Nix (Determinate Systems installer — handles most edge cases)
+curl --proto '=https' --tlsv1.2 -sSf -L \
+  https://install.determinate.systems/nix | sh -s -- install --no-confirm
+
+# 2. Source Nix environment
+. /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
+
+# 3. Clone config
+git clone <repo-url> ~/.config/home-manager
+
+# 4. Apply config
+nix run home-manager/master -- switch --flake ~/.config/home-manager#parinya
+```
+
+### C — Rollback on Existing Machine
+
+```bash
+# If last switch broke something:
+home-manager generations                        # list all
+home-manager switch --flake . --switch-generation <N>  # go back
+
+# Or pin to a specific commit (no undo needed — just checkout old config):
+git log --oneline -20                           # find known-good commit
+git checkout <known-good-hash>
+home-manager switch --flake .#parinya
+git checkout main                               # go back to latest
+home-manager switch --flake .#parinya           # reapply latest
+```
+
+---
+
+## Step 6 — Automation via CI (Optional)
+
+Run nightly backups automatically with GitHub Actions:
+
+```yaml
+# .github/workflows/backup.yml
+name: nix-backup
+on:
+  schedule:
+    - cron: "0 6 * * *"  # daily at 06:00
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          nix flake check
+          echo "flake.lock is valid"
+```
+
+---
+
+## Step 7 — Pre-Upgrade Safety Checklist
+
+Before running `nix flake update` or `home-manager switch` with risky changes:
+
+- [ ] `git status` — working tree clean
+- [ ] `git log --oneline -5` — know your current commit
+- [ ] `nix flake check` — config is valid
+- [ ] `home-manager generations | head -3` — know rollback targets
+- [ ] `nix store gc --print-dead | wc -l` — know GC impact
+- [ ] Backup plan: `git commit -m "checkpoint before update"`
 </file>
 
 <file path=".claude/skills/react-doctor/SKILL.md">
@@ -4945,221 +5135,6 @@ in
 }
 </file>
 
-<file path="modules/productivity/shells.nix">
-{
-  config,
-  lib,
-  pkgs,
-  ...
-}:
-
-let
-  cfg = config.my.productivity.shells;
-in
-{
-  options.my.productivity.shells.enable =
-    lib.mkEnableOption "Shell environments (bash, fish, starship)";
-
-  config = lib.mkIf cfg.enable {
-    programs.bash = {
-      enable = true;
-
-      shellAliases = {
-        ls = "eza --icons=auto --group-directories-first";
-        ll = "eza -lhF --icons=auto --git --group-directories-first";
-        la = "eza -lahF --icons=auto --git";
-        lt = "eza --tree --level=2 --icons=auto";
-        cat = "bat --style=full";
-        find = "fd";
-        grep = "rg --color=auto --smart-case";
-        sed = "sd";
-        awk = "choose";
-        cut = "choose";
-        diff = "delta";
-        man = "batman";
-        tree = "eza --tree";
-        curl = "xh";
-        df = "duf";
-        du = "dust";
-        ps = "procs";
-        top = "btm";
-        htop = "btm";
-        ping = "gping";
-        cd = "z";
-        ".." = "z ..";
-        "..." = "z ../..";
-        ".4" = "z ../../..";
-      };
-
-      initExtra = ''
-        export PATH="$HOME/.nix-profile/bin:$PATH"
-        export HISTSIZE=100000
-        export HISTFILESIZE=200000
-        export HISTCONTROL=ignoreboth:erasedups
-        shopt -s histappend
-        PROMPT_COMMAND="history -a; $PROMPT_COMMAND"
-        source ${pkgs.fzf}/share/fzf/key-bindings.bash
-        source ${pkgs.fzf}/share/fzf/completion.bash
-        export FZF_DEFAULT_COMMAND='fd --type f --hidden --follow --exclude .git'
-        export FZF_DEFAULT_OPTS='--height 40% --layout=reverse --border --info=inline'
-        eval "$(zoxide init bash)"
-        eval "$(starship init bash)"
-        export LESS='-R --use-color -Dd+r$Du+b'
-        export MANPAGER='bat -l man -p'
-      '';
-
-      historyControl = [
-        "ignoredups"
-        "erasedups"
-      ];
-    };
-
-    programs.fish = {
-      enable = true;
-
-      interactiveShellInit = ''
-        fish_add_path $HOME/.nix-profile/bin
-        set -g fish_greeting ""
-        zoxide init fish | source
-        fzf --fish | source
-        bind \cr 'history | fzf --tac | read -l cmd; and commandline $cmd'
-        pay-respects fish --alias | source
-        set -gx LD_LIBRARY_PATH /usr/lib64:${
-          lib.makeLibraryPath [
-            pkgs.stdenv.cc.cc.lib
-            pkgs.zlib
-            pkgs.zstd
-          ]
-        }:$LD_LIBRARY_PATH
-      '';
-
-      shellAliases = {
-        cd = "z";
-        cdi = "zi";
-        ".." = "z ..";
-        "..." = "z ../..";
-        ".4" = "z ../../..";
-        ls = "eza --icons=auto --group-directories-first";
-        ll = "eza -lhF --icons=auto --git --group-directories-first";
-        la = "eza -lahF --icons=auto --git";
-        lt = "eza --tree --level=2 --icons=auto";
-        llt = "eza --tree --level=3 --icons=auto -lh";
-        cat = "bat --style=full";
-        find = "fd";
-        grep = "rg --smart-case";
-        sed = "sd";
-        awk = "choose";
-        cut = "choose";
-        diff = "delta";
-        man = "batman";
-        tree = "eza --tree";
-        curl = "xh";
-        df = "duf";
-        du = "dust";
-        ps = "procs";
-        top = "btm";
-        htop = "btm";
-        ping = "gping";
-        cp = "cp -v";
-        mv = "mv -v";
-        rm = "rm -Iv";
-        mkdir = "mkdir -pv";
-        disk = "lsblk -o NAME,SIZE,FSTYPE,MOUNTPOINT,LABEL";
-        g = "git";
-        ga = "git add";
-        gaa = "git add .";
-        gap = "git add -p";
-        gc = "git commit";
-        gcm = "git commit -m";
-        gca = "git commit --amend --no-edit";
-        gst = "git status -sb";
-        gb = "git branch -vv";
-        gch = "git switch";
-        gcb = "git switch -c";
-        gp = "git push";
-        gpf = "git push --force-with-lease";
-        gpl = "git pull --rebase";
-        gd = "git diff";
-        gds = "git diff --staged";
-        glog = "git log --oneline --graph --decorate -20";
-        gloga = "git log --oneline --graph --decorate --all";
-        gwip = "git add -A && git commit -m 'wip: checkpoint'";
-        gunwip = "git log -n 1 --pretty=%B | rg -q 'wip' && git reset HEAD~";
-        gclean = "git branch --merged | rg -v main | xargs git branch -d";
-        nix-clean = "nix-collect-garbage -d && sudo nix-collect-garbage -d";
-        nix-update = "nix flake update";
-        nix-rebuild = "sudo nixos-rebuild switch --flake .#";
-        hm-switch = "home-manager switch --flake .#";
-      };
-
-      functions = {
-        mkcd = {
-          description = "Create directory and enter it";
-          body = "mkdir -p $argv && z $argv";
-        };
-        gcmt = {
-          description = "Commit with ticket prefix from branch name";
-          body = ''
-            set ticket (git branch --show-current | rg -o -P '[A-Z]+-\d+')
-            git commit -m "$ticket: $argv"
-          '';
-        };
-        gbf = {
-          description = "Fuzzy git branch switcher";
-          body = ''
-            git branch -a | fzf --height 40% | string trim | xargs git switch
-          '';
-        };
-        ns = {
-          description = "nix-shell with package";
-          body = "nix shell nixpkgs#$argv[1]";
-        };
-      };
-    };
-
-    programs.starship = {
-      enable = true;
-      enableFishIntegration = true;
-      settings = {
-        format = "$directory$git_branch$git_status$nix_shell$cmd_duration$line_break$character";
-        add_newline = true;
-        character = {
-          success_symbol = "[❯](bold green)";
-          error_symbol = "[❯](bold red)";
-          vimcmd_symbol = "[❮](bold yellow)";
-        };
-        directory = {
-          style = "bold cyan";
-          truncation_length = 3;
-          truncate_to_repo = true;
-        };
-        git_branch = {
-          symbol = " ";
-          style = "bold purple";
-        };
-        git_status = {
-          ahead = "⇡\${count}";
-          behind = "⇣\${count}";
-          diverged = "⇕⇡\${ahead_count}⇣\${behind_count}";
-          modified = "!";
-          staged = "+";
-          untracked = "?";
-          stashed = "≡";
-        };
-        nix_shell = {
-          symbol = " ";
-          style = "bold blue";
-        };
-        cmd_duration = {
-          min_time = 2000;
-          format = "took [$duration](bold yellow) ";
-        };
-      };
-    };
-  };
-}
-</file>
-
 <file path="modules/programs/autoskills.nix">
 {
   config,
@@ -5271,6 +5246,38 @@ in
     home.packages = with pkgs; [
       bun
     ];
+  };
+}
+</file>
+
+<file path="modules/programs/rtk.nix">
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
+
+let
+  cfg = config.my.programs.rtk;
+  initMarker = "$HOME/.config/rtk/.opencode-init-done";
+in
+{
+  options.my.programs.rtk = {
+    enable = lib.mkEnableOption "RTK — LLM token optimizer (auto-init with OpenCode)";
+  };
+
+  config = lib.mkIf cfg.enable {
+    home.activation = {
+      rtkInitOpenCode = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+        if [ ! -f "${initMarker}" ]; then
+          echo "n" | $DRY_RUN_CMD env RTK_TELEMETRY_DISABLED=1 ${lib.getExe pkgs.rtk} init -g --opencode
+          $DRY_RUN_CMD ${lib.getExe pkgs.rtk} telemetry disable >/dev/null 2>&1 || true
+          mkdir -p "$(dirname "${initMarker}")"
+          touch "${initMarker}"
+        fi
+      '';
+    };
   };
 }
 </file>
@@ -7344,140 +7351,6 @@ EOF
 }
 </file>
 
-<file path="ARCHITECTURE.md">
-# Architecture Overview
-This document serves as a critical, living template designed to equip agents with a rapid and comprehensive understanding of the codebase's architecture, enabling efficient navigation and effective contribution from day one. Update this document as the codebase evolves.
-
-## 1. Project Structure
-This section provides a high-level overview of the project's directory and file structure. It is essential for quickly navigating the codebase and understanding the separation between the imperative bootstrap layer and the declarative configuration layer.
-
-/home/parinya/.config/home-manager/
-├── distro/               # Distribution-specific driver scripts (Imperative Layer)
-│   ├── fedora/           # Fedora-specific setup and services
-│   ├── opensuse/         # openSUSE/Tumbleweed setup
-│   └── ubuntu/           # Ubuntu/Debian family setup
-├── modules/              # Nix/Home Manager modules (Declarative Layer)
-│   ├── packages/         # Lists of Nix packages by category (ai, cli, dev, etc.)
-│   ├── programs/         # Deep configuration for specific tools (fish, git, gnome, etc.)
-│   ├── suites.nix        # High-level feature toggles (Base, Dev, AI, Desktop)
-│   └── default.nix       # Module entry point importing all sub-modules
-├── steps/                # Granular bootstrap steps called by drivers
-├── flatpak/              # Flatpak application management scripts
-├── lib/                  # Shared shell utility functions for drivers
-├── flake.nix             # Root Nix Flake definition (Dependencies & Outputs)
-├── home.nix              # Primary Home Manager configuration (User settings & active suites)
-├── startup.sh            # Main universal entry point for system bootstrapping
-├── README.md             # User-facing project overview
-├── GEMINI.md             # AI-specific instructional context
-└── ARCHITECTURE.md       # This document
-
-## 2. High-Level System Diagram
-The system operates in two distinct phases: **Bootstrap** (Shell) and **Configuration** (Nix).
-
-[Fresh OS] --> [startup.sh] --> [Distro Driver (distro/)] --> [Nix/HM Installation]
-                                           |
-                                           v
-[Nix Store] <--- [home-manager switch] <--- [flake.nix / home.nix]
-       |
-       +--> [Symlinked Dotfiles in $HOME]
-       +--> [User Binaries in PATH]
-
-## 3. Core Components
-
-### 3.1. Bootstrap Engine (Imperative)
-Name: Universal Bootstrap (`startup.sh` + `distro/`)
-Description: Detects the host Linux distribution and prepares the environment for Nix. It handles root-level tasks like package manager updates, firmware installation, and the initial Nix/Home Manager installation.
-Technologies: Bash, `curl`, `git`, `sudo`.
-Deployment: Executed manually on a fresh OS install.
-
-### 3.2. Declarative Environment (Nix)
-Name: Home Manager Configuration
-Description: Defines the end-state of the user's home directory. It manages package installation, shell configuration, GNOME extensions, and tool-specific settings (dotfiles).
-Technologies: Nix (Flakes), Home Manager.
-Deployment: Managed via `home-manager switch --flake .#parinya`.
-
-## 4. Data Stores
-
-### 4.1. Nix Store
-Name: `/nix/store`
-Type: Content-addressable read-only filesystem.
-Purpose: Stores all packages and configuration files in isolation, preventing dependency conflicts.
-
-### 4.2. HM Generations
-Name: Home Manager Generations
-Type: Symlink-based versioning.
-Purpose: Allows the user to roll back the entire environment to a previous known-good state.
-
-## 5. Design Principles & UI/UX Paradigm
-This section documents the standardized UI/UX approach adopted across all automation scripts to ensure consistency, professionalism, and user experience.
-
-### 5.1. Core Principles
-1. **100% Non-interactive:** Scripts must never prompt for user input during execution. Use automatic flags like `-y`, `--no-confirm`, or redirect input from `/dev/null` to ensure CI/CD pipeline compatibility.
-2. **OOTB (Out of the box):** Scripts must work on a bare system without pre-installed dependencies. Use `nix-shell` shebangs to declare required packages (e.g., `gum`, `git`).
-3. **Minimalist UI:** Hide noisy command output behind `gum spin` spinners, showing only essential status indicators. Reserve detailed logs for file-based debugging.
-4. **Unified Visual Language:** All scripts share identical UI helper functions (`step()`, `ok()`, `warn()`, `info()`, `fail()`) powered by `gum style` for consistent branding.
-
-### 5.2. UI Helper Functions
-Standardized across `startup.sh`, `migrate.sh`, and `clean.sh`:
-- `step()`: Blue bold arrow ▶ for current operation
-- `ok()`: Green checkmark ✔ for successful completion
-- `warn()`: Yellow warning symbol ⚠ for recoverable issues
-- `info()`: Blue info symbol ℹ for contextual information
-- `fail()`: Red bold cross ✖ for fatal errors (exits script)
-
-### 5.3. Output Management
-- Long-running operations (git clone, nix install, flake update) wrapped in `gum spin --spinner <type> --title "..." -- <command>`
-- Command output redirected to log files (e.g., `/tmp/nix_system_cleanup.log`) for post-mortem analysis
-- Success/failure determined by exit code, not output parsing
-
-## 6. External Integrations / APIs
-
-Nixpkgs: The primary source for all software packages (Unstable branch).
-Home Manager Flake: Provides the framework for declarative user environments.
-Claude Flakes: Integrates `claude-code` and `claude-desktop` directly into the Nix environment via external flake inputs.
-
-## 7. Deployment & Infrastructure
-
-Cloud Provider: N/A (Local Workstation/Personal Linux Desktop)
-CI/CD Pipeline: Manual `nix flake update` and local verification.
-Monitoring: `btm` (Bottom), `vitals` (GNOME Extension) configured via Nix.
-
-## 8. Security Considerations
-
-Authentication: Sudo is required only for the initial bootstrap phase. Subsequent configuration changes are performed by the user.
-Data Isolation: Nix ensures that system-wide packages and user-specific packages do not interfere.
-Reproducibility: Flake lockfiles ensure that the exact same versions of tools are installed across different machines.
-
-## 9. Development & Testing Environment
-
-Local Setup Instructions: `bash startup.sh`
-Code Quality Tools: `nixfmt` (configured via `nix fmt`) for Nix files, `shellcheck` for driver scripts.
-
-## 10. Future Considerations / Roadmap
-
-- Implementation of `sops-nix` or `age` for secret management.
-- Formalizing the `steps/` directory to replace monolith distro scripts.
-- Supporting dynamic usernames (currently hardcoded to `parinya`).
-- Extending gum-based UI to all maintenance scripts.
-
-## 11. Project Identification
-
-Project Name: linux-config
-Repository URL: https://github.com/parinya-ao/linux-config
-Primary Contact/Team: parinya-ao
-Date of Last Update: 2026-05-30
-
-## 12. Glossary / Acronyms
-
-Nix: A purely functional package manager.
-Flake: A hermetic, reproducible Nix project format.
-Home Manager: A Nix-based system for managing user environments.
-HM: Short for Home Manager.
-Generation: A specific versioned state of the user environment.
-OOTB: Out of the box (works without pre-installation).
-UI/UX: User Interface/User Experience.
-</file>
-
 <file path="CLAUDE.md">
 # CLAUDE.md — Agent Onboarding
 
@@ -8891,37 +8764,6 @@ programs=(
 flatpak install "${programs[@]}" -y
 </file>
 
-<file path="modules/packages/cli.nix">
-{
-  config,
-  lib,
-  pkgs,
-  ...
-}: let
-  cfg = config.my.packages.cli;
-in
-{
-  options.my.packages.cli.enable = lib.mkEnableOption "CLI packages";
-
-  config = lib.mkIf cfg.enable {
-    home.packages = with pkgs; [
-      tmux
-      jq
-      curl
-      wget
-      neovim
-      lsd
-      fastfetch
-      tldr
-      p7zip
-      xclip
-      htop
-      gum
-    ];
-  };
-}
-</file>
-
 <file path="modules/packages/docs.nix">
 {
   config,
@@ -8941,6 +8783,269 @@ in
       d2
       pandoc
     ];
+  };
+}
+</file>
+
+<file path="modules/productivity/shells.nix">
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
+
+let
+  cfg = config.my.productivity.shells;
+in
+{
+  options.my.productivity.shells.enable =
+    lib.mkEnableOption "Shell environments (bash, fish, starship)";
+
+  config = lib.mkIf cfg.enable {
+    programs.bash = {
+      enable = true;
+
+      shellAliases = {
+        ls = "eza --icons=auto --group-directories-first";
+        ll = "eza -lhF --icons=auto --git --group-directories-first";
+        la = "eza -lahF --icons=auto --git";
+        lt = "eza --tree --level=2 --icons=auto";
+        cat = "bat --style=full";
+        find = "fd";
+        grep = "rg --color=auto --smart-case";
+        sed = "sd";
+        awk = "choose";
+        cut = "choose";
+        diff = "delta";
+        man = "batman";
+        tree = "eza --tree";
+        curl = "xh";
+        df = "duf";
+        du = "dust";
+        ps = "procs";
+        top = "btm";
+        htop = "btm";
+        ping = "gping";
+        cd = "z";
+        ".." = "z ..";
+        "..." = "z ../..";
+        ".4" = "z ../../..";
+      };
+
+      initExtra = ''
+        export PATH="$HOME/.nix-profile/bin:$PATH"
+        export HISTSIZE=100000
+        export HISTFILESIZE=200000
+        export HISTCONTROL=ignoreboth:erasedups
+        shopt -s histappend
+        PROMPT_COMMAND="history -a; $PROMPT_COMMAND"
+        source ${pkgs.fzf}/share/fzf/key-bindings.bash
+        source ${pkgs.fzf}/share/fzf/completion.bash
+        export FZF_DEFAULT_COMMAND='fd --type f --hidden --follow --exclude .git'
+        export FZF_DEFAULT_OPTS='--height 40% --layout=reverse --border --info=inline'
+        eval "$(zoxide init bash)"
+        eval "$(starship init bash)"
+        export LESS='-R --use-color -Dd+r$Du+b'
+        export MANPAGER='bat -l man -p'
+      '';
+
+      historyControl = [
+        "ignoredups"
+        "erasedups"
+      ];
+    };
+
+    programs.fish = {
+      enable = true;
+
+      interactiveShellInit = ''
+        fish_add_path $HOME/.nix-profile/bin
+        set -g fish_greeting ""
+        zoxide init fish | source
+        fzf --fish | source
+        bind \cr 'history | fzf --tac | read -l cmd; and commandline $cmd'
+        pay-respects fish --alias | source
+        set -gx LD_LIBRARY_PATH /usr/lib64:${
+          lib.makeLibraryPath [
+            pkgs.stdenv.cc.cc.lib
+            pkgs.zlib
+            pkgs.zstd
+          ]
+        }:$LD_LIBRARY_PATH
+      '';
+
+      shellAliases = {
+        cd = "z";
+        cdi = "zi";
+        ".." = "z ..";
+        "..." = "z ../..";
+        ".4" = "z ../../..";
+        ls = "eza --icons=auto --group-directories-first";
+        ll = "eza -lhF --icons=auto --git --group-directories-first";
+        la = "eza -lahF --icons=auto --git";
+        lt = "eza --tree --level=2 --icons=auto";
+        llt = "eza --tree --level=3 --icons=auto -lh";
+        cat = "bat --style=full";
+        find = "fd";
+        grep = "rg --smart-case";
+        sed = "sd";
+        awk = "choose";
+        cut = "choose";
+        diff = "delta";
+        man = "batman";
+        tree = "eza --tree";
+        curl = "xh";
+        df = "duf";
+        du = "dust";
+        ps = "procs";
+        top = "btm";
+        htop = "btm";
+        ping = "gping";
+        cp = "cp -v";
+        mv = "mv -v";
+        rm = "rm -Iv";
+        mkdir = "mkdir -pv";
+        disk = "lsblk -o NAME,SIZE,FSTYPE,MOUNTPOINT,LABEL";
+        g = "git";
+        ga = "git add";
+        gaa = "git add .";
+        gap = "git add -p";
+        gc = "git commit";
+        gcm = "git commit -m";
+        gca = "git commit --amend --no-edit";
+        gst = "git status -sb";
+        gb = "git branch -vv";
+        gch = "git switch";
+        gcb = "git switch -c";
+        gp = "git push";
+        gpf = "git push --force-with-lease";
+        gpl = "git pull --rebase";
+        gd = "git diff";
+        gds = "git diff --staged";
+        glog = "git log --oneline --graph --decorate -20";
+        gloga = "git log --oneline --graph --decorate --all";
+        gwip = "git add -A && git commit -m 'wip: checkpoint'";
+        gunwip = "git log -n 1 --pretty=%B | rg -q 'wip' && git reset HEAD~";
+        gclean = "git branch --merged | rg -v main | xargs git branch -d";
+        nix-clean = "nix-collect-garbage -d && sudo nix-collect-garbage -d";
+        nix-update = "nix flake update";
+        nix-rebuild = "sudo nixos-rebuild switch --flake .#";
+        hm-switch = "home-manager switch --flake .#";
+      };
+
+      functions = {
+        mkcd = {
+          description = "Create directory and enter it";
+          body = "mkdir -p $argv && z $argv";
+        };
+        gcmt = {
+          description = "Commit with ticket prefix from branch name";
+          body = ''
+            set ticket (git branch --show-current | rg -o -P '[A-Z]+-\d+')
+            git commit -m "$ticket: $argv"
+          '';
+        };
+        gbf = {
+          description = "Fuzzy git branch switcher";
+          body = ''
+            git branch -a | fzf --height 40% | string trim | xargs git switch
+          '';
+        };
+        ns = {
+          description = "nix-shell with package";
+          body = "nix shell nixpkgs#$argv[1]";
+        };
+      };
+    };
+
+    programs.starship = {
+      enable = true;
+      enableFishIntegration = true;
+      settings = {
+        format = "$directory$git_branch$git_status$nix_shell$cmd_duration$line_break$character";
+        add_newline = true;
+        character = {
+          success_symbol = "[❯](bold green)";
+          error_symbol = "[❯](bold red)";
+          vimcmd_symbol = "[❮](bold yellow)";
+        };
+        directory = {
+          style = "bold cyan";
+          truncation_length = 3;
+          truncate_to_repo = true;
+        };
+        git_branch = {
+          symbol = " ";
+          style = "bold purple";
+        };
+        git_status = {
+          ahead = "⇡\${count}";
+          behind = "⇣\${count}";
+          diverged = "⇕⇡\${ahead_count}⇣\${behind_count}";
+          modified = "!";
+          staged = "+";
+          untracked = "?";
+          stashed = "≡";
+        };
+        nix_shell = {
+          symbol = " ";
+          style = "bold blue";
+        };
+        cmd_duration = {
+          min_time = 2000;
+          format = "took [$duration](bold yellow) ";
+        };
+      };
+    };
+  };
+}
+</file>
+
+<file path="modules/programs/agent-skills.nix">
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
+
+let
+  cfg = config.my.programs.agent-skills;
+
+  skills = {
+    gum-bash = ./../../.claude/skills/gum-bash/SKILL.md;
+    react-doctor = ./../../.claude/skills/react-doctor/SKILL.md;
+    nix-backup = ./../../.claude/skills/nix-backup/SKILL.md;
+  };
+
+  # Every skill goes to all three agent directories
+  targets = [
+    ".config/opencode/skills"
+    ".claude/skills"
+    ".agents/skills"
+  ];
+
+  # Build home.file attrs: ".agents/skills/<name>/SKILL.md" -> { source = ... }
+  skillEntries = builtins.listToAttrs (
+    builtins.concatLists (
+      builtins.map (
+        name:
+        builtins.map (target: {
+          name = "${target}/${name}/SKILL.md";
+          value.source = skills.${name};
+        }) targets
+      ) (builtins.attrNames skills)
+    )
+  );
+in
+{
+  options.my.programs.agent-skills = {
+    enable = lib.mkEnableOption "Agent skill files deployed via Home Manager";
+  };
+
+  config = lib.mkIf cfg.enable {
+    home.file = skillEntries;
   };
 }
 </file>
@@ -9517,170 +9622,170 @@ sync_config
 apply_hm
 </file>
 
-<file path="clean.sh">
-#!/usr/bin/env nix-shell
-#!nix-shell -i bash -p gum
-# ==============================================================================
-# Script: clean.sh (Nix System Cleanup)
-# Description: Production-grade automated cleanup for Nix environments.
-# Architecture: Modular, KISS, State-driven, Open Architecture, Integration Tested
-# UI: Gum-powered, Minimalist, 100% Non-interactive
-# ==============================================================================
+<file path="ARCHITECTURE.md">
+# Architecture Overview
+This document serves as a critical, living template designed to equip agents with a rapid and comprehensive understanding of the codebase's architecture, enabling efficient navigation and effective contribution from day one. Update this document as the codebase evolves.
 
-set -euo pipefail
+## 1. Project Structure
+This section provides a high-level overview of the project's directory and file structure. It is essential for quickly navigating the codebase and understanding the separation between the imperative bootstrap layer and the declarative configuration layer.
 
-# ── Global Configurations ─────────────────────────────────────────────────────
-readonly LOG_FILE="/tmp/nix_system_cleanup.log"
+/home/parinya/.config/home-manager/
+├── distro/               # Distribution-specific driver scripts (Imperative Layer)
+│   ├── fedora/           # Fedora-specific setup and services
+│   ├── opensuse/         # openSUSE/Tumbleweed setup
+│   └── ubuntu/           # Ubuntu/Debian family setup
+├── modules/              # Nix/Home Manager modules (Declarative Layer)
+│   ├── packages/         # Lists of Nix packages by category (ai, cli, dev, etc.)
+│   ├── programs/         # Deep configuration for specific tools (fish, git, gnome, etc.)
+│   ├── suites.nix        # High-level feature toggles (Base, Dev, AI, Desktop)
+│   └── default.nix       # Module entry point importing all sub-modules
+├── steps/                # Granular bootstrap steps called by drivers
+├── flatpak/              # Flatpak application management scripts
+├── lib/                  # Shared shell utility functions for drivers
+├── flake.nix             # Root Nix Flake definition (Dependencies & Outputs)
+├── home.nix              # Primary Home Manager configuration (User settings & active suites)
+├── startup.sh            # Main universal entry point for system bootstrapping
+├── README.md             # User-facing project overview
+├── GEMINI.md             # AI-specific instructional context
+└── ARCHITECTURE.md       # This document
 
-# ── Gum-based UI (no raw ANSI codes) ─────────────────────────────────────────
-step() { gum style --foreground "#00BFFF" --bold "▶ $*"; }
-ok()   { gum style --foreground "#04B575" "  ✔ $*"; }
-warn() { gum style --foreground "#FFA500" "  ⚠ $*" >&2; }
-fail() { gum style --foreground "#FF4500" --bold "  ✖ $*" >&2; exit 1; }
+## 2. High-Level System Diagram
+The system operates in two distinct phases: **Bootstrap** (Shell) and **Configuration** (Nix).
 
-# ── Logging Framework (to file only) ─────────────────────────────────────────
-log() { echo "[$(date +'%Y-%m-%dT%H:%M:%S%z')] $1" >> "$LOG_FILE"; }
-log_info()    { log "[INFO] $1"; }
-log_success() { log "[SUCCESS] $1"; }
-log_error()   { log "[ERROR] $1"; }
-log_debug()   { log "[DEBUG] $1"; }
+[Fresh OS] --> [startup.sh] --> [Distro Driver (distro/)] --> [Nix/HM Installation]
+                                           |
+                                           v
+[Nix Store] <--- [home-manager switch] <--- [flake.nix / home.nix]
+       |
+       +--> [Symlinked Dotfiles in $HOME]
+       +--> [User Binaries in PATH]
 
-# ── Error Handler Trap ───────────────────────────────────────────────────────
-error_handler() {
-    # Don't trigger if we are inside a BATS test environment
-    if [ "${BATS_TEST_NAME:-unset}" != "unset" ]; then
-        return
-    fi
-    log_error "Script failed. Please check ${LOG_FILE} for details."
-    fail "Cleanup failed. See $LOG_FILE for details."
+## 3. Core Components
+
+### 3.1. Bootstrap Engine (Imperative)
+Name: Universal Bootstrap (`startup.sh` + `distro/`)
+Description: Detects the host Linux distribution and prepares the environment for Nix. It handles root-level tasks like package manager updates, firmware installation, and the initial Nix/Home Manager installation.
+Technologies: Bash, `curl`, `git`, `sudo`.
+Deployment: Executed manually on a fresh OS install.
+
+### 3.2. Declarative Environment (Nix)
+Name: Home Manager Configuration
+Description: Defines the end-state of the user's home directory. It manages package installation, shell configuration, GNOME extensions, and tool-specific settings (dotfiles).
+Technologies: Nix (Flakes), Home Manager.
+Deployment: Managed via `home-manager switch --flake .#parinya`.
+
+## 4. Data Stores
+
+### 4.1. Nix Store
+Name: `/nix/store`
+Type: Content-addressable read-only filesystem.
+Purpose: Stores all packages and configuration files in isolation, preventing dependency conflicts.
+
+### 4.2. HM Generations
+Name: Home Manager Generations
+Type: Symlink-based versioning.
+Purpose: Allows the user to roll back the entire environment to a previous known-good state.
+
+## 5. Design Principles & UI/UX Paradigm
+This section documents the standardized UI/UX approach adopted across all automation scripts to ensure consistency, professionalism, and user experience.
+
+### 5.1. Core Principles
+1. **100% Non-interactive:** Scripts must never prompt for user input during execution. Use automatic flags like `-y`, `--no-confirm`, or redirect input from `/dev/null` to ensure CI/CD pipeline compatibility.
+2. **OOTB (Out of the box):** Scripts must work on a bare system without pre-installed dependencies. Use `nix-shell` shebangs to declare required packages (e.g., `gum`, `git`).
+3. **Minimalist UI:** Hide noisy command output behind `gum spin` spinners, showing only essential status indicators. Reserve detailed logs for file-based debugging.
+4. **Unified Visual Language:** All scripts share identical UI helper functions (`step()`, `ok()`, `warn()`, `info()`, `fail()`) powered by `gum style` for consistent branding.
+
+### 5.2. UI Helper Functions
+Standardized across `startup.sh`, `migrate.sh`, and `clean.sh`:
+- `step()`: Blue bold arrow ▶ for current operation
+- `ok()`: Green checkmark ✔ for successful completion
+- `warn()`: Yellow warning symbol ⚠ for recoverable issues
+- `info()`: Blue info symbol ℹ for contextual information
+- `fail()`: Red bold cross ✖ for fatal errors (exits script)
+
+### 5.3. Output Management
+- Long-running operations (git clone, nix install, flake update) wrapped in `gum spin --spinner <type> --title "..." -- <command>`
+- Command output redirected to log files (e.g., `/tmp/nix_system_cleanup.log`) for post-mortem analysis
+- Success/failure determined by exit code, not output parsing
+
+## 6. External Integrations / APIs
+
+Nixpkgs: The primary source for all software packages (Unstable branch).
+Home Manager Flake: Provides the framework for declarative user environments.
+Claude Flakes: Integrates `claude-code` and `claude-desktop` directly into the Nix environment via external flake inputs.
+
+## 7. Deployment & Infrastructure
+
+Cloud Provider: N/A (Local Workstation/Personal Linux Desktop)
+CI/CD Pipeline: Manual `nix flake update` and local verification.
+Monitoring: `btm` (Bottom), `vitals` (GNOME Extension) configured via Nix.
+
+## 8. Security Considerations
+
+Authentication: Sudo is required only for the initial bootstrap phase. Subsequent configuration changes are performed by the user.
+Data Isolation: Nix ensures that system-wide packages and user-specific packages do not interfere.
+Reproducibility: Flake lockfiles ensure that the exact same versions of tools are installed across different machines.
+
+## 9. Development & Testing Environment
+
+Local Setup Instructions: `bash startup.sh`
+Code Quality Tools: `nixfmt` (configured via `nix fmt`) for Nix files, `shellcheck` for driver scripts.
+
+## 10. Future Considerations / Roadmap
+
+- Implementation of `sops-nix` or `age` for secret management.
+- Formalizing the `steps/` directory to replace monolith distro scripts.
+- Supporting dynamic usernames (currently hardcoded to `parinya`).
+- Extending gum-based UI to all maintenance scripts.
+
+## 11. Project Identification
+
+Project Name: linux-config
+Repository URL: https://github.com/parinya-ao/linux-config
+Primary Contact/Team: parinya-ao
+Date of Last Update: 2026-05-30
+
+## 12. Glossary / Acronyms
+
+Nix: A purely functional package manager.
+Flake: A hermetic, reproducible Nix project format.
+Home Manager: A Nix-based system for managing user environments.
+HM: Short for Home Manager.
+Generation: A specific versioned state of the user environment.
+OOTB: Out of the box (works without pre-installation).
+UI/UX: User Interface/User Experience.
+</file>
+
+<file path="modules/packages/cli.nix">
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
+let
+  cfg = config.my.packages.cli;
+in
+{
+  options.my.packages.cli.enable = lib.mkEnableOption "CLI packages";
+
+  config = lib.mkIf cfg.enable {
+    home.packages = with pkgs; [
+      tmux
+      jq
+      curl
+      wget
+      neovim
+      lsd
+      fastfetch
+      tldr
+      p7zip
+      xclip
+      htop
+      gum
+    ];
+  };
 }
-trap 'error_handler' ERR
-
-# ── Helpers ──────────────────────────────────────────────────────────────────
-need_cmd() { command -v "$1" >/dev/null 2>&1 || fail "Required command not found: $1"; }
-
-# ==============================================================================
-# MODULAR FUNCTIONS
-# ==============================================================================
-
-verify_dependencies() {
-    log_debug "Checking for required Nix commands..."
-    
-    for cmd in nix-env nix-store; do
-        if ! command -v "$cmd" >/dev/null 2>&1; then
-            log_error "Command '$cmd' not found. Is Nix installed?"
-            exit 1
-        fi
-    done
-    log_success "All Nix dependencies found."
-}
-
-remove_old_generations() {
-    log_debug "Executing: nix-env --delete-generations old"
-    
-    if gum spin --spinner line --title "Removing old generations..." -- \
-        nix-env --delete-generations old >> "$LOG_FILE" 2>&1; then
-        log_success "Old generations removed successfully."
-        ok "Old generations removed"
-    else
-        log_error "Failed to remove old generations."
-        return 1
-    fi
-}
-
-run_garbage_collection() {
-    log_debug "Executing: nix-store --gc"
-    
-    # Run GC and capture the output to extract freed space info
-    local gc_output
-    if gum spin --spinner globe --title "Cleaning up Nix store..." -- \
-        bash -c "gc_output=\$(nix-store --gc 2>&1); echo \"\$gc_output\" >> \"$LOG_FILE\"; echo \"\$gc_output\""; then
-        echo "$gc_output" >> "$LOG_FILE"
-        local bytes_freed
-        bytes_freed=$(echo "$gc_output" | grep -oP '\d+(?= bytes freed)' || echo "Unknown")
-        log_success "Garbage collection completed. Freed: ${bytes_freed} bytes."
-        ok "Garbage collection completed"
-    else
-        log_error "Garbage collection failed."
-        return 1
-    fi
-}
-
-optimize_nix_store() {
-    log_debug "Executing: nix-store --optimize"
-    
-    if gum spin --spinner points --title "Optimizing Nix store..." -- \
-        nix-store --optimize >> "$LOG_FILE" 2>&1; then
-        log_success "Nix store optimization completed (hardlinks created)."
-        ok "Nix store optimized"
-    else
-        log_error "Nix store optimization failed."
-        return 1
-    fi
-}
-
-# ==============================================================================
-# SYSTEM INTEGRATION TEST
-# ==============================================================================
-integration_test() {
-    log_info "Initiating system integration tests for cleanup state..."
-    
-    # Test 1: Verify 'nix-env --list-generations' doesn't fail
-    log_debug "Test 1: Validating current generation state..."
-    if nix-env --list-generations >/dev/null 2>&1; then
-        log_success "[Test 1 Passed] Generation list is accessible and intact."
-    else
-        log_error "[Test 1 Failed] Cannot list generations. Profile might be corrupted."
-        exit 1
-    fi
-    
-    # Test 2: Verify Nix store health after GC and Optimization
-    log_debug "Test 2: Verifying Nix store paths..."
-    if gum spin --spinner dot --title "Verifying Nix store integrity..." -- \
-        nix-store --verify --check-contents >> "$LOG_FILE" 2>&1; then
-        log_success "[Test 2 Passed] Nix store integrity verified successfully."
-        ok "Nix store verified"
-    else
-        log_error "[Test 2 Failed] Nix store verification failed. Corrupted paths detected."
-        exit 1
-    fi
-    
-    log_success "All system integration tests passed flawlessly."
-}
-
-# ==============================================================================
-# MAIN EXECUTION (Open Architecture)
-# ==============================================================================
-main() {
-    # Create log file safely
-    touch "$LOG_FILE" || { echo "Cannot write to ${LOG_FILE}. Exiting." >&2; exit 1; }
-    
-    log_info "Starting Nix Environment Cleanup Pipeline"
-    gum style --border double --margin "1" --padding "1 2" --border-foreground "#00BFFF" \
-        "$(gum style --bold --foreground "#00BFFF" "🧹 Nix System Cleanup")"
-    
-    verify_dependencies
-    remove_old_generations
-    run_garbage_collection
-    optimize_nix_store
-    
-    # Run self-check at the end
-    integration_test
-    
-    log_info "Cleanup pipeline executed and verified successfully."
-    
-    echo ""
-    gum format -- "✅ **Cleanup Complete!** Your Nix environment is now pristine." \
-        "" \
-        "📋 Log file: $LOG_FILE" \
-        "" \
-        "$(gum style --italic --foreground "#FFA500" "Run \`nix-env --list-generations\` to see current generations.")"
-}
-
-# Run Main only when script is executed (not when sourced)
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    main "$@"
-fi
 </file>
 
 <file path="modules/packages/dev.nix">
@@ -9746,194 +9851,6 @@ in
       nerd-fonts.jetbrains-mono
       nerd-fonts.fira-code
     ];
-  };
-}
-</file>
-
-<file path="modules/programs/fish.nix">
-{
-  config,
-  lib,
-  pkgs,
-  ...
-}:
-let
-  cfg = config.my.programs.fish;
-in
-{
-  options.my.programs.fish.enable = lib.mkEnableOption "fish shell and starship";
-
-  config = lib.mkIf cfg.enable {
-    programs.fish = {
-      enable = true;
-
-      interactiveShellInit = ''
-        # PATH
-        fish_add_path $HOME/.nix-profile/bin
-
-        # Suppress greeting
-        set -g fish_greeting ""
-
-        # zoxide integration
-        zoxide init fish | source
-
-        # fzf integration
-        fzf --fish | source
-
-        # Keybindings: Ctrl+R → fzf history
-        bind \cr 'history | fzf --tac | read -l cmd; and commandline $cmd'
-
-        pay-respects fish --alias | source
-
-        # uv 
-        set -gx LD_LIBRARY_PATH /usr/lib64:${
-          lib.makeLibraryPath [
-            pkgs.stdenv.cc.cc.lib
-            pkgs.zlib
-            pkgs.zstd
-          ]
-        }:$LD_LIBRARY_PATH
-      '';
-
-      shellAliases = {
-        # --- Navigation (with zoxide) ---
-        cd = "z";
-        cdi = "zi"; # interactive jump
-        ".." = "z ..";
-        "..." = "z ../..";
-        ".4" = "z ../../..";
-
-        # --- File tools ---
-        ls = "eza --icons=auto --group-directories-first";
-        ll = "eza -lhF --icons=auto --git --group-directories-first";
-        la = "eza -lahF --icons=auto --git";
-        lt = "eza --tree --level=2 --icons=auto";
-        llt = "eza --tree --level=3 --icons=auto -lh";
-        cat = "bat --style=full";
-        find = "fd";
-        grep = "rg --smart-case";
-        sed = "sd";
-        awk = "choose";
-        cut = "choose";
-        diff = "delta"; # git-delta for beautiful diffs
-        man = "batman";
-        tree = "eza --tree";
-        curl = "xh";
-
-        # --- System ---
-        df = "duf";
-        du = "dust";
-        ps = "procs";
-        top = "btm";
-        htop = "btm";
-        ping = "gping";
-        cp = "cp -v";
-        mv = "mv -v";
-        rm = "rm -Iv"; # capital I = prompt once if removing >3 files
-        mkdir = "mkdir -pv";
-        disk = "lsblk -o NAME,SIZE,FSTYPE,MOUNTPOINT,LABEL";
-
-        # --- Git (power shortcuts) ---
-        g = "git";
-        ga = "git add";
-        gaa = "git add .";
-        gap = "git add -p"; # interactive patch staging
-        gc = "git commit";
-        gcm = "git commit -m";
-        gca = "git commit --amend --no-edit";
-        gst = "git status -sb";
-        gb = "git branch -vv";
-        gch = "git switch"; # modern replacement for checkout
-        gcb = "git switch -c";
-        gp = "git push";
-        gpf = "git push --force-with-lease"; # safe force push
-        gpl = "git pull --rebase";
-        gd = "git diff";
-        gds = "git diff --staged";
-        glog = "git log --oneline --graph --decorate -20";
-        gloga = "git log --oneline --graph --decorate --all";
-        gwip = "git add -A && git commit -m 'wip: checkpoint'";
-        gunwip = "git log -n 1 --pretty=%B | rg -q 'wip' && git reset HEAD~";
-        gclean = "git branch --merged | rg -v main | xargs git branch -d";
-
-        # --- Dev shortcuts ---
-        nix-clean = "nix-collect-garbage -d && sudo nix-collect-garbage -d";
-        nix-update = "nix flake update";
-        nix-rebuild = "sudo nixos-rebuild switch --flake .#";
-        hm-switch = "home-manager switch --flake .#";
-      };
-
-      functions = {
-        # Create dir and cd into it
-        mkcd = {
-          description = "Create directory and enter it";
-          body = "mkdir -p $argv && z $argv";
-        };
-
-        # Quick git commit with ticket prefix
-        gcmt = {
-          description = "Commit with ticket prefix from branch name";
-          body = ''
-            set ticket (git branch --show-current | rg -o -P '[A-Z]+-\d+')
-            git commit -m "$ticket: $argv"
-          '';
-        };
-
-        # fzf-powered branch switcher
-        gbf = {
-          description = "Fuzzy git branch switcher";
-          body = ''
-            git branch -a | fzf --height 40% | string trim | xargs git switch
-          '';
-        };
-
-        # Quick nix shell
-        ns = {
-          description = "nix-shell with package";
-          body = "nix shell nixpkgs#$argv[1]";
-        };
-      };
-    };
-
-    programs.starship = {
-      enable = true;
-      enableFishIntegration = true;
-      settings = {
-        format = "$directory$git_branch$git_status$nix_shell$cmd_duration$line_break$character";
-        add_newline = true;
-        character = {
-          success_symbol = "[❯](bold green)";
-          error_symbol = "[❯](bold red)";
-          vimcmd_symbol = "[❮](bold yellow)";
-        };
-        directory = {
-          style = "bold cyan";
-          truncation_length = 3;
-          truncate_to_repo = true;
-        };
-        git_branch = {
-          symbol = " ";
-          style = "bold purple";
-        };
-        git_status = {
-          ahead = "⇡\${count}";
-          behind = "⇣\${count}";
-          diverged = "⇕⇡\${ahead_count}⇣\${behind_count}";
-          modified = "!";
-          staged = "+";
-          untracked = "?";
-          stashed = "≡";
-        };
-        nix_shell = {
-          symbol = " ";
-          style = "bold blue";
-        };
-        cmd_duration = {
-          min_time = 2000;
-          format = "took [$duration](bold yellow) ";
-        };
-      };
-    };
   };
 }
 </file>
@@ -10013,69 +9930,6 @@ in
           colorMovedWS = "allow-indentation-change";
         };
       };
-    };
-  };
-}
-</file>
-
-<file path="modules/default.nix">
-{ ... }:
-
-{
-  imports = [
-    ./suites.nix
-    ./packages/ai.nix
-    ./packages/cli.nix
-    ./packages/dev.nix
-    ./packages/docs.nix
-    ./packages/gui.nix
-    ./programs/bash.nix
-    ./programs/cli-tools.nix
-    ./programs/fish.nix
-    ./programs/git.nix
-    ./programs/gnome.nix
-    ./programs/neovim.nix
-    ./programs/react-doctor.nix
-    ./programs/opencode.nix
-    ./programs/rtk.nix
-    ./packages/font.nix
-  ];
-}
-</file>
-
-<file path="modules/suites.nix">
-{ config, lib, ... }:
-
-let
-  cfg = config.my.suites;
-in
-{
-  options.my.suites = {
-    base.enable = lib.mkEnableOption "Base CLI & Shell tools";
-    development.enable = lib.mkEnableOption "Development tools (Editor, Git, compilers)";
-    ai.enable = lib.mkEnableOption "AI Tools & CLIs";
-    desktop.enable = lib.mkEnableOption "GNOME Desktop & GUI apps";
-  };
-
-  config = {
-    my.programs = {
-      bash = lib.mkIf cfg.base.enable { enable = true; };
-      fish = lib.mkIf cfg.base.enable { enable = true; };
-      cli-tools = lib.mkIf cfg.base.enable { enable = true; };
-      git = lib.mkIf cfg.development.enable { enable = true; };
-      neovim = lib.mkIf cfg.development.enable { enable = true; };
-      gnome = lib.mkIf cfg.desktop.enable { enable = true; };
-      react-doctor = lib.mkIf cfg.ai.enable { enable = true; };
-      opencode = lib.mkIf cfg.ai.enable { enable = true; };
-      rtk = lib.mkIf cfg.ai.enable { enable = true; };
-    };
-    my.packages = {
-      cli = lib.mkIf cfg.base.enable { enable = true; };
-      dev = lib.mkIf cfg.development.enable { enable = true; };
-      ai = lib.mkIf cfg.ai.enable { enable = true; };
-      gui = lib.mkIf cfg.desktop.enable { enable = true; };
-      docs = lib.mkIf cfg.desktop.enable { enable = true; };
-      fonts = lib.mkIf cfg.desktop.enable { enable = true; };
     };
   };
 }
@@ -10588,198 +10442,170 @@ main() {
 main "$@"
 </file>
 
-<file path=".gitignore">
-# Created by https://www.toptal.com/developers/gitignore/api/python,powershell,fish
-# Edit at https://www.toptal.com/developers/gitignore?templates=python,powershell,fish
+<file path="clean.sh">
+#!/usr/bin/env nix-shell
+#!nix-shell -i bash -p gum
+# ==============================================================================
+# Script: clean.sh (Nix System Cleanup)
+# Description: Production-grade automated cleanup for Nix environments.
+# Architecture: Modular, KISS, State-driven, Open Architecture, Integration Tested
+# UI: Gum-powered, Minimalist, 100% Non-interactive
+# ==============================================================================
 
-### Fish ###
-fishd.*
-fish_history
-fish_variables
-config.local.fish
+set -euo pipefail
 
-### PowerShell ###
-# Exclude packaged modules
-*.zip
+# ── Global Configurations ─────────────────────────────────────────────────────
+readonly LOG_FILE="/tmp/nix_system_cleanup.log"
 
-# Exclude .NET assemblies from source
-*.dll
+# ── Gum-based UI (no raw ANSI codes) ─────────────────────────────────────────
+step() { gum style --foreground "#00BFFF" --bold "▶ $*"; }
+ok()   { gum style --foreground "#04B575" "  ✔ $*"; }
+warn() { gum style --foreground "#FFA500" "  ⚠ $*" >&2; }
+fail() { gum style --foreground "#FF4500" --bold "  ✖ $*" >&2; exit 1; }
 
-### Python ###
-# Byte-compiled / optimized / DLL files
-__pycache__/
-*.py[cod]
-*$py.class
+# ── Logging Framework (to file only) ─────────────────────────────────────────
+log() { echo "[$(date +'%Y-%m-%dT%H:%M:%S%z')] $1" >> "$LOG_FILE"; }
+log_info()    { log "[INFO] $1"; }
+log_success() { log "[SUCCESS] $1"; }
+log_error()   { log "[ERROR] $1"; }
+log_debug()   { log "[DEBUG] $1"; }
 
-# C extensions
-*.so
+# ── Error Handler Trap ───────────────────────────────────────────────────────
+error_handler() {
+    # Don't trigger if we are inside a BATS test environment
+    if [ "${BATS_TEST_NAME:-unset}" != "unset" ]; then
+        return
+    fi
+    log_error "Script failed. Please check ${LOG_FILE} for details."
+    fail "Cleanup failed. See $LOG_FILE for details."
+}
+trap 'error_handler' ERR
 
-# Distribution / packaging
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
+# ── Helpers ──────────────────────────────────────────────────────────────────
+need_cmd() { command -v "$1" >/dev/null 2>&1 || fail "Required command not found: $1"; }
 
-# PyInstaller
-#  Usually these files are written by a python script from a template
-#  before PyInstaller builds the exe, so as to inject date/other infos into it.
-*.manifest
-*.spec
+# ==============================================================================
+# MODULAR FUNCTIONS
+# ==============================================================================
 
-# Installer logs
-pip-log.txt
-pip-delete-this-directory.txt
+verify_dependencies() {
+    log_debug "Checking for required Nix commands..."
+    
+    for cmd in nix-env nix-store; do
+        if ! command -v "$cmd" >/dev/null 2>&1; then
+            log_error "Command '$cmd' not found. Is Nix installed?"
+            exit 1
+        fi
+    done
+    log_success "All Nix dependencies found."
+}
 
-# Unit test / coverage reports
-htmlcov/
-.tox/
-.nox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
-.hypothesis/
-.pytest_cache/
-cover/
+remove_old_generations() {
+    log_debug "Executing: nix-env --delete-generations old"
+    
+    if gum spin --spinner line --title "Removing old generations..." -- \
+        nix-env --delete-generations old >> "$LOG_FILE" 2>&1; then
+        log_success "Old generations removed successfully."
+        ok "Old generations removed"
+    else
+        log_error "Failed to remove old generations."
+        return 1
+    fi
+}
 
-# Translations
-*.mo
-*.pot
+run_garbage_collection() {
+    log_debug "Executing: nix-store --gc"
+    
+    # Run GC and capture the output to extract freed space info
+    local gc_output
+    if gum spin --spinner globe --title "Cleaning up Nix store..." -- \
+        bash -c "gc_output=\$(nix-store --gc 2>&1); echo \"\$gc_output\" >> \"$LOG_FILE\"; echo \"\$gc_output\""; then
+        echo "$gc_output" >> "$LOG_FILE"
+        local bytes_freed
+        bytes_freed=$(echo "$gc_output" | grep -oP '\d+(?= bytes freed)' || echo "Unknown")
+        log_success "Garbage collection completed. Freed: ${bytes_freed} bytes."
+        ok "Garbage collection completed"
+    else
+        log_error "Garbage collection failed."
+        return 1
+    fi
+}
 
-# Django stuff:
-*.log
-local_settings.py
-db.sqlite3
-db.sqlite3-journal
+optimize_nix_store() {
+    log_debug "Executing: nix-store --optimize"
+    
+    if gum spin --spinner points --title "Optimizing Nix store..." -- \
+        nix-store --optimize >> "$LOG_FILE" 2>&1; then
+        log_success "Nix store optimization completed (hardlinks created)."
+        ok "Nix store optimized"
+    else
+        log_error "Nix store optimization failed."
+        return 1
+    fi
+}
 
-# Flask stuff:
-instance/
-.webassets-cache
+# ==============================================================================
+# SYSTEM INTEGRATION TEST
+# ==============================================================================
+integration_test() {
+    log_info "Initiating system integration tests for cleanup state..."
+    
+    # Test 1: Verify 'nix-env --list-generations' doesn't fail
+    log_debug "Test 1: Validating current generation state..."
+    if nix-env --list-generations >/dev/null 2>&1; then
+        log_success "[Test 1 Passed] Generation list is accessible and intact."
+    else
+        log_error "[Test 1 Failed] Cannot list generations. Profile might be corrupted."
+        exit 1
+    fi
+    
+    # Test 2: Verify Nix store health after GC and Optimization
+    log_debug "Test 2: Verifying Nix store paths..."
+    if gum spin --spinner dot --title "Verifying Nix store integrity..." -- \
+        nix-store --verify --check-contents >> "$LOG_FILE" 2>&1; then
+        log_success "[Test 2 Passed] Nix store integrity verified successfully."
+        ok "Nix store verified"
+    else
+        log_error "[Test 2 Failed] Nix store verification failed. Corrupted paths detected."
+        exit 1
+    fi
+    
+    log_success "All system integration tests passed flawlessly."
+}
 
-# Scrapy stuff:
-.scrapy
+# ==============================================================================
+# MAIN EXECUTION (Open Architecture)
+# ==============================================================================
+main() {
+    # Create log file safely
+    touch "$LOG_FILE" || { echo "Cannot write to ${LOG_FILE}. Exiting." >&2; exit 1; }
+    
+    log_info "Starting Nix Environment Cleanup Pipeline"
+    gum style --border double --margin "1" --padding "1 2" --border-foreground "#00BFFF" \
+        "$(gum style --bold --foreground "#00BFFF" "🧹 Nix System Cleanup")"
+    
+    verify_dependencies
+    remove_old_generations
+    run_garbage_collection
+    optimize_nix_store
+    
+    # Run self-check at the end
+    integration_test
+    
+    log_info "Cleanup pipeline executed and verified successfully."
+    
+    echo ""
+    gum format -- "✅ **Cleanup Complete!** Your Nix environment is now pristine." \
+        "" \
+        "📋 Log file: $LOG_FILE" \
+        "" \
+        "$(gum style --italic --foreground "#FFA500" "Run \`nix-env --list-generations\` to see current generations.")"
+}
 
-# Sphinx documentation
-docs/_build/
-
-# PyBuilder
-.pybuilder/
-target/
-
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# IPython
-profile_default/
-ipython_config.py
-
-# pyenv
-#   For a library or package, you might want to ignore these files since the code is
-#   intended to run in multiple environments; otherwise, check them in:
-# .python-version
-
-# pipenv
-#   According to pypa/pipenv#598, it is recommended to include Pipfile.lock in version control.
-#   However, in case of collaboration, if having platform-specific dependencies or dependencies
-#   having no cross-platform support, pipenv may install dependencies that don't work, or not
-#   install all needed dependencies.
-#Pipfile.lock
-
-# poetry
-#   Similar to Pipfile.lock, it is generally recommended to include poetry.lock in version control.
-#   This is especially recommended for binary packages to ensure reproducibility, and is more
-#   commonly ignored for libraries.
-#   https://python-poetry.org/docs/basic-usage/#commit-your-poetrylock-file-to-version-control
-#poetry.lock
-
-# pdm
-#   Similar to Pipfile.lock, it is generally recommended to include pdm.lock in version control.
-#pdm.lock
-#   pdm stores project-wide configurations in .pdm.toml, but it is recommended to not include it
-#   in version control.
-#   https://pdm.fming.dev/#use-with-ide
-.pdm.toml
-
-# PEP 582; used by e.g. github.com/David-OConnor/pyflow and github.com/pdm-project/pdm
-__pypackages__/
-
-# Celery stuff
-celerybeat-schedule
-celerybeat.pid
-
-# SageMath parsed files
-*.sage.py
-
-# Environments
-.env
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-
-# Spyder project settings
-.spyderproject
-.spyproject
-
-# Rope project settings
-.ropeproject
-
-# mkdocs documentation
-/site
-
-# mypy
-.mypy_cache/
-.dmypy.json
-dmypy.json
-
-# Pyre type checker
-.pyre/
-
-# pytype static type analyzer
-.pytype/
-
-# Cython debug symbols
-cython_debug/
-
-# PyCharm
-#  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
-#  be found at https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore
-#  and can be added to the global gitignore or merged into this file.  For a more nuclear
-#  option (not recommended) you can uncomment the following to ignore the entire idea folder.
-#.idea/
-
-### Python Patch ###
-# Poetry local configuration file - https://python-poetry.org/docs/configuration/#local-configuration
-poetry.toml
-
-# ruff
-.ruff_cache/
-
-# LSP config files
-pyrightconfig.json
-
-# End of https://www.toptal.com/developers/gitignore/api/python,powershell,fish
-repomix-output.xml
-repomix-output.md
+# Run Main only when script is executed (not when sourced)
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    main "$@"
+fi
 </file>
 
 <file path="distro/fedora/fedora.sh">
@@ -11678,37 +11504,6 @@ main() {
 main "$@"
 </file>
 
-<file path="modules/packages/ai.nix">
-# modules/packages/ai.nix
-{
-  config,
-  lib,
-  pkgs,
-  inputs,
-  ...
-}:
-
-let
-  cfg = config.my.packages.ai;
-in
-{
-  options.my.packages.ai = {
-    enable = lib.mkEnableOption "AI Tools (Claude, Antigravity, Codex)";
-  };
-
-  config = lib.mkIf cfg.enable {
-    home.packages = [
-      inputs.claude-code.packages.${pkgs.stdenv.hostPlatform.system}.default
-      # inputs.claude-desktop.packages.${pkgs.stdenv.hostPlatform.system}.claude-desktop-fhs  # broken upstream
-      inputs.codex-cli-nix.packages.${pkgs.stdenv.hostPlatform.system}.default
-      pkgs.github-copilot-cli
-      pkgs.rtk
-      pkgs.bash
-    ];
-  };
-}
-</file>
-
 <file path="modules/programs/cli-tools.nix">
 {
   config,
@@ -11841,6 +11636,453 @@ in
     };
   };
 }
+</file>
+
+<file path="modules/programs/fish.nix">
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
+let
+  cfg = config.my.programs.fish;
+in
+{
+  options.my.programs.fish.enable = lib.mkEnableOption "fish shell and starship";
+
+  config = lib.mkIf cfg.enable {
+    programs.fish = {
+      enable = true;
+
+      interactiveShellInit = ''
+        # PATH
+        fish_add_path $HOME/.nix-profile/bin
+
+        # Suppress greeting
+        set -g fish_greeting ""
+
+        # zoxide integration
+        zoxide init fish | source
+
+        # fzf integration
+        fzf --fish | source
+
+        # Keybindings: Ctrl+R → fzf history
+        bind \cr 'history | fzf --tac | read -l cmd; and commandline $cmd'
+
+        pay-respects fish --alias | source
+
+        # uv 
+        set -gx LD_LIBRARY_PATH /usr/lib64:${
+          lib.makeLibraryPath [
+            pkgs.stdenv.cc.cc.lib
+            pkgs.zlib
+            pkgs.zstd
+          ]
+        }:$LD_LIBRARY_PATH
+      '';
+
+      shellAliases = {
+        # --- Navigation (with zoxide) ---
+        cd = "z";
+        cdi = "zi"; # interactive jump
+        ".." = "z ..";
+        "..." = "z ../..";
+        ".4" = "z ../../..";
+
+        # --- File tools ---
+        ls = "eza --icons=auto --group-directories-first";
+        ll = "eza -lhF --icons=auto --git --group-directories-first";
+        la = "eza -lahF --icons=auto --git";
+        lt = "eza --tree --level=2 --icons=auto";
+        llt = "eza --tree --level=3 --icons=auto -lh";
+        cat = "bat --style=full";
+        find = "fd";
+        grep = "rg --smart-case";
+        sed = "sd";
+        awk = "choose";
+        cut = "choose";
+        diff = "delta"; # git-delta for beautiful diffs
+        man = "batman";
+        tree = "eza --tree";
+        curl = "xh";
+
+        # --- System ---
+        df = "duf";
+        du = "dust";
+        ps = "procs";
+        top = "btm";
+        htop = "btm";
+        ping = "gping";
+        cp = "cp -v";
+        mv = "mv -v";
+        rm = "rm -Iv"; # capital I = prompt once if removing >3 files
+        mkdir = "mkdir -pv";
+        disk = "lsblk -o NAME,SIZE,FSTYPE,MOUNTPOINT,LABEL";
+
+        # --- Git (power shortcuts) ---
+        g = "git";
+        ga = "git add";
+        gaa = "git add .";
+        gap = "git add -p"; # interactive patch staging
+        gc = "git commit";
+        gcm = "git commit -m";
+        gca = "git commit --amend --no-edit";
+        gst = "git status -sb";
+        gb = "git branch -vv";
+        gch = "git switch"; # modern replacement for checkout
+        gcb = "git switch -c";
+        gp = "git push";
+        gpf = "git push --force-with-lease"; # safe force push
+        gpl = "git pull --rebase";
+        gd = "git diff";
+        gds = "git diff --staged";
+        glog = "git log --oneline --graph --decorate -20";
+        gloga = "git log --oneline --graph --decorate --all";
+        gwip = "git add -A && git commit -m 'wip: checkpoint'";
+        gunwip = "git log -n 1 --pretty=%B | rg -q 'wip' && git reset HEAD~";
+        gclean = "git branch --merged | rg -v main | xargs git branch -d";
+
+        # --- Dev shortcuts ---
+        nix-clean = "nix-collect-garbage -d && sudo nix-collect-garbage -d";
+        nix-update = "nix flake update";
+        nix-rebuild = "sudo nixos-rebuild switch --flake .#";
+        hm-switch = "home-manager switch --flake .#";
+      };
+
+      functions = {
+        # Create dir and cd into it
+        mkcd = {
+          description = "Create directory and enter it";
+          body = "mkdir -p $argv && z $argv";
+        };
+
+        # Quick git commit with ticket prefix
+        gcmt = {
+          description = "Commit with ticket prefix from branch name";
+          body = ''
+            set ticket (git branch --show-current | rg -o -P '[A-Z]+-\d+')
+            git commit -m "$ticket: $argv"
+          '';
+        };
+
+        # fzf-powered branch switcher
+        gbf = {
+          description = "Fuzzy git branch switcher";
+          body = ''
+            git branch -a | fzf --height 40% | string trim | xargs git switch
+          '';
+        };
+
+        # Quick nix shell
+        ns = {
+          description = "nix-shell with package";
+          body = "nix shell nixpkgs#$argv[1]";
+        };
+      };
+    };
+
+    programs.starship = {
+      enable = true;
+      enableFishIntegration = true;
+      settings = {
+        format = "$directory$git_branch$git_status$nix_shell$cmd_duration$line_break$character";
+        add_newline = true;
+        character = {
+          success_symbol = "[❯](bold green)";
+          error_symbol = "[❯](bold red)";
+          vimcmd_symbol = "[❮](bold yellow)";
+        };
+        directory = {
+          style = "bold cyan";
+          truncation_length = 3;
+          truncate_to_repo = true;
+        };
+        git_branch = {
+          symbol = " ";
+          style = "bold purple";
+        };
+        git_status = {
+          ahead = "⇡\${count}";
+          behind = "⇣\${count}";
+          diverged = "⇕⇡\${ahead_count}⇣\${behind_count}";
+          modified = "!";
+          staged = "+";
+          untracked = "?";
+          stashed = "≡";
+        };
+        nix_shell = {
+          symbol = " ";
+          style = "bold blue";
+        };
+        cmd_duration = {
+          min_time = 2000;
+          format = "took [$duration](bold yellow) ";
+        };
+      };
+    };
+  };
+}
+</file>
+
+<file path="modules/default.nix">
+{ ... }:
+
+{
+  imports = [
+    ./suites.nix
+    ./packages/ai.nix
+    ./packages/cli.nix
+    ./packages/dev.nix
+    ./packages/docs.nix
+    ./packages/gui.nix
+    ./programs/agent-skills.nix
+    ./programs/bash.nix
+    ./programs/cli-tools.nix
+    ./programs/fish.nix
+    ./programs/git.nix
+    ./programs/gnome.nix
+    ./programs/neovim.nix
+    ./programs/react-doctor.nix
+    ./programs/opencode.nix
+    ./programs/rtk.nix
+    ./packages/font.nix
+  ];
+}
+</file>
+
+<file path="modules/suites.nix">
+{ config, lib, ... }:
+
+let
+  cfg = config.my.suites;
+in
+{
+  options.my.suites = {
+    base.enable = lib.mkEnableOption "Base CLI & Shell tools";
+    development.enable = lib.mkEnableOption "Development tools (Editor, Git, compilers)";
+    ai.enable = lib.mkEnableOption "AI Tools & CLIs";
+    desktop.enable = lib.mkEnableOption "GNOME Desktop & GUI apps";
+  };
+
+  config = {
+    my.programs = {
+      bash = lib.mkIf cfg.base.enable { enable = true; };
+      fish = lib.mkIf cfg.base.enable { enable = true; };
+      cli-tools = lib.mkIf cfg.base.enable { enable = true; };
+      git = lib.mkIf cfg.development.enable { enable = true; };
+      neovim = lib.mkIf cfg.development.enable { enable = true; };
+      gnome = lib.mkIf cfg.desktop.enable { enable = true; };
+      agent-skills = lib.mkIf cfg.ai.enable { enable = true; };
+      react-doctor = lib.mkIf cfg.ai.enable { enable = true; };
+      opencode = lib.mkIf cfg.ai.enable { enable = true; };
+      rtk = lib.mkIf cfg.ai.enable { enable = true; };
+    };
+    my.packages = {
+      cli = lib.mkIf cfg.base.enable { enable = true; };
+      dev = lib.mkIf cfg.development.enable { enable = true; };
+      ai = lib.mkIf cfg.ai.enable { enable = true; };
+      gui = lib.mkIf cfg.desktop.enable { enable = true; };
+      docs = lib.mkIf cfg.desktop.enable { enable = true; };
+      fonts = lib.mkIf cfg.desktop.enable { enable = true; };
+    };
+  };
+}
+</file>
+
+<file path=".gitignore">
+# Created by https://www.toptal.com/developers/gitignore/api/python,powershell,fish
+# Edit at https://www.toptal.com/developers/gitignore?templates=python,powershell,fish
+
+### Fish ###
+fishd.*
+fish_history
+fish_variables
+config.local.fish
+
+### PowerShell ###
+# Exclude packaged modules
+*.zip
+
+# Exclude .NET assemblies from source
+*.dll
+
+### Python ###
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+#  Usually these files are written by a python script from a template
+#  before PyInstaller builds the exe, so as to inject date/other infos into it.
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# Translations
+*.mo
+*.pot
+
+# Django stuff:
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Flask stuff:
+instance/
+.webassets-cache
+
+# Scrapy stuff:
+.scrapy
+
+# Sphinx documentation
+docs/_build/
+
+# PyBuilder
+.pybuilder/
+target/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+#   For a library or package, you might want to ignore these files since the code is
+#   intended to run in multiple environments; otherwise, check them in:
+# .python-version
+
+# pipenv
+#   According to pypa/pipenv#598, it is recommended to include Pipfile.lock in version control.
+#   However, in case of collaboration, if having platform-specific dependencies or dependencies
+#   having no cross-platform support, pipenv may install dependencies that don't work, or not
+#   install all needed dependencies.
+#Pipfile.lock
+
+# poetry
+#   Similar to Pipfile.lock, it is generally recommended to include poetry.lock in version control.
+#   This is especially recommended for binary packages to ensure reproducibility, and is more
+#   commonly ignored for libraries.
+#   https://python-poetry.org/docs/basic-usage/#commit-your-poetrylock-file-to-version-control
+#poetry.lock
+
+# pdm
+#   Similar to Pipfile.lock, it is generally recommended to include pdm.lock in version control.
+#pdm.lock
+#   pdm stores project-wide configurations in .pdm.toml, but it is recommended to not include it
+#   in version control.
+#   https://pdm.fming.dev/#use-with-ide
+.pdm.toml
+
+# PEP 582; used by e.g. github.com/David-OConnor/pyflow and github.com/pdm-project/pdm
+__pypackages__/
+
+# Celery stuff
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# pytype static type analyzer
+.pytype/
+
+# Cython debug symbols
+cython_debug/
+
+# PyCharm
+#  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
+#  be found at https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore
+#  and can be added to the global gitignore or merged into this file.  For a more nuclear
+#  option (not recommended) you can uncomment the following to ignore the entire idea folder.
+#.idea/
+
+### Python Patch ###
+# Poetry local configuration file - https://python-poetry.org/docs/configuration/#local-configuration
+poetry.toml
+
+# ruff
+.ruff_cache/
+
+# LSP config files
+pyrightconfig.json
+
+# End of https://www.toptal.com/developers/gitignore/api/python,powershell,fish
+repomix-output.xml
+repomix-output.md
 </file>
 
 <file path="distro/opensuse/opensuse.sh">
@@ -13673,6 +13915,37 @@ if [[ "${RESTRICTED_ACTIVE}" == "true" \
 fi
 </file>
 
+<file path="modules/packages/ai.nix">
+# modules/packages/ai.nix
+{
+  config,
+  lib,
+  pkgs,
+  inputs,
+  ...
+}:
+
+let
+  cfg = config.my.packages.ai;
+in
+{
+  options.my.packages.ai = {
+    enable = lib.mkEnableOption "AI Tools (Claude, Antigravity, Codex)";
+  };
+
+  config = lib.mkIf cfg.enable {
+    home.packages = [
+      inputs.claude-code.packages.${pkgs.stdenv.hostPlatform.system}.default
+      # inputs.claude-desktop.packages.${pkgs.stdenv.hostPlatform.system}.claude-desktop-fhs  # broken upstream
+      inputs.codex-cli-nix.packages.${pkgs.stdenv.hostPlatform.system}.default
+      pkgs.github-copilot-cli
+      pkgs.rtk
+      pkgs.bash
+    ];
+  };
+}
+</file>
+
 <file path="modules/programs/gnome.nix">
 # ═══════════════════════════════════════════════════════════════════════════════
 #
@@ -14266,6 +14539,34 @@ in
 }
 </file>
 
+<file path="home.nix">
+{ ... }:
+
+{
+  home = {
+    username = "parinya";
+    homeDirectory = "/home/parinya";
+    stateVersion = "24.11";
+  };
+
+  imports = [
+    ./modules
+  ];
+
+  # --- Best Practice: Enable Suites ---
+  my.suites = {
+    base.enable = true;
+    development.enable = true;
+    ai.enable = true;
+    desktop.enable = true;
+  };
+
+  programs.home-manager.enable = true;
+
+  # Disable noisy news notifications
+}
+</file>
+
 <file path="migrate.sh">
 #!/usr/bin/env nix-shell
 #!nix-shell -i bash -p gum git
@@ -14636,34 +14937,6 @@ fi
   },
   "root": "root",
   "version": 7
-}
-</file>
-
-<file path="home.nix">
-{ ... }:
-
-{
-  home = {
-    username = "parinya";
-    homeDirectory = "/home/parinya";
-    stateVersion = "24.11";
-  };
-
-  imports = [
-    ./modules
-  ];
-
-  # --- Best Practice: Enable Suites ---
-  my.suites = {
-    base.enable = true;
-    development.enable = true;
-    ai.enable = true;
-    desktop.enable = true;
-  };
-
-  programs.home-manager.enable = true;
-
-  # Disable noisy news notifications
 }
 </file>
 
