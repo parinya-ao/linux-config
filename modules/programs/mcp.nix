@@ -28,16 +28,18 @@ in
       };
     };
 
-    # Claude-Mem persistent memory worker (runs on port 37777)
+    # Claude-Mem persistent memory daemon (background worker, port ~37700)
+    # Uses Type=oneshot because claude-mem start spawns a daemon and exits.
     systemd.user.services.claude-mem-worker = {
       Unit = {
         Description = "Claude-Mem Persistent Memory Worker";
         After = [ "network.target" ];
       };
       Service = {
-        ExecStart = "${lib.getExe pkgs.bun} x claude-mem worker start";
-        Restart = "always";
-        RestartSec = 5;
+        Type = "oneshot";
+        RemainAfterExit = true;
+        ExecStart = "${lib.getExe pkgs.bun} x claude-mem start";
+        ExecStop = "${lib.getExe pkgs.bun} x claude-mem stop";
       };
       Install = {
         WantedBy = [ "default.target" ];
@@ -47,7 +49,7 @@ in
     # Activation script: install claude-mem hooks for OpenCode and Codex
     home.activation.setupClaudeMem = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       $DRY_RUN_CMD ${lib.getExe pkgs.bun} x claude-mem install --ide opencode || true
-      $DRY_RUN_CMD ${lib.getExe pkgs.bun} x claude-mem install --ide codex || true
+      $DRY_RUN_CMD ${lib.getExe pkgs.bun} x claude-mem install --ide codex-cli || true
     '';
   };
 }
