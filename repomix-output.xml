@@ -11826,71 +11826,6 @@ in
 }
 </file>
 
-<file path="modules/default.nix">
-{ ... }:
-
-{
-  imports = [
-    ./suites.nix
-    ./packages/ai.nix
-    ./packages/cli.nix
-    ./packages/dev.nix
-    ./packages/docs.nix
-    ./packages/gui.nix
-    ./programs/agent-skills.nix
-    ./programs/bash.nix
-    ./programs/cli-tools.nix
-    ./programs/fish.nix
-    ./programs/git.nix
-    ./programs/gnome.nix
-    ./programs/neovim.nix
-    ./programs/react-doctor.nix
-    ./programs/opencode.nix
-    ./programs/rtk.nix
-    ./packages/font.nix
-  ];
-}
-</file>
-
-<file path="modules/suites.nix">
-{ config, lib, ... }:
-
-let
-  cfg = config.my.suites;
-in
-{
-  options.my.suites = {
-    base.enable = lib.mkEnableOption "Base CLI & Shell tools";
-    development.enable = lib.mkEnableOption "Development tools (Editor, Git, compilers)";
-    ai.enable = lib.mkEnableOption "AI Tools & CLIs";
-    desktop.enable = lib.mkEnableOption "GNOME Desktop & GUI apps";
-  };
-
-  config = {
-    my.programs = {
-      bash = lib.mkIf cfg.base.enable { enable = true; };
-      fish = lib.mkIf cfg.base.enable { enable = true; };
-      cli-tools = lib.mkIf cfg.base.enable { enable = true; };
-      git = lib.mkIf cfg.development.enable { enable = true; };
-      neovim = lib.mkIf cfg.development.enable { enable = true; };
-      gnome = lib.mkIf cfg.desktop.enable { enable = true; };
-      agent-skills = lib.mkIf cfg.ai.enable { enable = true; };
-      react-doctor = lib.mkIf cfg.ai.enable { enable = true; };
-      opencode = lib.mkIf cfg.ai.enable { enable = true; };
-      rtk = lib.mkIf cfg.ai.enable { enable = true; };
-    };
-    my.packages = {
-      cli = lib.mkIf cfg.base.enable { enable = true; };
-      dev = lib.mkIf cfg.development.enable { enable = true; };
-      ai = lib.mkIf cfg.ai.enable { enable = true; };
-      gui = lib.mkIf cfg.desktop.enable { enable = true; };
-      docs = lib.mkIf cfg.desktop.enable { enable = true; };
-      fonts = lib.mkIf cfg.desktop.enable { enable = true; };
-    };
-  };
-}
-</file>
-
 <file path=".gitignore">
 # Created by https://www.toptal.com/developers/gitignore/api/python,powershell,fish
 # Edit at https://www.toptal.com/developers/gitignore?templates=python,powershell,fish
@@ -14457,6 +14392,71 @@ in
 }
 </file>
 
+<file path="modules/default.nix">
+{ ... }:
+
+{
+  imports = [
+    ./suites.nix
+    ./packages/ai.nix
+    ./packages/cli.nix
+    ./packages/dev.nix
+    ./packages/docs.nix
+    ./packages/gui.nix
+    ./programs/agent-skills.nix
+    ./programs/bash.nix
+    ./programs/cli-tools.nix
+    ./programs/fish.nix
+    ./programs/git.nix
+    ./programs/gnome.nix
+    ./programs/neovim.nix
+    ./programs/react-doctor.nix
+    ./programs/opencode.nix
+    ./programs/rtk.nix
+    ./packages/font.nix
+  ];
+}
+</file>
+
+<file path="modules/suites.nix">
+{ config, lib, ... }:
+
+let
+  cfg = config.my.suites;
+in
+{
+  options.my.suites = {
+    base.enable = lib.mkEnableOption "Base CLI & Shell tools";
+    development.enable = lib.mkEnableOption "Development tools (Editor, Git, compilers)";
+    ai.enable = lib.mkEnableOption "AI Tools & CLIs";
+    desktop.enable = lib.mkEnableOption "GNOME Desktop & GUI apps";
+  };
+
+  config = {
+    my.programs = {
+      bash = lib.mkIf cfg.base.enable { enable = true; };
+      fish = lib.mkIf cfg.base.enable { enable = true; };
+      cli-tools = lib.mkIf cfg.base.enable { enable = true; };
+      git = lib.mkIf cfg.development.enable { enable = true; };
+      neovim = lib.mkIf cfg.development.enable { enable = true; };
+      gnome = lib.mkIf cfg.desktop.enable { enable = true; };
+      agent-skills = lib.mkIf cfg.ai.enable { enable = true; };
+      react-doctor = lib.mkIf cfg.ai.enable { enable = true; };
+      opencode = lib.mkIf cfg.ai.enable { enable = true; };
+      rtk = lib.mkIf cfg.ai.enable { enable = true; };
+    };
+    my.packages = {
+      cli = lib.mkIf cfg.base.enable { enable = true; };
+      dev = lib.mkIf cfg.development.enable { enable = true; };
+      ai = lib.mkIf cfg.ai.enable { enable = true; };
+      gui = lib.mkIf cfg.desktop.enable { enable = true; };
+      docs = lib.mkIf cfg.desktop.enable { enable = true; };
+      fonts = lib.mkIf cfg.desktop.enable { enable = true; };
+    };
+  };
+}
+</file>
+
 <file path="flake.nix">
 {
   # Description of the flake's purpose.
@@ -14651,22 +14651,18 @@ main() {
     step "Securing Environment"
     [[ -f "flake.lock" ]] && cp flake.lock flake.lock.bak && ok "Lockfile backed up."
 
-    step "Fetching Updates"
-    if gum spin --spinner globe --title "Updating Flake inputs (This may take a while)..." -- \
-        nix --extra-experimental-features "nix-command flakes" flake update; then
+    step "Fetching Updates (Showing inner details...)"
+    if nix --extra-experimental-features "nix-command flakes" flake update; then
         ok "Flake lockfile updated successfully."
     else
         fail "Failed to update flake inputs."
-        return 1
     fi
 
-    step "Applying Configuration"
-    if gum spin --spinner dot --title "Switching Home Manager Generation..." -- \
-        home-manager switch --flake .; then
+    step "Applying Configuration (Showing inner details...)"
+    if home-manager switch --flake . --verbose --show-trace -b backup; then
         ok "System configured beautifully."
     else
         fail "Home Manager switch failed."
-        return 1
     fi
 
     rm -f flake.lock.bak
@@ -14681,6 +14677,223 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
 fi
 </file>
 
+<file path="startup.sh">
+#!/usr/bin/env bash
+# =============================================================================
+#  startup.sh  — Universal Bootstrap for parinya-ao/linux-config
+#  Architecture: Gum-powered, 100% Non-interactive, OOTB
+#  1. Bootstraps gum (if missing) via universal binary download
+#  2. Detects distro via /etc/os-release
+#  3. Dispatches per-distro driver script (apt / dnf / zypper)
+#  4. Installs Nix (Determinate Systems, multi-user, no-confirm)
+#  5. Clones / pulls the Home Manager config repo
+#  6. Runs `home-manager switch` via Nix flakes
+# =============================================================================
+set -Eeuo pipefail
+umask 022
+
+# ── Bootstrap gum (OOTB: works on any distro, no sudo, no package manager) ──
+if ! command -v gum &>/dev/null; then
+  GUM_VERSION="0.14.0"
+  mkdir -p /tmp/gum-bin
+  curl -fsSL "https://github.com/charmbracelet/gum/releases/download/v${GUM_VERSION}/gum_${GUM_VERSION}_linux_x86_64.tar.gz" \
+    | tar -xz -C /tmp/gum-bin --strip-components=1 "gum_${GUM_VERSION}_linux_x86_64/gum"
+  chmod +x /tmp/gum-bin/gum
+  export PATH="/tmp/gum-bin:$PATH"
+fi
+
+# ── Gum-based UI (no raw ANSI codes) ────────────────────────────────────────
+step() { gum style --foreground "#00BFFF" --bold "▶ $*"; }
+ok()   { gum style --foreground "#04B575" "  ✔ $*"; }
+warn() { gum style --foreground "#FFA500" "  ⚠ $*" >&2; }
+info() { gum style --foreground "#FFA500" "  ℹ $*"; }
+fail() { gum style --foreground "#FF4500" --bold "  ✖ $*" >&2; exit 1; }
+
+# ── Trap ─────────────────────────────────────────────────────────────────────
+trap 'fail "Unexpected error at line $LINENO"' ERR
+
+# ── Helpers ──────────────────────────────────────────────────────────────────
+need_cmd() { command -v "$1" >/dev/null 2>&1 || fail "Required command not found: $1"; }
+
+resolve_self_dir() {
+  local src="${BASH_SOURCE[0]}"
+  while [ -L "$src" ]; do
+    local dir; dir="$(cd -P "$(dirname "$src")" && pwd)"
+    src="$(readlink "$src")"
+    [[ "$src" != /* ]] && src="$dir/$src"
+  done
+  cd -P "$(dirname "$src")" && pwd
+}
+
+need_cmd grep
+need_cmd cut
+SELF_DIR="$(resolve_self_dir)"
+
+# ── root check ──────────────────────────────────────────────────────────────
+if [[ $EUID -ne 0 ]]; then
+  fail "This script must be run as root: sudo bash $0"
+fi
+
+is_atomic() {
+  command -v rpm-ostree >/dev/null 2>&1 || return 1
+  rpm-ostree status >/dev/null 2>&1 || return 1
+  return 0
+}
+
+# ── stdin guard: ปิด interactive input ทุกอย่าง ──────────────────────────────
+exec </dev/null
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PART 0 — Distro detection
+# ─────────────────────────────────────────────────────────────────────────────
+OS_RELEASE="/etc/os-release"
+[ -r "$OS_RELEASE" ] || fail "Cannot read $OS_RELEASE"
+
+# shellcheck disable=SC1091,SC1090
+. "$OS_RELEASE"
+
+OS_ID="${ID:-}"
+OS_LIKE="${ID_LIKE:-}"
+OS_PRETTY="${PRETTY_NAME:-$OS_ID}"
+
+[ -n "$OS_ID" ] || fail "ID is missing in $OS_RELEASE"
+
+pick_distro_script() {
+  case "$OS_ID" in
+    ubuntu|debian|linuxmint|pop|elementary|neon|zorin|kali|parrot)
+      printf '%s/distro/ubuntu/ubuntu.sh\n' "$SELF_DIR"; return 0 ;;
+    fedora)
+      if is_atomic; then
+        printf '%s/distro/fedora/atomic.sh\n' "$SELF_DIR"; return 0
+      fi
+      printf '%s/distro/fedora/fedora.sh\n' "$SELF_DIR"; return 0 ;;
+    opensuse-tumbleweed|opensuse-leap|opensuse-slowroll|opensuse)
+      printf '%s/distro/opensuse/opensuse.sh\n' "$SELF_DIR"; return 0 ;;
+  esac
+  case " $OS_LIKE " in
+    *" debian "*)
+      printf '%s/distro/ubuntu/ubuntu.sh\n' "$SELF_DIR"; return 0 ;;
+    *" fedora "*|*" rhel "*|*" centos "*)
+      if is_atomic; then
+        printf '%s/distro/fedora/atomic.sh\n' "$SELF_DIR"; return 0
+      fi
+      printf '%s/distro/fedora/fedora.sh\n' "$SELF_DIR"; return 0 ;;
+    *" suse "*|*" opensuse "*)
+      printf '%s/distro/opensuse/opensuse.sh\n' "$SELF_DIR"; return 0 ;;
+  esac
+  return 1
+}
+
+DISTRO_SCRIPT="$(pick_distro_script)" \
+  || fail "Unsupported distro: ID=${OS_ID} ID_LIKE=${OS_LIKE:-<empty>}
+  Supported: ubuntu/debian family, fedora, opensuse/tumbleweed/leap"
+
+case "$DISTRO_SCRIPT" in
+  "$SELF_DIR"/*) ;;
+  *) fail "Refusing script outside repo dir: $DISTRO_SCRIPT" ;;
+esac
+
+[ -f "$DISTRO_SCRIPT" ] || fail "Distro script not found: $DISTRO_SCRIPT"
+[ -r "$DISTRO_SCRIPT" ] || fail "Distro script not readable: $DISTRO_SCRIPT"
+
+gum style --bold --foreground "#00BFFF" "  Detected:  $(gum style --italic "$OS_PRETTY")"
+info "Script:    $DISTRO_SCRIPT"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PART 1 — Run distro-specific driver
+# ─────────────────────────────────────────────────────────────────────────────
+if gum spin --spinner line --title "Running distro driver: $(basename "$DISTRO_SCRIPT")" -- \
+  bash "$DISTRO_SCRIPT" "$@"; then
+  ok "Distro driver finished."
+else
+  fail "Distro driver failed."
+fi
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PART 2 — Install Nix (Determinate Systems, no-confirm)
+# ─────────────────────────────────────────────────────────────────────────────
+if command -v nix >/dev/null 2>&1; then
+  NIX_VER="$(nix --version 2>/dev/null || echo 'unknown')"
+  info "Nix already installed: $(gum style --bold "$NIX_VER") — skipping."
+else
+  need_cmd curl
+  if gum spin --spinner globe --title "Installing Nix package manager..." -- \
+    curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix \
+      | sh -s -- install --no-confirm; then
+    ok "Nix installed."
+  else
+    fail "Nix installation failed."
+  fi
+fi
+
+NIX_PROFILE='/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh'
+if [ -e "$NIX_PROFILE" ]; then
+  # shellcheck disable=SC1090
+  . "$NIX_PROFILE"
+  ok "Nix profile sourced."
+else
+  warn "nix-daemon.sh not found — PATH will be set after reboot."
+fi
+
+need_cmd nix
+info "Nix version: $(nix --version)"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PART 3 — Clone / update Home Manager config repo (fully non-interactive)
+# ─────────────────────────────────────────────────────────────────────────────
+TARGET_USER="parinya"
+TARGET_HOME="/home/${TARGET_USER}"
+TARGET_DIR="${TARGET_HOME}/.config/home-manager"
+REPO_URL="https://github.com/parinya-ao/linux-config.git"
+
+mkdir -p "$(dirname "$TARGET_DIR")"
+
+if [ ! -d "${TARGET_DIR}/.git" ]; then
+  need_cmd git
+  if gum spin --spinner points --title "Cloning repo → ${TARGET_DIR}" -- \
+    GIT_TERMINAL_PROMPT=0 git clone "$REPO_URL" "$TARGET_DIR"; then
+    chown -R "${TARGET_USER}:${TARGET_USER}" "$TARGET_DIR"
+    ok "Repo cloned and ownership set to ${TARGET_USER}."
+  else
+    fail "Git clone failed."
+  fi
+else
+  need_cmd git
+  chown -R "${TARGET_USER}:${TARGET_USER}" "$TARGET_DIR"
+  ok "Repo exists and ownership verified."
+fi
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PART 4 — Home Manager switch (fully non-interactive)
+# ─────────────────────────────────────────────────────────────────────────────
+cd "$TARGET_DIR"
+
+dnf install -y dbus-x11 2>/dev/null || apt-get install -y dbus-x11 2>/dev/null || zypper --non-interactive install dbus-1-x11 2>/dev/null || true
+
+if gum spin --spinner dot --title "Building Home Manager environment..." -- \
+  sudo -u "${TARGET_USER}" -H \
+    dbus-run-session bash -c \
+      "source /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh && \
+       /nix/var/nix/profiles/default/bin/nix \
+         --extra-experimental-features 'nix-command flakes' \
+         run home-manager/master -- \
+         switch --flake '$TARGET_DIR#${TARGET_USER}' -b backup --show-trace"; then
+  ok "Home Manager switch complete."
+else
+  fail "Home Manager switch failed."
+fi
+
+# ── Summary ──────────────────────────────────────────────────────────────────
+gum style --border rounded --margin "1 2" --padding "1 2" --border-foreground "#04B575" \
+  "$(gum style --bold --foreground "#04B575" "🎉 ALL DONE")" \
+  "" \
+  "Distro driver    $(basename "$DISTRO_SCRIPT")" \
+  "Nix              $(nix --version 2>/dev/null || echo 'installed')" \
+  "Home Manager     switched → .#parinya" \
+  "" \
+  "$(gum style --italic --foreground "#FFA500" "Open a new terminal (or reboot) for all PATH changes to take effect.")"
+</file>
+
 <file path="flake.lock">
 {
   "nodes": {
@@ -14690,11 +14903,11 @@ fi
         "nixpkgs": "nixpkgs"
       },
       "locked": {
-        "lastModified": 1780087443,
-        "narHash": "sha256-W8Lhbpl7OLhSTwuTEVuqoVZeUyYTEsAm7q6b+koD1p0=",
+        "lastModified": 1780109992,
+        "narHash": "sha256-qzmk1JsVr3Umi4k9cx5KCLxPSWQpd6NeKCXXSr4bYoY=",
         "owner": "sadjow",
         "repo": "claude-code-nix",
-        "rev": "720ac5f26d58f0893541546c0d1ee66b224d1828",
+        "rev": "66c8b1714f2d45ce71de002baa89f8652483f245",
         "type": "github"
       },
       "original": {
@@ -14938,223 +15151,6 @@ fi
   "root": "root",
   "version": 7
 }
-</file>
-
-<file path="startup.sh">
-#!/usr/bin/env bash
-# =============================================================================
-#  startup.sh  — Universal Bootstrap for parinya-ao/linux-config
-#  Architecture: Gum-powered, 100% Non-interactive, OOTB
-#  1. Bootstraps gum (if missing) via universal binary download
-#  2. Detects distro via /etc/os-release
-#  3. Dispatches per-distro driver script (apt / dnf / zypper)
-#  4. Installs Nix (Determinate Systems, multi-user, no-confirm)
-#  5. Clones / pulls the Home Manager config repo
-#  6. Runs `home-manager switch` via Nix flakes
-# =============================================================================
-set -Eeuo pipefail
-umask 022
-
-# ── Bootstrap gum (OOTB: works on any distro, no sudo, no package manager) ──
-if ! command -v gum &>/dev/null; then
-  GUM_VERSION="0.14.0"
-  mkdir -p /tmp/gum-bin
-  curl -fsSL "https://github.com/charmbracelet/gum/releases/download/v${GUM_VERSION}/gum_${GUM_VERSION}_linux_x86_64.tar.gz" \
-    | tar -xz -C /tmp/gum-bin --strip-components=1 "gum_${GUM_VERSION}_linux_x86_64/gum"
-  chmod +x /tmp/gum-bin/gum
-  export PATH="/tmp/gum-bin:$PATH"
-fi
-
-# ── Gum-based UI (no raw ANSI codes) ────────────────────────────────────────
-step() { gum style --foreground "#00BFFF" --bold "▶ $*"; }
-ok()   { gum style --foreground "#04B575" "  ✔ $*"; }
-warn() { gum style --foreground "#FFA500" "  ⚠ $*" >&2; }
-info() { gum style --foreground "#FFA500" "  ℹ $*"; }
-fail() { gum style --foreground "#FF4500" --bold "  ✖ $*" >&2; exit 1; }
-
-# ── Trap ─────────────────────────────────────────────────────────────────────
-trap 'fail "Unexpected error at line $LINENO"' ERR
-
-# ── Helpers ──────────────────────────────────────────────────────────────────
-need_cmd() { command -v "$1" >/dev/null 2>&1 || fail "Required command not found: $1"; }
-
-resolve_self_dir() {
-  local src="${BASH_SOURCE[0]}"
-  while [ -L "$src" ]; do
-    local dir; dir="$(cd -P "$(dirname "$src")" && pwd)"
-    src="$(readlink "$src")"
-    [[ "$src" != /* ]] && src="$dir/$src"
-  done
-  cd -P "$(dirname "$src")" && pwd
-}
-
-need_cmd grep
-need_cmd cut
-SELF_DIR="$(resolve_self_dir)"
-
-# ── root check ──────────────────────────────────────────────────────────────
-if [[ $EUID -ne 0 ]]; then
-  fail "This script must be run as root: sudo bash $0"
-fi
-
-is_atomic() {
-  command -v rpm-ostree >/dev/null 2>&1 || return 1
-  rpm-ostree status >/dev/null 2>&1 || return 1
-  return 0
-}
-
-# ── stdin guard: ปิด interactive input ทุกอย่าง ──────────────────────────────
-exec </dev/null
-
-# ─────────────────────────────────────────────────────────────────────────────
-# PART 0 — Distro detection
-# ─────────────────────────────────────────────────────────────────────────────
-OS_RELEASE="/etc/os-release"
-[ -r "$OS_RELEASE" ] || fail "Cannot read $OS_RELEASE"
-
-# shellcheck disable=SC1091,SC1090
-. "$OS_RELEASE"
-
-OS_ID="${ID:-}"
-OS_LIKE="${ID_LIKE:-}"
-OS_PRETTY="${PRETTY_NAME:-$OS_ID}"
-
-[ -n "$OS_ID" ] || fail "ID is missing in $OS_RELEASE"
-
-pick_distro_script() {
-  case "$OS_ID" in
-    ubuntu|debian|linuxmint|pop|elementary|neon|zorin|kali|parrot)
-      printf '%s/distro/ubuntu/ubuntu.sh\n' "$SELF_DIR"; return 0 ;;
-    fedora)
-      if is_atomic; then
-        printf '%s/distro/fedora/atomic.sh\n' "$SELF_DIR"; return 0
-      fi
-      printf '%s/distro/fedora/fedora.sh\n' "$SELF_DIR"; return 0 ;;
-    opensuse-tumbleweed|opensuse-leap|opensuse-slowroll|opensuse)
-      printf '%s/distro/opensuse/opensuse.sh\n' "$SELF_DIR"; return 0 ;;
-  esac
-  case " $OS_LIKE " in
-    *" debian "*)
-      printf '%s/distro/ubuntu/ubuntu.sh\n' "$SELF_DIR"; return 0 ;;
-    *" fedora "*|*" rhel "*|*" centos "*)
-      if is_atomic; then
-        printf '%s/distro/fedora/atomic.sh\n' "$SELF_DIR"; return 0
-      fi
-      printf '%s/distro/fedora/fedora.sh\n' "$SELF_DIR"; return 0 ;;
-    *" suse "*|*" opensuse "*)
-      printf '%s/distro/opensuse/opensuse.sh\n' "$SELF_DIR"; return 0 ;;
-  esac
-  return 1
-}
-
-DISTRO_SCRIPT="$(pick_distro_script)" \
-  || fail "Unsupported distro: ID=${OS_ID} ID_LIKE=${OS_LIKE:-<empty>}
-  Supported: ubuntu/debian family, fedora, opensuse/tumbleweed/leap"
-
-case "$DISTRO_SCRIPT" in
-  "$SELF_DIR"/*) ;;
-  *) fail "Refusing script outside repo dir: $DISTRO_SCRIPT" ;;
-esac
-
-[ -f "$DISTRO_SCRIPT" ] || fail "Distro script not found: $DISTRO_SCRIPT"
-[ -r "$DISTRO_SCRIPT" ] || fail "Distro script not readable: $DISTRO_SCRIPT"
-
-gum style --bold --foreground "#00BFFF" "  Detected:  $(gum style --italic "$OS_PRETTY")"
-info "Script:    $DISTRO_SCRIPT"
-
-# ─────────────────────────────────────────────────────────────────────────────
-# PART 1 — Run distro-specific driver
-# ─────────────────────────────────────────────────────────────────────────────
-if gum spin --spinner line --title "Running distro driver: $(basename "$DISTRO_SCRIPT")" -- \
-  bash "$DISTRO_SCRIPT" "$@"; then
-  ok "Distro driver finished."
-else
-  fail "Distro driver failed."
-fi
-
-# ─────────────────────────────────────────────────────────────────────────────
-# PART 2 — Install Nix (Determinate Systems, no-confirm)
-# ─────────────────────────────────────────────────────────────────────────────
-if command -v nix >/dev/null 2>&1; then
-  NIX_VER="$(nix --version 2>/dev/null || echo 'unknown')"
-  info "Nix already installed: $(gum style --bold "$NIX_VER") — skipping."
-else
-  need_cmd curl
-  if gum spin --spinner globe --title "Installing Nix package manager..." -- \
-    curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix \
-      | sh -s -- install --no-confirm; then
-    ok "Nix installed."
-  else
-    fail "Nix installation failed."
-  fi
-fi
-
-NIX_PROFILE='/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh'
-if [ -e "$NIX_PROFILE" ]; then
-  # shellcheck disable=SC1090
-  . "$NIX_PROFILE"
-  ok "Nix profile sourced."
-else
-  warn "nix-daemon.sh not found — PATH will be set after reboot."
-fi
-
-need_cmd nix
-info "Nix version: $(nix --version)"
-
-# ─────────────────────────────────────────────────────────────────────────────
-# PART 3 — Clone / update Home Manager config repo (fully non-interactive)
-# ─────────────────────────────────────────────────────────────────────────────
-TARGET_USER="parinya"
-TARGET_HOME="/home/${TARGET_USER}"
-TARGET_DIR="${TARGET_HOME}/.config/home-manager"
-REPO_URL="https://github.com/parinya-ao/linux-config.git"
-
-mkdir -p "$(dirname "$TARGET_DIR")"
-
-if [ ! -d "${TARGET_DIR}/.git" ]; then
-  need_cmd git
-  if gum spin --spinner points --title "Cloning repo → ${TARGET_DIR}" -- \
-    GIT_TERMINAL_PROMPT=0 git clone "$REPO_URL" "$TARGET_DIR"; then
-    chown -R "${TARGET_USER}:${TARGET_USER}" "$TARGET_DIR"
-    ok "Repo cloned and ownership set to ${TARGET_USER}."
-  else
-    fail "Git clone failed."
-  fi
-else
-  need_cmd git
-  chown -R "${TARGET_USER}:${TARGET_USER}" "$TARGET_DIR"
-  ok "Repo exists and ownership verified."
-fi
-
-# ─────────────────────────────────────────────────────────────────────────────
-# PART 4 — Home Manager switch (fully non-interactive)
-# ─────────────────────────────────────────────────────────────────────────────
-cd "$TARGET_DIR"
-
-dnf install -y dbus-x11 2>/dev/null || apt-get install -y dbus-x11 2>/dev/null || zypper --non-interactive install dbus-1-x11 2>/dev/null || true
-
-if gum spin --spinner dot --title "Building Home Manager environment..." -- \
-  sudo -u "${TARGET_USER}" -H \
-    dbus-run-session bash -c \
-      "source /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh && \
-       /nix/var/nix/profiles/default/bin/nix \
-         --extra-experimental-features 'nix-command flakes' \
-         run home-manager/master -- \
-         switch --flake '$TARGET_DIR#${TARGET_USER}' -b backup --show-trace"; then
-  ok "Home Manager switch complete."
-else
-  fail "Home Manager switch failed."
-fi
-
-# ── Summary ──────────────────────────────────────────────────────────────────
-gum style --border rounded --margin "1 2" --padding "1 2" --border-foreground "#04B575" \
-  "$(gum style --bold --foreground "#04B575" "🎉 ALL DONE")" \
-  "" \
-  "Distro driver    $(basename "$DISTRO_SCRIPT")" \
-  "Nix              $(nix --version 2>/dev/null || echo 'installed')" \
-  "Home Manager     switched → .#parinya" \
-  "" \
-  "$(gum style --italic --foreground "#FFA500" "Open a new terminal (or reboot) for all PATH changes to take effect.")"
 </file>
 
 </files>

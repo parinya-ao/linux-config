@@ -20,6 +20,7 @@ in
       neovim = lib.mkIf cfg.development.enable { enable = true; };
       gnome = lib.mkIf cfg.desktop.enable { enable = true; };
       agent-skills = lib.mkIf cfg.ai.enable { enable = true; };
+      codegraph = lib.mkIf cfg.ai.enable { enable = true; };
       react-doctor = lib.mkIf cfg.ai.enable { enable = true; };
       opencode = lib.mkIf cfg.ai.enable { enable = true; };
       rtk = lib.mkIf cfg.ai.enable { enable = true; };
