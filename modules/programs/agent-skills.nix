@@ -8,13 +8,31 @@
 let
   cfg = config.my.programs.agent-skills;
 
-  # Source: repo-root/.claude/skills/<name>/SKILL.md
-  # These are the manually-managed skills shipped with the repo.
   skills = {
     gum-bash = ./../../.claude/skills/gum-bash/SKILL.md;
     react-doctor = ./../../.claude/skills/react-doctor/SKILL.md;
     nix-backup = ./../../.claude/skills/nix-backup/SKILL.md;
   };
+
+  # Every skill goes to all three agent directories
+  targets = [
+    ".config/opencode/skills"
+    ".claude/skills"
+    ".agents/skills"
+  ];
+
+  # Build home.file attrs: ".agents/skills/<name>/SKILL.md" -> { source = ... }
+  skillEntries = builtins.listToAttrs (
+    builtins.concatLists (
+      builtins.map (
+        name:
+        builtins.map (target: {
+          name = "${target}/${name}/SKILL.md";
+          value.source = skills.${name};
+        }) targets
+      ) (builtins.attrNames skills)
+    )
+  );
 in
 {
   options.my.programs.agent-skills = {
@@ -22,13 +40,6 @@ in
   };
 
   config = lib.mkIf cfg.enable {
-    # Deploy all skills to OpenCode's skill directory
-    # ~/.config/opencode/skills/<name>/SKILL.md
-    xdg.configFile = builtins.listToAttrs (
-      builtins.map (name: {
-        name = "opencode/skills/${name}/SKILL.md";
-        value.source = skills.${name};
-      }) (builtins.attrNames skills)
-    );
+    home.file = skillEntries;
   };
 }
