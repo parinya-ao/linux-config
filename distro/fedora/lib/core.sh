@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # ==============================================================================
 # CORE SHARED LIBRARY — colors, logging, error handling
 # ==============================================================================
@@ -15,6 +16,7 @@ setup_colors() {
         GREEN=''
         YELLOW=''
         BLUE=''
+        # shellcheck disable=SC2034
         BOLD=''
         NC=''
     fi

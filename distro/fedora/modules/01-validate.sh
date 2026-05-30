@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # ==============================================================================
 # PHASE 1 — Validation
 # ==============================================================================
@@ -31,6 +32,7 @@ run_validation_phase() {
     CURRENT_VER="$(rpm -E %fedora)"
 
     if command -v dnf5 >/dev/null 2>&1; then
+        # shellcheck disable=SC2034
         IS_DNF5=1
     fi
 
@@ -91,6 +93,7 @@ run_validation_phase() {
 
     log_ok "Disk capacity validated."
 
+    # shellcheck disable=SC2034
     CURRENT_STATE="REPOSITORIES"
 
     local safe_regex="^(fedora|updates|updates-testing|fedora-cisco-openh264)"

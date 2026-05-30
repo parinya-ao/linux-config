@@ -12,7 +12,8 @@ set -euo pipefail
 # ------------------------------------------------------------------------------
 # 1. Global State & Configuration
 # ------------------------------------------------------------------------------
-readonly LOG_FILE="/tmp/fvm_install_$(date +%s).log"
+readonly LOG_FILE
+LOG_FILE="/tmp/fvm_install_$(date +%s).log"
 readonly FVM_OFFICIAL_URL="https://fvm.app/install.sh"
 readonly DEFAULT_INSTALL_DIR="$HOME/fvm"
 readonly FVM_CONFIG_DIR="$HOME/.config/fvm"
@@ -329,11 +330,6 @@ configure_all_shells_path() {
     local loader
     loader=$(write_universal_loader)
 
-    local nix_store_symlink=""
-    if [[ "$(uname)" == "Linux" ]]; then
-        nix_store_symlink="/nix/store"
-    fi
-
     # Update current session
     export PATH="$fvm_bin_dir:$PATH"
     log "INFO" "Current session PATH updated."
@@ -355,9 +351,11 @@ FISH_EOF
         if fish -c "fish_add_path $fvm_bin_dir" >/dev/null 2>&1; then
             log "OK" "Fish: PATH updated for current session (universal var)."
         else
-            fish -c "set -U fish_user_paths $fvm_bin_dir \$fish_user_paths" >/dev/null 2>&1 && \
-                log "OK" "Fish: PATH updated via fish_user_paths." || \
+            if fish -c "set -U fish_user_paths $fvm_bin_dir \$fish_user_paths" >/dev/null 2>&1; then
+                log "OK" "Fish: PATH updated via fish_user_paths."
+            else
                 log "WARN" "Fish: could not update PATH for current session."
+            fi
         fi
     else
         log "DEBUG" "Fish not installed; skipping."

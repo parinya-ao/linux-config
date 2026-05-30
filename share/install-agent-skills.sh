@@ -47,8 +47,10 @@
 set -Eeuo pipefail
 
 # ── CONFIG ──────────────────────────────────────────────────────────────────
-readonly SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
-readonly REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd -P)"
+readonly SCRIPT_DIR
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+readonly REPO_ROOT
+REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd -P)"
 readonly C_PRIMARY="#00BFFF"
 readonly C_SUCCESS="#04B575"
 readonly C_WARNING="#FFA500"
@@ -351,7 +353,7 @@ resolve_target_users() {
     # Find all users with a home directory in /home/
     getent passwd | awk -F: '{ if ($6 ~ "^/home/") print $1 }' | sort -u
   else
-    echo "$(whoami)"
+    whoami
   fi
 }
 
@@ -369,7 +371,7 @@ show_summary() {
   rows+=("$(kv "Nix store path" "${store_path:-/nix/store/...}")")
   rows+=("$(kv "Skills packaged" "${#ALL_SKILLS[@]}")")
   rows+=("$(kv "Users installed" "${#installed_users[@]}")")
-  rows+=("$(kv "Global dir" "~/${GLOBAL_DIR}")")
+  rows+=("$(kv "Global dir" "${HOME}/${GLOBAL_DIR}")")
   rows+=("$(kv "System-wide" "${INSTALL_SYSTEM:-false}")")
 
   local body

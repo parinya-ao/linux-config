@@ -1,4 +1,5 @@
 #!/usr/bin/env nix-shell
+# shellcheck shell=bash
 #!nix-shell -i bash -p gum git
 # ==============================================================================
 # Script: migrate.sh
@@ -21,6 +22,7 @@ fail() { gum style --foreground "#FF4500" --bold "  ✖ $*" >&2; exit 1; }
 # 2. Resiliency & Rollback
 # ------------------------------------------------------------------------------
 rollback_on_error() {
+    # shellcheck disable=SC2317
     local exit_code=$?
     trap - ERR INT TERM
     fail "Process interrupted! Rolling back..."
@@ -56,7 +58,8 @@ auto_fix_versions() {
         gum spin --spinner minidot --title "Aligning Home Manager branch to Master..." -- \
             sed -i -E "s|(github:nix-community/home-manager/)[a-zA-Z0-9._-]+|\1master|g" flake.nix
     else
-        local nix_ver=$(grep -E 'github:nixos/nixpkgs/' flake.nix | grep -oE '[0-9]+\.[0-9]+' | head -n1 || true)
+        local nix_ver
+        nix_ver=$(grep -E 'github:nixos/nixpkgs/' flake.nix | grep -oE '[0-9]+\.[0-9]+' | head -n1 || true)
         if [[ -n "$nix_ver" ]]; then
             gum spin --spinner minidot --title "Aligning Home Manager branch to release-${nix_ver}..." -- \
                 sed -i -E "s|(github:nix-community/home-manager/)[a-zA-Z0-9._-]+|\1release-${nix_ver}|g" flake.nix

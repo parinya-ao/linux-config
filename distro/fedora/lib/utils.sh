@@ -1,8 +1,10 @@
+#!/usr/bin/env bash
 # ==============================================================================
 # UTILITY SHARED LIBRARY — lock, shared helpers
 # ==============================================================================
 
 acquire_lock() {
+    # shellcheck disable=SC2034
     CURRENT_STATE="LOCK"
 
     exec 9>"$LOCK_FILE"

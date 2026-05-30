@@ -1,9 +1,11 @@
+#!/usr/bin/env bash
 # ==============================================================================
 # PHASE 3 — Execution
 # ==============================================================================
 
 run_execution_phase() {
 
+    # shellcheck disable=SC2034
     CURRENT_STATE="SNAPSHOT"
 
     if [[ $SKIP_SNAPSHOT -eq 1 ]]; then
@@ -108,6 +110,7 @@ run_execution_phase() {
 
     log_ok "Upgrade payload ready."
 
+    # shellcheck disable=SC2034
     CURRENT_STATE="UPGRADE"
 
     if [[ $DRY_RUN -eq 1 ]]; then

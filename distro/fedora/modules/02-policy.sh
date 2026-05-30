@@ -1,8 +1,10 @@
+#!/usr/bin/env bash
 # ==============================================================================
 # PHASE 2 — N-1 Governance Policy
 # ==============================================================================
 
 run_policy_phase() {
+    # shellcheck disable=SC2034
     CURRENT_STATE="POLICY"
 
     log_info "Fetching Fedora release metadata..."
@@ -37,6 +39,7 @@ run_policy_phase() {
         log_warn "Upgrading to Latest ($latest) violates policy. Forcing DRY RUN."
 
         TARGET_VER="$latest"
+        # shellcheck disable=SC2034
         DRY_RUN=1
     else
         local gap=$((n1 - CURRENT_VER))
@@ -50,6 +53,7 @@ run_policy_phase() {
         fi
 
         log_ok "Compliant upgrade path. Auto-confirming upgrade."
+        # shellcheck disable=SC2034
         AUTO_CONFIRM=1
     fi
 
