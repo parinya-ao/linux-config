@@ -36,8 +36,7 @@ in
         After = [ "network.target" ];
       };
       Service = {
-        Type = "oneshot";
-        RemainAfterExit = true;
+        Type = "forking";
         ExecStart = "${lib.getExe pkgs.bun} x claude-mem start";
         ExecStop = "${lib.getExe pkgs.bun} x claude-mem stop";
       };
