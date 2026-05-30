@@ -76,7 +76,7 @@ in
         fzf --fish | source
         bind \cr 'history | fzf --tac | read -l cmd; and commandline $cmd'
         pay-respects fish --alias | source
-        set -gx LD_LIBRARY_PATH ${
+        set -gx LD_LIBRARY_PATH /usr/lib64:${
           lib.makeLibraryPath [
             pkgs.stdenv.cc.cc.lib
             pkgs.zlib

@@ -9,7 +9,8 @@
 
     # Tool for managing user environment and dotfiles.
     home-manager = {
-      url = "github:nix-community/home-manager";
+      # Use master branch to match nixos-unstable nixpkgs.
+      url = "github:nix-community/home-manager/master";
       # Ensure home-manager uses the same nixpkgs version to save space.
       inputs.nixpkgs.follows = "nixpkgs";
     };
@@ -58,7 +59,7 @@
             { pkgs, ... }:
             {
               programs.fish.shellAliases = {
-                uv = "env LD_LIBRARY_PATH=${
+                uv = "env LD_LIBRARY_PATH=/usr/lib64:${
                   pkgs.lib.makeLibraryPath (
                     with pkgs;
                     [

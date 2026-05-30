@@ -21,6 +21,7 @@ in
       # inputs.claude-desktop.packages.${pkgs.stdenv.hostPlatform.system}.claude-desktop-fhs  # broken upstream
       inputs.codex-cli-nix.packages.${pkgs.stdenv.hostPlatform.system}.default
       pkgs.github-copilot-cli
+      pkgs.rtk
       pkgs.bash
     ];
   };
