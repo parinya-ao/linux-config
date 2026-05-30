@@ -38,7 +38,7 @@
       system = "x86_64-linux";
 
       # ── Custom overlay: make agent-skills available as pkgs.agent-skills ──
-      agentSkillsOverlay = final: prev: {
+      agentSkillsOverlay = _final: prev: {
         agent-skills = prev.callPackage ./pkgs/agent-skills { };
       };
 

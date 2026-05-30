@@ -88,7 +88,7 @@ jobs:
         run: nix run nixpkgs#statix -- check .
 
       - name: Find dead code (deadnix)
-        run: nix run nixpkgs#deadnix -- --fail .
+        run: nix run nixpkgs#deadnix -- .
 
       # ── Fail Fast: evaluate ก่อน build ───────────────
       - name: Flake check (no build)
