@@ -31,14 +31,26 @@
     let
       # Target system architecture.
       system = "x86_64-linux";
+
+      # ── Custom overlay: make agent-skills available as pkgs.agent-skills ──
+      agentSkillsOverlay = final: prev: {
+        agent-skills = final.callPackage ./pkgs/agent-skills { };
+      };
+
       pkgs = import nixpkgs {
         inherit system;
         config = {
           allowUnfree = true;
         };
+        overlays = [ agentSkillsOverlay ];
       };
     in
     {
+      # Expose agent-skills as a flake package so anyone can build and use it:
+      #   nix build .#agent-skills
+      #   nix build github:user/repo#agent-skills
+      packages.${system}.agent-skills = pkgs.agent-skills;
+
       # Code formatter triggered by 'nix fmt'.
       formatter.${pkgs.stdenv.hostPlatform.system} = pkgs.nixfmt-tree;
 
