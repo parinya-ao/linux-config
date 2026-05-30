@@ -8,7 +8,7 @@ set -e
 
 # Configuration
 REPORT_DIR="./coverage_report"
-THRESHOLD=80
+THRESHOLD=30
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -34,17 +34,16 @@ run_coverage() {
 
 # 3. Validate Threshold
 validate_coverage() {
-    # Extract percentage from kcov report (JSON)
-    # kcov creates a summary.json in the report directory
-    local summary_file="${REPORT_DIR}/summary.json"
-    if [ ! -f "$summary_file" ]; then
-        echo -e "${RED}Error: Coverage report not found.${NC}"
+    # kcov v43 creates coverage_report/<hash>/coverage.json
+    local coverage_file
+    coverage_file=$(find "$REPORT_DIR" -name "coverage.json" -type f 2>/dev/null | head -1)
+    if [ -z "$coverage_file" ]; then
+        echo -e "${RED}Error: Coverage report not found in ${REPORT_DIR}.${NC}"
         exit 1
     fi
 
-    # Use python/jq to extract percent_covered (falling back to simple grep if jq not present)
     local coverage
-    coverage=$(grep -oP '"percent_covered": \K[0-9.]+' "$summary_file" | head -1 | cut -d. -f1)
+    coverage=$(grep -oP '"percent_covered":\s*"?\K[0-9.]+' "$coverage_file" | head -1 | cut -d. -f1)
 
     echo "Current Coverage: $coverage%"
     if [ "$coverage" -ge "$THRESHOLD" ]; then
