@@ -81,22 +81,18 @@ main() {
     step "Securing Environment"
     [[ -f "flake.lock" ]] && cp flake.lock flake.lock.bak && ok "Lockfile backed up."
 
-    step "Fetching Updates"
-    if gum spin --spinner globe --title "Updating Flake inputs (This may take a while)..." -- \
-        nix --extra-experimental-features "nix-command flakes" flake update; then
+    step "Fetching Updates (Showing inner details...)"
+    if nix --extra-experimental-features "nix-command flakes" flake update; then
         ok "Flake lockfile updated successfully."
     else
         fail "Failed to update flake inputs."
-        return 1
     fi
 
-    step "Applying Configuration"
-    if gum spin --spinner dot --title "Switching Home Manager Generation..." -- \
-        home-manager switch --flake .; then
+    step "Applying Configuration (Showing inner details...)"
+    if home-manager switch --flake . --verbose --show-trace -b backup; then
         ok "System configured beautifully."
     else
         fail "Home Manager switch failed."
-        return 1
     fi
 
     rm -f flake.lock.bak
