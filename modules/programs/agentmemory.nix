@@ -55,7 +55,7 @@ in
         ${lib.getExe pkgs.jq} '.mcp.agentmemory = {"type": "local", "command": ["${agentmemory-mcp}/bin/agentmemory-mcp"], "enabled": true}' "$OPENCODE_JSON" > "$OPENCODE_JSON.tmp" && mv "$OPENCODE_JSON.tmp" "$OPENCODE_JSON"
       fi
       # Install 8 agentmemory skills so agents know when to call the tools
-      PATH="${lib.getExe pkgs.git}/bin:$PATH" $DRY_RUN_CMD ${pkgs.bun}/bin/bun x --yes skills@latest add rohitg00/agentmemory -y -a '*' || true
+      PATH="${pkgs.git}/bin:$PATH" $DRY_RUN_CMD ${pkgs.bun}/bin/bun x --yes skills@latest add rohitg00/agentmemory -y -a '*' || true
     '';
   };
 }
