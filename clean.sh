@@ -11,6 +11,9 @@
 # ── Global Configurations ─────────────────────────────────────────────────────
 readonly LOG_FILE="/tmp/nix_system_cleanup.log"
 
+# Track current pipeline state (used externally by test_clean.bats)
+export CURRENT_STATE
+
 # ── Gum-based UI (no raw ANSI codes) ─────────────────────────────────────────
 step() { gum style --foreground "#00BFFF" --bold "▶ $*"; }
 ok()   { gum style --foreground "#04B575" "  ✔ $*"; }
