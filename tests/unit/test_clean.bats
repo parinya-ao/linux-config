@@ -67,7 +67,8 @@ teardown() {
 @test "verify_dependencies: fail when nix-store is missing" {
     touch "${MOCK_BIN_DIR}/nix-env"
     chmod +x "${MOCK_BIN_DIR}/nix-env"
-    # Do not create nix-store
+    # Override PATH to exclude system Nix so nix-store is truly unavailable
+    PATH="${MOCK_BIN_DIR}:/usr/bin:/bin"
     
     run verify_dependencies
     
