@@ -9,6 +9,7 @@
     ./packages/docs.nix
     ./packages/gui.nix
     ./programs/agent-skills.nix
+    ./programs/agentmemory.nix
     ./programs/codegraph.nix
     ./programs/bash.nix
     ./programs/cli-tools.nix
