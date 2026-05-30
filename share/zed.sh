@@ -392,6 +392,7 @@ EOF
 # shell path
 # ─────────────────────────────────────────────
 setup_bash_path() {
+  # shellcheck disable=SC2016
   local export_line='export PATH="$HOME/.local/bin:$PATH"'
   local touched=0
 
@@ -413,6 +414,7 @@ setup_fish_path() {
     return 0
   fi
 
+  # shellcheck disable=SC2016
   fish -lc 'fish_add_path $HOME/.local/bin' >/dev/null 2>&1 \
     || fish -c 'set -U fish_user_paths $HOME/.local/bin $fish_user_paths' >/dev/null 2>&1 \
     || warn "Could not update fish PATH automatically."

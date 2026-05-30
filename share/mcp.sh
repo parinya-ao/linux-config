@@ -141,6 +141,7 @@ inject_mcp_servers() {
       jq '.mcp["agentmemory"] = {"type": "local", "command": ["bunx", "@agentmemory/mcp"], "enabled": true}' "$opencode_json" > /tmp/opencode_tmp.json && mv /tmp/opencode_tmp.json "$opencode_json"
       ((injected++)) || true
     fi
+    # shellcheck disable=SC2015
     [ "$injected" -gt 0 ] && ok "Injected MCP entries into $(basename "$opencode_json")" || info "$(basename "$opencode_json") already configured"
   fi
 

@@ -85,8 +85,8 @@ setup_repository() {
     sudo chmod a+r /etc/apt/keyrings/docker.asc 2>&1 | sudo tee -a "$LOG_FILE" >/dev/null
 
     # Setup Repository (DEB822 format as requested in task.md)
-    # shellcheck disable=SC1091
     local codename
+    # shellcheck disable=SC1091
     codename=$(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")
     local arch
     arch=$(dpkg --print-architecture)

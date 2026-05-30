@@ -41,6 +41,7 @@ detect_os() {
     CURRENT_STATE="DETECT_OS"
     log_debug "Detecting Operating System from /etc/os-release..."
     if [[ -f /etc/os-release ]]; then
+        # shellcheck disable=SC1091
         . /etc/os-release
         OS_ID=$ID
         log_debug "OS detected as: $OS_ID"

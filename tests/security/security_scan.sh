@@ -82,7 +82,7 @@ run_zap_scan() {
 
     docker run --rm -v "$(pwd)/$REPORT_DIR":/zap/wrk/:rw \
         --name zap-scan "$ZAP_IMAGE" \
-        $mode -t "$target_url" \
+        "$mode" -t "$target_url" \
         -r report.html -J report.json > /dev/null 2>&1 || true
     
     log_success "ZAP scan finished."

@@ -22,6 +22,7 @@ run_validation_phase() {
         }
     done
 
+    # shellcheck disable=SC1091
     source /etc/os-release
 
     if [[ "$ID" != "fedora" ]]; then

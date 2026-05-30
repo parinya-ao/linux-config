@@ -1,11 +1,9 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2015,SC2162
 # =============================================================================
-# 06-drivers-comprehensive-ubuntu.sh
-# Ubuntu (apt) — Comprehensive Driver, Firmware & Codec Installer
-# Enhanced with Hardware Detection, GPU Architecture Awareness, Secure Boot
-# Supports: Ubuntu 22.04 LTS / 24.04 LTS / 24.10 / 25.04+
-# Auto-detects install state and runs correct phase automatically.
-# Usage: sudo bash 06-drivers-comprehensive-ubuntu.sh
+# ubuntu.sh - Ubuntu (apt) Driver for OS Setup
+# Auto-detects install state and runs the correct round automatically.
+# Usage: sudo bash ubuntu.sh   (or bash ubuntu.sh; sudo will be used as needed)
 # =============================================================================
 set -euo pipefail
 

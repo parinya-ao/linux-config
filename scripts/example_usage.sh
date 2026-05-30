@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 # Source the configuration parser
+# shellcheck disable=SC1091
 source ./scripts/parse_config.sh
 
 # Fetch variables from the centralized config.toml

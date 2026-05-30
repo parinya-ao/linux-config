@@ -25,15 +25,21 @@ readonly SELF_DIR
 SELF_DIR="$(dirname "${BASH_SOURCE[0]}")"
 
 # Configuration
+# shellcheck disable=SC1091
 source "$SELF_DIR/config.env"
 
 # Shared libraries
+# shellcheck disable=SC1091
 source "$SELF_DIR/lib/core.sh"
+# shellcheck disable=SC1091
 source "$SELF_DIR/lib/utils.sh"
 
 # Pipeline modules
+# shellcheck disable=SC1091
 source "$SELF_DIR/modules/01-validate.sh"
+# shellcheck disable=SC1091
 source "$SELF_DIR/modules/02-policy.sh"
+# shellcheck disable=SC1091
 source "$SELF_DIR/modules/03-execute.sh"
 
 # ==============================================================================

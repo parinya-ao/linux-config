@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2015,SC2162
 # =============================================================================
-# 06-drivers-comprehensive.sh
-# Fedora Workstation (dnf) — Comprehensive Driver, Firmware & Codec Installer
-# Enhanced with Hardware Detection, GPU Architecture Awareness, Secure Boot Handling
-# Auto-detects install state and runs the correct phase automatically.
-# Usage: sudo bash 06-drivers-comprehensive.sh
+# fedora.sh - Fedora (dnf) Driver for OS Setup
+# Auto-detects install state and runs the correct round automatically.
+# Usage: sudo bash fedora.sh   (or bash fedora.sh; sudo will be used as needed)
 # =============================================================================
 set -euo pipefail
 
@@ -19,6 +18,7 @@ BLUE=$'\033[1;34m'
 RED=$'\033[1;31m'
 
 # other package
+# shellcheck disable=SC1091
 source "$(dirname "$0")/package/ghostty.sh"
 
 # ------------------------------------------

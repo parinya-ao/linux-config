@@ -21,8 +21,8 @@ fail() { gum style --foreground "#FF4500" --bold "  ✖ $*" >&2; exit 1; }
 # ------------------------------------------------------------------------------
 # 2. Resiliency & Rollback
 # ------------------------------------------------------------------------------
+# shellcheck disable=SC2317
 rollback_on_error() {
-    # shellcheck disable=SC2317
     local exit_code=$?
     trap - ERR INT TERM
     fail "Process interrupted! Rolling back..."
