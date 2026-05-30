@@ -46,8 +46,8 @@ in
 
     # Activation script: install claude-mem hooks for OpenCode and Codex
     home.activation.setupClaudeMem = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-      $DRY_RUN_CMD bunx claude-mem install --ide opencode || true
-      $DRY_RUN_CMD bunx claude-mem install --ide codex || true
+      $DRY_RUN_CMD ${lib.getExe pkgs.bun} x claude-mem install --ide opencode || true
+      $DRY_RUN_CMD ${lib.getExe pkgs.bun} x claude-mem install --ide codex || true
     '';
   };
 }
