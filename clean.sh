@@ -8,8 +8,6 @@
 # UI: Gum-powered, Minimalist, 100% Non-interactive
 # ==============================================================================
 
-set -euo pipefail
-
 # ── Global Configurations ─────────────────────────────────────────────────────
 readonly LOG_FILE="/tmp/nix_system_cleanup.log"
 
@@ -45,6 +43,7 @@ need_cmd() { command -v "$1" >/dev/null 2>&1 || fail "Required command not found
 # ==============================================================================
 
 verify_dependencies() {
+    CURRENT_STATE="VERIFY_DEPENDENCIES"
     log_debug "Checking for required Nix commands..."
     
     for cmd in nix-env nix-store; do
@@ -57,6 +56,7 @@ verify_dependencies() {
 }
 
 remove_old_generations() {
+    CURRENT_STATE="REMOVE_OLD_GENERATIONS"
     log_debug "Executing: nix-env --delete-generations old"
     
     if gum spin --spinner line --title "Removing old generations..." -- \
@@ -70,6 +70,7 @@ remove_old_generations() {
 }
 
 run_garbage_collection() {
+    CURRENT_STATE="RUN_GARBAGE_COLLECTION"
     log_debug "Executing: nix-store --gc"
     
     # Run GC and capture the output to extract freed space info
@@ -91,6 +92,7 @@ run_garbage_collection() {
 }
 
 optimize_nix_store() {
+    CURRENT_STATE="OPTIMIZE_NIX_STORE"
     log_debug "Executing: nix-store --optimize"
     
     if gum spin --spinner points --title "Optimizing Nix store..." -- \
@@ -107,6 +109,7 @@ optimize_nix_store() {
 # SYSTEM INTEGRATION TEST
 # ==============================================================================
 integration_test() {
+    CURRENT_STATE="INTEGRATION_TEST"
     log_info "Initiating system integration tests for cleanup state..."
     
     # Test 1: Verify 'nix-env --list-generations' doesn't fail
@@ -163,5 +166,6 @@ main() {
 
 # Run Main only when script is executed (not when sourced)
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    set -euo pipefail
     main "$@"
 fi

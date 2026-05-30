@@ -7,14 +7,40 @@
 
 # Setup: runs before each test
 setup() {
-    # สร้าง directory ชั่วคราวสำหรับ mock bin
+    # Create temporary directory for mock binaries
     export MOCK_BIN_DIR="${BATS_TMPDIR}/mock_bin"
     mkdir -p "$MOCK_BIN_DIR"
     export PATH="${MOCK_BIN_DIR}:${PATH}"
     
+    # Mock gum: handles spin, style, and format subcommands
+    cat << 'GUM_EOF' > "${MOCK_BIN_DIR}/gum"
+#!/usr/bin/env bash
+cmd="$1"
+shift
+case "$cmd" in
+    spin)
+        # gum spin --spinner <type> --title "<title>" -- <command> [args...]
+        args=(); found=false
+        for arg in "$@"; do
+            if [[ "$arg" == "--" ]]; then found=true; continue; fi
+            $found && args+=("$arg")
+        done
+        exec "${args[@]}"
+        ;;
+    style|format)
+        # gum style --foreground <color> "text" → echo text
+        for arg in "$@"; do
+            [[ "$arg" != -* ]] && echo "$arg"
+        done
+        ;;
+    *)
+        exec "$cmd" "$@"
+        ;;
+esac
+GUM_EOF
+    chmod +x "${MOCK_BIN_DIR}/gum"
+    
     # Source the clean script
-    # โดยธรรมชาติ Bash จะตรวจสอบ if [[ "${BASH_SOURCE[0]}" == "${0}" ]] 
-    # ดังนั้นการ source เข้ามาจะไม่รัน main() โดยอัตโนมัติ
     source "${BATS_TEST_DIRNAME}/../../clean.sh"
 }
 
@@ -25,7 +51,7 @@ teardown() {
 
 # --- Case 1: Happy Path - verify_dependencies ---
 @test "verify_dependencies: pass when nix commands exist" {
-    # สร้าง mock command
+    # Create mock commands
     touch "${MOCK_BIN_DIR}/nix-env"
     chmod +x "${MOCK_BIN_DIR}/nix-env"
     touch "${MOCK_BIN_DIR}/nix-store"
@@ -33,25 +59,26 @@ teardown() {
     
     run verify_dependencies
     [ "$status" -eq 0 ]
-    [[ "$output" == *"Checking for required Nix commands"* ]]
+    # Verify the log file contains the expected debug message
+    grep -q "Checking for required Nix commands" /tmp/nix_system_cleanup.log
 }
 
 # --- Case 2: Sad Path - verify_dependencies (missing binary) ---
 @test "verify_dependencies: fail when nix-store is missing" {
     touch "${MOCK_BIN_DIR}/nix-env"
     chmod +x "${MOCK_BIN_DIR}/nix-env"
-    # ไม่สร้าง nix-store
+    # Do not create nix-store
     
     run verify_dependencies
     
     [ "$status" -eq 1 ]
-    # ตรวจสอบว่ามี error message พ่นออกมา
-    [[ "$output" == *"not found"* ]]
+    # Verify the log file contains the error message
+    grep -q "not found" /tmp/nix_system_cleanup.log
 }
 
 # --- Case 3: Mock Output Parsing - run_garbage_collection ---
 @test "run_garbage_collection: parse freed bytes correctly" {
-    # สร้าง mock command nix-store
+    # Create mock nix-store
     cat << 'EOF' > "${MOCK_BIN_DIR}/nix-store"
 #!/usr/bin/env bash
 echo "123456 bytes freed"
@@ -59,13 +86,13 @@ exit 0
 EOF
     chmod +x "${MOCK_BIN_DIR}/nix-store"
     
-    # รันฟังก์ชัน
     run run_garbage_collection
     
     [ "$status" -eq 0 ]
-    # ตรวจสอบ log ที่เกิดขึ้นภายในฟังก์ชัน
-    # ตรวจสอบว่าข้อความที่ log success มีตัวเลข 123456
-    [[ "$output" == *"Freed: 123456 bytes"* ]]
+    # Verify freed bytes parsed correctly in the log file
+    grep -q "Freed: 123456 bytes" /tmp/nix_system_cleanup.log
+    # Verify the GC output was captured in the log
+    grep -q "123456 bytes freed" /tmp/nix_system_cleanup.log
 }
 
 # --- Case 4: State Transition & Variables ---
