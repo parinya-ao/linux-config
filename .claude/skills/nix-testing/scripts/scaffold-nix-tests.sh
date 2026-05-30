@@ -53,7 +53,7 @@ if [ -f flake.nix ]; then
     echo ""
     echo "==> NOTE: Add these to your flake.nix manually:"
     echo ""
-    echo '  perSystem = { pkgs, lib, system, inputs', ... }: {'
+    echo '  perSystem = { pkgs, lib, system, inputs, ... }: {'
     echo '    checks = {'
     echo '      unit = pkgs.callPackage ./tests/unit { };'
     echo '      integration = pkgs.callPackage ./tests/integration { };'
