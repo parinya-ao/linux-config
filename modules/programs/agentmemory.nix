@@ -45,12 +45,17 @@ in
       };
     };
 
-    # Wire MCP for opencode + other agents
+    # Wire MCP for agents (opencode needs manual entry — not in agentmemory's supported list)
     home.activation.setupAgentMemory = lib.hm.dag.entryBefore [ "reloadSystemd" ] ''
       $DRY_RUN_CMD ${agentmemory-wrapper}/bin/agentmemory connect claude-code || true
       $DRY_RUN_CMD ${agentmemory-wrapper}/bin/agentmemory connect codex || true
-      $DRY_RUN_CMD ${agentmemory-wrapper}/bin/agentmemory connect opencode || true
-      $DRY_RUN_CMD ${pkgs.bun}/bin/bun x --yes skills@latest add rohitg00/agentmemory -y -a '*' || true
+      # opencode not supported by agentmemory connect — merge MCP entry manually
+      OPENCODE_JSON="$HOME/.config/opencode/opencode.jsonc"
+      if command -v ${lib.getExe pkgs.jq} >/dev/null 2>&1 && [ -f "$OPENCODE_JSON" ]; then
+        ${lib.getExe pkgs.jq} '.mcp.agentmemory = {"type": "local", "command": ["${agentmemory-mcp}/bin/agentmemory-mcp"], "enabled": true}' "$OPENCODE_JSON" > "$OPENCODE_JSON.tmp" && mv "$OPENCODE_JSON.tmp" "$OPENCODE_JSON"
+      fi
+      # Install 8 agentmemory skills so agents know when to call the tools
+      PATH="${lib.getExe pkgs.git}/bin:$PATH" $DRY_RUN_CMD ${pkgs.bun}/bin/bun x --yes skills@latest add rohitg00/agentmemory -y -a '*' || true
     '';
   };
 }

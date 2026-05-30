@@ -54,6 +54,8 @@ The content is organized as follows:
       SKILL.md
     react-doctor/
       SKILL.md
+.codegraph/
+  .gitignore
 .github/
   workflows/
     _nix-setup.yaml
@@ -136,9 +138,11 @@ modules/
     shells.nix
   programs/
     agent-skills.nix
+    agentmemory.nix
     autoskills.nix
     bash.nix
     cli-tools.nix
+    codegraph.nix
     fish.nix
     git.nix
     gnome.nix
@@ -1492,6 +1496,25 @@ bunx react-doctor@latest --verbose --diff
 | `--verbose` | Show affected files and line numbers per rule |
 | `--diff`    | Only scan changed files vs base branch        |
 | `--score`   | Output only the numeric score                 |
+</file>
+
+<file path=".codegraph/.gitignore">
+# CodeGraph data files
+# These are local to each machine and should not be committed
+
+# Database
+*.db
+*.db-wal
+*.db-shm
+
+# Cache
+cache/
+
+# Logs
+*.log
+
+# Hook markers
+.dirty
 </file>
 
 <file path=".github/workflows/_nix-setup.yaml">
@@ -5135,6 +5158,65 @@ in
 }
 </file>
 
+<file path="modules/programs/agentmemory.nix">
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
+
+let
+  cfg = config.my.programs.agentmemory;
+
+  agentmemory-wrapper = pkgs.writeShellScriptBin "agentmemory" ''
+    exec ${lib.getExe pkgs.bun} x --yes @agentmemory/agentmemory@latest "$@"
+  '';
+
+  agentmemory-mcp = pkgs.writeShellScriptBin "agentmemory-mcp" ''
+    exec ${lib.getExe pkgs.bun} x --yes @agentmemory/mcp@latest "$@"
+  '';
+in
+{
+  options.my.programs.agentmemory = {
+    enable = lib.mkEnableOption "AgentMemory — persistent memory server for AI agents";
+  };
+
+  config = lib.mkIf cfg.enable {
+    home.packages = with pkgs; [
+      agentmemory-wrapper
+      agentmemory-mcp
+      bun
+    ];
+
+    # Background server for agentmemory (REST API on :3111, viewer on :3113)
+    systemd.user.services.agentmemory = {
+      Unit = {
+        Description = "AgentMemory Persistent Memory Server";
+        After = [ "network.target" ];
+      };
+      Service = {
+        Type = "simple";
+        ExecStart = "${agentmemory-wrapper}/bin/agentmemory";
+        Restart = "on-failure";
+        RestartSec = "5";
+      };
+      Install = {
+        WantedBy = [ "default.target" ];
+      };
+    };
+
+    # Wire MCP for opencode + other agents
+    home.activation.setupAgentMemory = lib.hm.dag.entryBefore [ "reloadSystemd" ] ''
+      $DRY_RUN_CMD ${agentmemory-wrapper}/bin/agentmemory connect claude-code || true
+      $DRY_RUN_CMD ${agentmemory-wrapper}/bin/agentmemory connect codex || true
+      $DRY_RUN_CMD ${agentmemory-wrapper}/bin/agentmemory connect opencode || true
+      $DRY_RUN_CMD ${pkgs.bun}/bin/bun x --yes skills@latest add rohitg00/agentmemory -y -a '*' || true
+    '';
+  };
+}
+</file>
+
 <file path="modules/programs/autoskills.nix">
 {
   config,
@@ -5155,6 +5237,42 @@ in
     home.packages = with pkgs; [
       bun
     ];
+  };
+}
+</file>
+
+<file path="modules/programs/codegraph.nix">
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
+
+let
+  cfg = config.my.programs.codegraph;
+
+  codegraph-wrapper = pkgs.writeShellScriptBin "codegraph" ''
+    exec ${lib.getExe pkgs.bun} x --yes @colbymchenry/codegraph@latest "$@"
+  '';
+in
+{
+  options.my.programs.codegraph = {
+    enable = lib.mkEnableOption "CodeGraph — pre-indexed code knowledge graph for AI agents";
+  };
+
+  config = lib.mkIf cfg.enable {
+    home.packages = with pkgs; [
+      codegraph-wrapper
+      bun
+    ];
+
+    home.activation.setupCodeGraph = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+      $DRY_RUN_CMD ${codegraph-wrapper}/bin/codegraph install \
+        --yes \
+        --target=auto \
+        --location=global
+    '';
   };
 }
 </file>
@@ -14392,71 +14510,6 @@ in
 }
 </file>
 
-<file path="modules/default.nix">
-{ ... }:
-
-{
-  imports = [
-    ./suites.nix
-    ./packages/ai.nix
-    ./packages/cli.nix
-    ./packages/dev.nix
-    ./packages/docs.nix
-    ./packages/gui.nix
-    ./programs/agent-skills.nix
-    ./programs/bash.nix
-    ./programs/cli-tools.nix
-    ./programs/fish.nix
-    ./programs/git.nix
-    ./programs/gnome.nix
-    ./programs/neovim.nix
-    ./programs/react-doctor.nix
-    ./programs/opencode.nix
-    ./programs/rtk.nix
-    ./packages/font.nix
-  ];
-}
-</file>
-
-<file path="modules/suites.nix">
-{ config, lib, ... }:
-
-let
-  cfg = config.my.suites;
-in
-{
-  options.my.suites = {
-    base.enable = lib.mkEnableOption "Base CLI & Shell tools";
-    development.enable = lib.mkEnableOption "Development tools (Editor, Git, compilers)";
-    ai.enable = lib.mkEnableOption "AI Tools & CLIs";
-    desktop.enable = lib.mkEnableOption "GNOME Desktop & GUI apps";
-  };
-
-  config = {
-    my.programs = {
-      bash = lib.mkIf cfg.base.enable { enable = true; };
-      fish = lib.mkIf cfg.base.enable { enable = true; };
-      cli-tools = lib.mkIf cfg.base.enable { enable = true; };
-      git = lib.mkIf cfg.development.enable { enable = true; };
-      neovim = lib.mkIf cfg.development.enable { enable = true; };
-      gnome = lib.mkIf cfg.desktop.enable { enable = true; };
-      agent-skills = lib.mkIf cfg.ai.enable { enable = true; };
-      react-doctor = lib.mkIf cfg.ai.enable { enable = true; };
-      opencode = lib.mkIf cfg.ai.enable { enable = true; };
-      rtk = lib.mkIf cfg.ai.enable { enable = true; };
-    };
-    my.packages = {
-      cli = lib.mkIf cfg.base.enable { enable = true; };
-      dev = lib.mkIf cfg.development.enable { enable = true; };
-      ai = lib.mkIf cfg.ai.enable { enable = true; };
-      gui = lib.mkIf cfg.desktop.enable { enable = true; };
-      docs = lib.mkIf cfg.desktop.enable { enable = true; };
-      fonts = lib.mkIf cfg.desktop.enable { enable = true; };
-    };
-  };
-}
-</file>
-
 <file path="flake.nix">
 {
   # Description of the flake's purpose.
@@ -14892,6 +14945,75 @@ gum style --border rounded --margin "1 2" --padding "1 2" --border-foreground "#
   "Home Manager     switched → .#parinya" \
   "" \
   "$(gum style --italic --foreground "#FFA500" "Open a new terminal (or reboot) for all PATH changes to take effect.")"
+</file>
+
+<file path="modules/default.nix">
+{ ... }:
+
+{
+  imports = [
+    ./suites.nix
+    ./packages/ai.nix
+    ./packages/cli.nix
+    ./packages/dev.nix
+    ./packages/docs.nix
+    ./packages/gui.nix
+    ./programs/agent-skills.nix
+    ./programs/agentmemory.nix
+    ./programs/codegraph.nix
+    ./programs/bash.nix
+    ./programs/cli-tools.nix
+    ./programs/fish.nix
+    ./programs/git.nix
+    ./programs/gnome.nix
+    ./programs/neovim.nix
+    ./programs/react-doctor.nix
+    ./programs/opencode.nix
+    ./programs/rtk.nix
+    ./packages/font.nix
+  ];
+}
+</file>
+
+<file path="modules/suites.nix">
+{ config, lib, ... }:
+
+let
+  cfg = config.my.suites;
+in
+{
+  options.my.suites = {
+    base.enable = lib.mkEnableOption "Base CLI & Shell tools";
+    development.enable = lib.mkEnableOption "Development tools (Editor, Git, compilers)";
+    ai.enable = lib.mkEnableOption "AI Tools & CLIs";
+    desktop.enable = lib.mkEnableOption "GNOME Desktop & GUI apps";
+  };
+
+  config = {
+    my.programs = {
+      bash = lib.mkIf cfg.base.enable { enable = true; };
+      fish = lib.mkIf cfg.base.enable { enable = true; };
+      cli-tools = lib.mkIf cfg.base.enable { enable = true; };
+      git = lib.mkIf cfg.development.enable { enable = true; };
+      neovim = lib.mkIf cfg.development.enable { enable = true; };
+      gnome = lib.mkIf cfg.desktop.enable { enable = true; };
+      agent-skills = lib.mkIf cfg.ai.enable { enable = true; };
+      agentmemory = lib.mkIf cfg.ai.enable { enable = true; };
+      codegraph = lib.mkIf cfg.ai.enable { enable = true; };
+      react-doctor = lib.mkIf cfg.ai.enable { enable = true; };
+      opencode = lib.mkIf cfg.ai.enable { enable = true; };
+      rtk = lib.mkIf cfg.ai.enable { enable = true; };
+    };
+    my.packages = {
+      cli = lib.mkIf cfg.base.enable { enable = true; };
+      dev = lib.mkIf cfg.development.enable { enable = true; };
+      ai = lib.mkIf cfg.ai.enable { enable = true; };
+      gui = lib.mkIf cfg.desktop.enable { enable = true; };
+      docs = lib.mkIf cfg.desktop.enable { enable = true; };
+      fonts = lib.mkIf cfg.desktop.enable { enable = true; };
+    };
+  };
+}
 </file>
 
 <file path="flake.lock">
