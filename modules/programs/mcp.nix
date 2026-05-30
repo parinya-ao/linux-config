@@ -46,7 +46,8 @@ in
     };
 
     # Activation script: install claude-mem hooks for OpenCode and Codex
-    home.activation.setupClaudeMem = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    # Runs before systemd reload so the worker isn't killed mid-install
+    home.activation.setupClaudeMem = lib.hm.dag.entryBefore [ "reloadSystemd" ] ''
       $DRY_RUN_CMD ${lib.getExe pkgs.bun} x claude-mem install --ide opencode || true
       $DRY_RUN_CMD ${lib.getExe pkgs.bun} x claude-mem install --ide codex-cli || true
     '';
