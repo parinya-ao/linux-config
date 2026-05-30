@@ -65,4 +65,34 @@ stdenvNoCC.mkDerivation {
 
     echo "=== Done — $(( $(ls -1 "$out" | wc -l) )) skills packaged ==="
   '';
+
+  doInstallCheck = true;
+
+  installCheckPhase = ''
+    echo "=== Verifying agent-skills package ==="
+
+    expected_skills="bash-defensive-patterns commit-context commit-history conventional-commit forget handoff recall recap remember session-history gum-bash nix-backup react-doctor"
+
+    failures=0
+    for skill in $expected_skills; do
+      if [ -f "$out/$skill/SKILL.md" ]; then
+        size=$(wc -c < "$out/$skill/SKILL.md")
+        if [ "$size" -gt 0 ]; then
+          echo "  ✓ $skill ($size bytes)"
+        else
+          echo "  ✗ $skill/SKILL.md is empty"
+          failures=$((failures + 1))
+        fi
+      else
+        # Non-fatal: skill may not exist in source (CI runs from repo root)
+        echo "  - $skill not found in output (may not exist in source)"
+      fi
+    done
+
+    # Count total skills packaged
+    total=$(ls -1 "$out" | wc -l)
+    echo "=== $total skill directories, $failures failures ==="
+    [ "$failures" -eq 0 ] || exit 1
+  '';
+
 }

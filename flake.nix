@@ -27,7 +27,12 @@
 
   # Entry point that processes inputs and defines system configurations.
   outputs =
-    { nixpkgs, home-manager, ... }@inputs:
+    {
+      self,
+      nixpkgs,
+      home-manager,
+      ...
+    }@inputs:
     let
       # Target system architecture.
       system = "x86_64-linux";
@@ -53,6 +58,29 @@
 
       # Code formatter triggered by 'nix fmt'.
       formatter.${pkgs.stdenv.hostPlatform.system} = pkgs.nixfmt-tree;
+
+      # ── Flake checks — run with `nix flake check` ──
+      checks.${system} = {
+        # 1. Build the package (includes installCheckPhase)
+        agent-skills-build = pkgs.agent-skills;
+
+        # 2. Formatting check
+        formatting =
+          pkgs.runCommand "check-formatting"
+            {
+              nativeBuildInputs = [ pkgs.nixfmt ];
+            }
+            ''
+              cd ${self}
+              echo "=== Checking Nix formatting ==="
+              nixfmt --check $(find . -name "*.nix" -type f) 2>&1 || {
+                echo ""
+                echo "Run 'nix fmt' to fix formatting issues."
+                exit 1
+              }
+              touch $out
+            '';
+      };
 
       # Home Manager configuration for user 'parinya'.
       homeConfigurations."parinya" = home-manager.lib.homeManagerConfiguration {

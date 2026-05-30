@@ -1,4 +1,9 @@
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
 let
   cfg = config.my.programs.agent-skills;
@@ -26,27 +31,37 @@ let
     ".claude/skills"
     ".agents/skills"
     ".codex/skills"
-  ] ++ cfg.extraTargetDirs;
+  ]
+  ++ cfg.extraTargetDirs;
 
   # Build a flat list of { name, value } for each skill × dir
-  entryList = builtins.foldl' (acc: dir:
-    acc ++ builtins.foldl' (acc2: skill:
-      acc2 ++ [{
-        name = "${dir}/${skill}/SKILL.md";
-        value.source = "${pkgs.agent-skills}/${skill}/SKILL.md";
-      }]
-    ) [] allSkills
-  ) [] targetDirs;
+  entryList = builtins.foldl' (
+    acc: dir:
+    acc
+    ++ builtins.foldl' (
+      acc2: skill:
+      acc2
+      ++ [
+        {
+          name = "${dir}/${skill}/SKILL.md";
+          value.source = "${pkgs.agent-skills}/${skill}/SKILL.md";
+        }
+      ]
+    ) [ ] allSkills
+  ) [ ] targetDirs;
 
   skillEntries = builtins.listToAttrs entryList;
 
   globalEntry =
-    if cfg.globalDir != null then {
-      "${cfg.globalDir}" = {
-        source = pkgs.agent-skills;
-        recursive = true;
-      };
-    } else { };
+    if cfg.globalDir != null then
+      {
+        "${cfg.globalDir}" = {
+          source = pkgs.agent-skills;
+          recursive = true;
+        };
+      }
+    else
+      { };
 in
 {
   options.my.programs.agent-skills = {
@@ -59,7 +74,10 @@ in
         Additional relative home directories to install skills into.
         Each entry is a path under $HOME (e.g. ".cursor/skills").
       '';
-      example = [ ".cursor/skills" ".windsurf/skills" ];
+      example = [
+        ".cursor/skills"
+        ".windsurf/skills"
+      ];
     };
 
     globalDir = lib.mkOption {
