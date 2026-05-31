@@ -95,24 +95,6 @@
         modules = [
           ./home.nix
 
-          (
-            { pkgs, ... }:
-            {
-              programs.fish.shellAliases = {
-                uv = "env LD_LIBRARY_PATH=/usr/lib64:${
-                  pkgs.lib.makeLibraryPath (
-                    with pkgs;
-                    [
-                      pkgs.stdenv.cc.cc.lib
-                      zlib
-                      zstd
-                      glib
-                    ]
-                  )
-                } uv";
-              };
-            }
-          )
         ];
       };
     };

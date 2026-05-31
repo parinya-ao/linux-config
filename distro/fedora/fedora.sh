@@ -7,6 +7,11 @@
 # =============================================================================
 set -euo pipefail
 
+# DEBUG MODE: If DEBUG=1 is set, enable shell tracing
+if [[ "${DEBUG:-0}" == "1" ]]; then
+    set -x
+fi
+
 # ------------------------------------------
 # COLORS
 # ------------------------------------------
@@ -17,13 +22,7 @@ GREEN=$'\033[1;32m'
 BLUE=$'\033[1;34m'
 RED=$'\033[1;31m'
 
-# other package
-# shellcheck disable=SC1091
-source "$(dirname "$0")/package/ghostty.sh"
-
-# ------------------------------------------
-# HELPERS
-# ------------------------------------------
+# helpers
 step()  { echo -e "\n${BLUE}[STEP]${RESET} $*"; }
 ok()    { echo -e "${GREEN}[OK]${RESET} $*"; }
 warn()  { echo -e "${YELLOW}[WARN]${RESET} $*"; }
@@ -41,6 +40,50 @@ pkg_installed() {
 skip() {
   # Skip message
   info "⊘ Skipping: $*"
+}
+
+# ------------------------------------------
+# SECURE REPOSITORY SETUP
+# ------------------------------------------
+setup_fedora_repos() {
+  step "[SAFE-REPO] Configuring Official Fedora + Kernel.org mirrors..."
+
+  # 1. Backup original repos (idempotent)
+  if [ ! -d "/etc/yum.repos.d.bak" ]; then
+    info "Creating backup of repo files to /etc/yum.repos.d.bak..."
+    cp -r /etc/yum.repos.d /etc/yum.repos.d.bak
+  else
+    info "Restoring original repo files from backup for a clean configuration..."
+    [ -f /etc/yum.repos.d.bak/fedora.repo ] && cp /etc/yum.repos.d.bak/fedora.repo /etc/yum.repos.d/fedora.repo
+    [ -f /etc/yum.repos.d.bak/fedora-updates.repo ] && cp /etc/yum.repos.d.bak/fedora-updates.repo /etc/yum.repos.d/fedora-updates.repo
+  fi
+
+  # 2. Configure fedora.repo (Main OS)
+  info "Patching /etc/yum.repos.d/fedora.repo..."
+  # shellcheck disable=SC2016
+  sed -i '/^\[fedora\]/,/^\[/ { /^baseurl=/d; /^#baseurl=/d; s|^metalink=\(.*\)|#metalink=\1\nbaseurl=https://dl.fedoraproject.org/pub/fedora/linux/releases/$releasever/Everything/$basearch/os/\n       https://mirrors.kernel.org/fedora/releases/$releasever/Everything/$basearch/os/| }' /etc/yum.repos.d/fedora.repo
+
+  # 3. Configure fedora-updates.repo (Updates)
+  info "Patching /etc/yum.repos.d/fedora-updates.repo..."
+  # shellcheck disable=SC2016
+  sed -i '/^\[updates\]/,/^\[/ { /^baseurl=/d; /^#baseurl=/d; s|^metalink=\(.*\)|#metalink=\1\nbaseurl=https://dl.fedoraproject.org/pub/fedora/linux/updates/$releasever/Everything/$basearch/\n       https://mirrors.kernel.org/fedora/updates/$releasever/Everything/$basearch/| }' /etc/yum.repos.d/fedora-updates.repo
+
+  # 4. Optimize DNF Configuration
+  info "Optimizing /etc/dnf/dnf.conf (max_parallel_downloads=20)..."
+  cp /etc/dnf/dnf.conf "/etc/dnf/dnf.conf.backup.$(date +%s)" 2>/dev/null || true
+  
+  if grep -q "^max_parallel_downloads=" /etc/dnf/dnf.conf; then
+    sed -i "s/^max_parallel_downloads=.*/max_parallel_downloads=20/" /etc/dnf/dnf.conf
+  else
+    echo "max_parallel_downloads=20" >> /etc/dnf/dnf.conf
+  fi
+
+  # 5. Refresh cache
+  info "Refreshing DNF cache..."
+  dnf clean all
+  dnf makecache
+  
+  ok "Secure Fedora mirrors and DNF optimizations applied."
 }
 
 # ------------------------------------------
@@ -249,9 +292,35 @@ vainfo_has() {
 }
 
 dnf_install() {
-  dnf install -y "$@" \
-    && ok "Installed: $*" \
-    || warn "Some packages in [$*] unavailable or already present — continuing"
+  info "Installing packages using: dnf install -y $*"
+  if dnf install -y "$@"; then
+    ok "Installed packages: $*"
+    info "Summary of changes (Last transaction):"
+    dnf history info | head -n 15 || true
+  else
+    warn "Some packages in [$*] unavailable or already present — continuing"
+  fi
+}
+
+dnf_upgrade() {
+  # shellcheck disable=SC2086
+  info "Upgrading system using: dnf upgrade $* -y"
+  if dnf upgrade "$@" -y; then
+    ok "System upgrade ($*) completed successfully."
+    info "Summary of changes (Last transaction):"
+    dnf history info | head -n 15 || true
+  else
+    warn "System upgrade ($*) failed or partially completed."
+  fi
+}
+
+dnf_group_upgrade() {
+  info "Upgrading group using: dnf group upgrade -y $*"
+  if dnf group upgrade -y "$@"; then
+    ok "Group upgrade completed: $*"
+  else
+    warn "Group upgrade failed: $*"
+  fi
 }
 
 # ------------------------------------------
@@ -269,7 +338,7 @@ fi
 # Ensure lspci is available for hardware detection
 if ! command -v lspci &>/dev/null; then
   info "Installing pciutils for hardware detection..."
-  dnf install -y pciutils || warn "Could not install pciutils"
+  dnf_install pciutils
 fi
 
 FEDORA_VER=$(rpm -E %fedora)
@@ -406,8 +475,10 @@ info "State: RPM_Fusion=${RPM_FUSION_ACTIVE} | ffmpeg=${FFMPEG_ACTIVE} | NVIDIA=
 # =============================================================================
 # PHASE 0 — System refresh (always runs)
 # =============================================================================
+setup_fedora_repos
+
 step "[P0] System refresh..."
-dnf upgrade --refresh -y
+dnf_upgrade --refresh
 ok "System up to date."
 
 # =============================================================================
@@ -418,10 +489,9 @@ if [[ "${RPM_FUSION_ACTIVE}" == "false" ]]; then
   step "[ROUND 1] Enabling RPM Fusion (free + nonfree + tainted)..."
 
   # Install RPM Fusion release packages
-  dnf install -y \
+  dnf_install \
     "https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-${FEDORA_VER}.noarch.rpm" \
-    "https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-${FEDORA_VER}.noarch.rpm" \
-    || warn "RPM Fusion may already be present."
+    "https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-${FEDORA_VER}.noarch.rpm"
 
   # Tainted repos
   dnf_install rpmfusion-free-release-tainted rpmfusion-nonfree-release-tainted
@@ -431,7 +501,7 @@ if [[ "${RPM_FUSION_ACTIVE}" == "false" ]]; then
     || dnf config-manager --enable fedora-cisco-openh264 2>/dev/null \
     || warn "Could not enable OpenH264 repo — try manually."
 
-  dnf upgrade --refresh -y
+  dnf_upgrade --refresh
   ok "RPM Fusion enabled and system refreshed."
 
   echo ""
@@ -453,41 +523,6 @@ if [[ "${RPM_FUSION_ACTIVE}" == "true" && "${FFMPEG_ACTIVE}" == "false" ]]; then
   ok "RPM Fusion confirmed active."
 
   # -----------------------------------------------------------------------
-  # PHASE 0.25 — DNF Optimization (Performance Tuning)
-  # -----------------------------------------------------------------------
-  step "[P0.25] Configuring DNF for optimal performance..."
-
-  # Backup dnf.conf
-  cp /etc/dnf/dnf.conf "/etc/dnf/dnf.conf.backup.$(date +%s)" 2>/dev/null || true
-
-  # Add or update DNF performance settings
-  # Check if max_parallel_downloads already exists
-  if grep -q "^max_parallel_downloads=" /etc/dnf/dnf.conf; then
-    sed -i 's/^max_parallel_downloads=.*/max_parallel_downloads=20/' /etc/dnf/dnf.conf
-  else
-    echo "max_parallel_downloads=20" >> /etc/dnf/dnf.conf
-  fi
-
-  # Add fastestmirror if not present
-  if ! grep -q "^fastestmirror=" /etc/dnf/dnf.conf; then
-    echo "fastestmirror=True" >> /etc/dnf/dnf.conf
-  else
-    sed -i 's/^fastestmirror=.*/fastestmirror=True/' /etc/dnf/dnf.conf
-  fi
-
-  # Add keepcache if not present (keep downloaded packages)
-  if ! grep -q "^keepcache=" /etc/dnf/dnf.conf; then
-    echo "keepcache=True" >> /etc/dnf/dnf.conf
-  else
-    sed -i 's/^keepcache=.*/keepcache=True/' /etc/dnf/dnf.conf
-  fi
-
-  ok "DNF optimizations configured:"
-  info "  • max_parallel_downloads = 20 (faster parallel downloads)"
-  info "  • fastestmirror = True (use fastest mirror)"
-  info "  • keepcache = True (keep downloaded packages)"
-
-  # -----------------------------------------------------------------------
   # PHASE 0.5 — NVIDIA Driver (Smart Branch Selection)
   # -----------------------------------------------------------------------
   if [[ "${NVIDIA_DETECTED}" == "true" ]]; then
@@ -499,7 +534,7 @@ if [[ "${RPM_FUSION_ACTIVE}" == "true" && "${FFMPEG_ACTIVE}" == "false" ]]; then
       # Ensure kernel-devel is present
       if ! pkg_installed "kernel-devel"; then
         info "Installing kernel-devel..."
-        dnf install -y kernel-devel || warn "kernel-devel install failed"
+        dnf_install kernel-devel
       fi
 
       # Blacklist nouveau ONLY if not already done
@@ -739,10 +774,9 @@ if [[ "${RPM_FUSION_ACTIVE}" == "true" && "${FFMPEG_ACTIVE}" == "false" ]]; then
   # PHASE 9 — Final upgrade & cleanup
   # -----------------------------------------------------------------------
   step "[P9] Final upgrade & cleanup..."
-  dnf upgrade -y
+  dnf_upgrade
   dnf autoremove -y
   ok "System cleanup done."
-  install_ghostty
 
   # -----------------------------------------------------------------------
   # SUMMARY

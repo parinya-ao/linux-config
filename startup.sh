@@ -122,8 +122,13 @@ info "Script:    $DISTRO_SCRIPT"
 # ─────────────────────────────────────────────────────────────────────────────
 # PART 1 — Run distro-specific driver
 # ─────────────────────────────────────────────────────────────────────────────
-if gum spin --spinner line --title "Running distro driver: $(basename "$DISTRO_SCRIPT")" -- \
-  bash "$DISTRO_SCRIPT" "$@"; then
+# DEBUG MODE: If DEBUG=1 is set, enable shell tracing
+if [[ "${DEBUG:-0}" == "1" ]]; then
+    set -x
+fi
+
+step "[DEBUG ENABLED] Running distro driver: $(basename "$DISTRO_SCRIPT")"
+if bash "$DISTRO_SCRIPT" "$@"; then
   ok "Distro driver finished."
 else
   fail "Distro driver failed."
@@ -137,8 +142,8 @@ if command -v nix >/dev/null 2>&1; then
   info "Nix already installed: $(gum style --bold "$NIX_VER") — skipping."
 else
   need_cmd curl
-  if gum spin --spinner globe --title "Installing Nix package manager..." -- \
-    curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix \
+  step "Installing Nix package manager..."
+  if curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix \
       | sh -s -- install --no-confirm; then
     ok "Nix installed."
   else
@@ -170,8 +175,8 @@ mkdir -p "$(dirname "$TARGET_DIR")"
 
 if [ ! -d "${TARGET_DIR}/.git" ]; then
   need_cmd git
-  if gum spin --spinner points --title "Cloning repo → ${TARGET_DIR}" -- \
-    GIT_TERMINAL_PROMPT=0 git clone "$REPO_URL" "$TARGET_DIR"; then
+  step "Cloning repo → ${TARGET_DIR}"
+  if GIT_TERMINAL_PROMPT=0 git clone "$REPO_URL" "$TARGET_DIR"; then
     chown -R "${TARGET_USER}:${TARGET_USER}" "$TARGET_DIR"
     ok "Repo cloned and ownership set to ${TARGET_USER}."
   else
@@ -184,24 +189,25 @@ else
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────
-# PART 4 — Home Manager switch (fully non-interactive)
+# PART 4 — Migration & Final Switch (Automated via migrate.sh)
 # ─────────────────────────────────────────────────────────────────────────────
 cd "$TARGET_DIR"
 
-dnf install -y dbus-x11 2>/dev/null || apt-get install -y dbus-x11 2>/dev/null || zypper --non-interactive install dbus-1-x11 2>/dev/null || true
+# Ensure dbus is available for the switch (needed for GNOME/dconf settings)
+# We also ensure git is available (needed by migrate.sh)
+dnf install -y dbus-x11 git 2>/dev/null || apt-get install -y dbus-x11 git 2>/dev/null || zypper --non-interactive install dbus-1-x11 git 2>/dev/null || true
 
-if gum spin --spinner dot --title "Building Home Manager environment..." -- \
-  sudo -u "${TARGET_USER}" -H \
-    dbus-run-session bash -c \
-      "source /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh && \
-       /nix/var/nix/profiles/default/bin/nix \
-         --extra-experimental-features 'nix-command flakes' \
-         run home-manager/master -- \
-         switch --flake '$TARGET_DIR#${TARGET_USER}' -b backup --show-trace"; then
-  ok "Home Manager switch complete."
+# Run migrate.sh as the target user to perform the final setup
+# We must preserve the bootstrapped gum PATH and target user's home
+if sudo -u "${TARGET_USER}" -H \
+  PATH="/tmp/gum-bin:$PATH" \
+  DEBUG="${DEBUG:-0}" \
+  bash ./migrate.sh; then
+  ok "Migration and Home Manager switch complete."
 else
-  fail "Home Manager switch failed."
+  fail "Migration Assistant (migrate.sh) failed."
 fi
+
 
 # ── Summary ──────────────────────────────────────────────────────────────────
 gum style --border rounded --margin "1 2" --padding "1 2" --border-foreground "#04B575" \

@@ -17,6 +17,12 @@
     - Package lists go in `modules/packages/*.nix`.
     - Tool configs go in `modules/programs/*.nix`.
     - High-level toggles are managed via `my.suites` in `home.nix`.
+- **Agent Skills (Centralized in `pkgs/agent-skills/`):** 
+    - All skill source files (SKILL.md, references/, scripts/) live in `pkgs/agent-skills/<name>/`.
+    - Add a new skill: create dir there, then register in 3 places (derivation, HM module, install script).
+    - The Nix derivation (`pkgs/agent-skills/default.nix`) auto-discovers all skill subdirs.
+    - `home-manager switch` deploys them to `.config/opencode/skills/`, `.claude/skills/`, `.agents/skills/`, `.codex/skills/`.
+    - Old `.agents/skills/` and `.claude/skills/` source dirs are gone — all source is now in `pkgs/agent-skills/`.
 - **Shells:** 
     - `startup.sh` and `distro/` use **Bash** (imperative).
     - Interactive environment is **Fish** (declarative config in `modules/programs/fish.nix`).

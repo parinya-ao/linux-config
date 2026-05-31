@@ -5,11 +5,16 @@
 # OS Target: Fedora (using DNF / DNF5 package managers).
 # Architecture: KISS, highly decoupled, deterministic error handling.
 # ==============================================================================
-
 # Fail immediately if a command fails, an unset variable is used, or a pipe fails
 set -euo pipefail
 
+# DEBUG MODE: If DEBUG=1 is set, enable shell tracing
+if [[ "${DEBUG:-0}" == "1" ]]; then
+    set -x
+fi
+
 # ------------------------------------------------------------------------------
+
 # Global Settings & State Monitoring Tracker
 # ------------------------------------------------------------------------------
 LOG_FILE="/tmp/firefox_dev_install_$(date +%s).log"
@@ -74,9 +79,9 @@ purge_deprecated_copr() {
     log_state "DEBUG" "Auditing for conflicting legacy COPR dependencies..."
 
     # Safely look for old COPR package 'firefox-dev' without breaking on zero exits
-    if rpm -q firefox-dev 2>&1 | sudo tee -a "$LOG_FILE" >/dev/null; then
+    if rpm -q firefox-dev 2>&1 | sudo tee -a "$LOG_FILE"; then
         log_state "WARN" "Legacy community COPR installation found. Purging package 'firefox-dev'..."
-        sudo dnf remove -y firefox-dev 2>&1 | sudo tee -a "$LOG_FILE" >/dev/null || critical_intercept "Failed to uninstall legacy COPR package."
+        sudo dnf remove -y firefox-dev 2>&1 | sudo tee -a "$LOG_FILE" || critical_intercept "Failed to uninstall legacy COPR package."
         log_state "SUCCESS" "Legacy 'firefox-dev' package dropped."
     else
         log_state "DEBUG" "No legacy COPR package traces found."
@@ -84,13 +89,13 @@ purge_deprecated_copr() {
 
     # Safely disable the old repository mapping if present
     log_state "DEBUG" "Disabling 'the4runner/firefox-dev' repository if configured..."
-    sudo dnf copr disable -y the4runner/firefox-dev 2>&1 | sudo tee -a "$LOG_FILE" >/dev/null || true
+    sudo dnf copr disable -y the4runner/firefox-dev 2>&1 | sudo tee -a "$LOG_FILE" || true
     log_state "SUCCESS" "COPR isolation cleared cleanly."
 }
 
 synchronize_base_metadata() {
     log_state "DEBUG" "Forcing structural refresh of standard DNF repository metadata..."
-    sudo dnf upgrade --refresh -y --downloadonly 2>&1 | sudo tee -a "$LOG_FILE" >/dev/null || critical_intercept "Metadata synchronization loop broke."
+    sudo dnf upgrade --refresh -y --downloadonly 2>&1 | sudo tee -a "$LOG_FILE" || critical_intercept "Metadata synchronization loop broke."
     log_state "SUCCESS" "System metadata cache successfully synced."
 }
 
@@ -105,7 +110,7 @@ inject_mozilla_repository() {
         --set=gpgcheck=1 \
         --set=repo_gpgcheck=0 \
         --set=priority=10 \
-        --set=includepkgs=firefox-devedition\* 2>&1 | sudo tee -a "$LOG_FILE" >/dev/null; then
+        --set=includepkgs=firefox-devedition\* 2>&1 | sudo tee -a "$LOG_FILE"; then
         
         log_state "SUCCESS" "Mozilla repository metadata record mapped to $MOZ_REPO_FILE"
     else
@@ -115,13 +120,13 @@ inject_mozilla_repository() {
 
 refresh_target_cache() {
     log_state "DEBUG" "Binding and checking signatures for newly attached Mozilla repo..."
-    sudo dnf makecache --refresh --repo mozilla 2>&1 | sudo tee -a "$LOG_FILE" >/dev/null || critical_intercept "Failed validation check on Mozilla signing keys."
+    sudo dnf makecache --refresh --repo mozilla 2>&1 | sudo tee -a "$LOG_FILE" || critical_intercept "Failed validation check on Mozilla signing keys."
     log_state "SUCCESS" "Mozilla package index cached locally."
 }
 
 execute_package_provisioning() {
     log_state "DEBUG" "Provisioning 'firefox-devedition' tracking binaries via DNF..."
-    sudo dnf install -y firefox-devedition 2>&1 | sudo tee -a "$LOG_FILE" >/dev/null || critical_intercept "Package payload transaction aborted during runtime execution."
+    sudo dnf install -y firefox-devedition 2>&1 | sudo tee -a "$LOG_FILE" || critical_intercept "Package payload transaction aborted during runtime execution."
     log_state "SUCCESS" "DNF transaction finalized successfully."
 }
 
@@ -129,7 +134,7 @@ verify_operational_integrity() {
     log_state "DEBUG" "Running functional tests on runtime layer components..."
 
     # 1. Structural RPM database query
-    if ! rpm -q firefox-devedition 2>&1 | sudo tee -a "$LOG_FILE" >/dev/null; then
+    if ! rpm -q firefox-devedition 2>&1 | sudo tee -a "$LOG_FILE"; then
         critical_intercept "Post-install validation fault: Package not registered in system engine database."
     fi
 
