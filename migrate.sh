@@ -68,10 +68,8 @@ fix_trusted_user() {
             sudo bash -c "echo 'trusted-users = root @wheel $current_user' >> $target_conf"
         fi
 
-        # Reload nix-daemon
-        if command -v systemctl >/dev/null 2>&1; then
-            gum spin --spinner points --title "Restarting nix-daemon..." -- sudo systemctl restart nix-daemon || true
-        fi
+        # Inform the user (daemon restart disabled by request)
+        info "Trusted users updated. A manual restart of nix-daemon (sudo systemctl restart nix-daemon) may be required for changes to take effect."
         ok "Added $current_user to trusted-users in $target_conf."
     fi
 }
