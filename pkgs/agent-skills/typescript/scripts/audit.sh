@@ -22,17 +22,28 @@ echo "════════════════════════�
 # ── Runtime ──────────────────────────────
 echo ""
 echo "Runtime"
-command -v bun &>/dev/null && pass "bun installed ($(bun --version))" || fail "bun not installed"
-[ -f "bun.lockb" ] || [ -f "bun.lock" ] && pass "bun lockfile present" || fail "no bun lockfile (is this a bun project?)"
+if command -v bun &>/dev/null; then
+  pass "bun installed ($(bun --version))"
+else
+  fail "bun not installed"
+fi
+if [ -f "bun.lockb" ] || [ -f "bun.lock" ]; then
+  pass "bun lockfile present"
+else
+  fail "no bun lockfile (is this a bun project?)"
+fi
 
 # ── package.json ──────────────────────────
 echo ""
 echo "package.json"
-[ -f "package.json" ] && pass "package.json exists" || fail "no package.json"
+if [ -f "package.json" ]; then
+  pass "package.json exists"
+else
+  fail "no package.json"
+fi
 
 check_dep() {
   local pkg="$1"
-  local is_dev="${2:-}"
   if [ -f "package.json" ]; then
     if grep -q "\"$pkg\"" package.json; then
       pass "$pkg"
@@ -67,51 +78,156 @@ check_dep "standard-version"
 # ── Config files ─────────────────────────
 echo ""
 echo "Config files"
-[ -f "tsconfig.json" ] && pass "tsconfig.json" || fail "tsconfig.json missing"
-
 if [ -f "tsconfig.json" ]; then
-  grep -q '"@/\*"' tsconfig.json && pass "  → path alias @/ configured" || fail "  → path alias @/ NOT configured in tsconfig"
-  grep -q '"strict": true' tsconfig.json && pass "  → strict mode on" || warn "  → strict mode not explicitly enabled"
+  pass "tsconfig.json"
+else
+  fail "tsconfig.json missing"
 fi
 
-[ -f ".editorconfig" ] && pass ".editorconfig" || fail ".editorconfig missing"
-[ -f ".prettierrc" ] || [ -f ".prettierrc.json" ] && pass ".prettierrc" || fail ".prettierrc missing"
-[ -f ".prettierignore" ] && pass ".prettierignore" || warn ".prettierignore missing (optional but recommended)"
-[ -f "eslint.config.mjs" ] || [ -f "eslint.config.js" ] && pass "eslint.config (flat)" || \
-  ([ -f ".eslintrc.json" ] || [ -f ".eslintrc.js" ] && warn "legacy .eslintrc found (consider migrating to flat config)" || fail "no ESLint config")
+if [ -f "tsconfig.json" ]; then
+  if grep -q '"@/\*"' tsconfig.json; then
+    pass "  → path alias @/ configured"
+  else
+    fail "  → path alias @/ NOT configured in tsconfig"
+  fi
+  if grep -q '"strict": true' tsconfig.json; then
+    pass "  → strict mode on"
+  else
+    warn "  → strict mode not explicitly enabled"
+  fi
+fi
 
-[ -f "vitest.config.ts" ] && pass "vitest.config.ts" || fail "vitest.config.ts missing"
-[ -f "playwright.config.ts" ] && pass "playwright.config.ts" || fail "playwright.config.ts missing"
-[ -f "commitlint.config.ts" ] && pass "commitlint.config.ts" || fail "commitlint.config.ts missing"
-[ -f ".versionrc.json" ] && pass ".versionrc.json" || fail ".versionrc.json missing"
+if [ -f ".editorconfig" ]; then
+  pass ".editorconfig"
+else
+  fail ".editorconfig missing"
+fi
+if [ -f ".prettierrc" ] || [ -f ".prettierrc.json" ]; then
+  pass ".prettierrc"
+else
+  fail ".prettierrc missing"
+fi
+if [ -f ".prettierignore" ]; then
+  pass ".prettierignore"
+else
+  warn ".prettierignore missing (optional but recommended)"
+fi
+if [ -f "eslint.config.mjs" ] || [ -f "eslint.config.js" ]; then
+  pass "eslint.config (flat)"
+elif [ -f ".eslintrc.json" ] || [ -f ".eslintrc.js" ]; then
+  warn "legacy .eslintrc found (consider migrating to flat config)"
+else
+  fail "no ESLint config"
+fi
+
+if [ -f "vitest.config.ts" ]; then
+  pass "vitest.config.ts"
+else
+  fail "vitest.config.ts missing"
+fi
+if [ -f "playwright.config.ts" ]; then
+  pass "playwright.config.ts"
+else
+  fail "playwright.config.ts missing"
+fi
+if [ -f "commitlint.config.ts" ]; then
+  pass "commitlint.config.ts"
+else
+  fail "commitlint.config.ts missing"
+fi
+if [ -f ".versionrc.json" ]; then
+  pass ".versionrc.json"
+else
+  fail ".versionrc.json missing"
+fi
 
 # ── Husky ────────────────────────────────
 echo ""
 echo "Git hooks (Husky)"
-[ -d ".husky" ] && pass ".husky directory" || fail ".husky not initialised"
-[ -f ".husky/pre-commit" ] && pass "pre-commit hook" || fail "pre-commit hook missing"
-[ -f ".husky/commit-msg" ] && pass "commit-msg hook" || fail "commit-msg hook missing"
+if [ -d ".husky" ]; then
+  pass ".husky directory"
+else
+  fail ".husky not initialised"
+fi
+if [ -f ".husky/pre-commit" ]; then
+  pass "pre-commit hook"
+else
+  fail "pre-commit hook missing"
+fi
+if [ -f ".husky/commit-msg" ]; then
+  pass "commit-msg hook"
+else
+  fail "commit-msg hook missing"
+fi
 
 # ── Source layout ─────────────────────────
 echo ""
 echo "Source layout"
-[ -d "src" ] && pass "src/ directory" || fail "src/ directory missing"
-[ -f "src/env.ts" ] && pass "src/env.ts (t3-env)" || warn "src/env.ts not found — create env schema"
-[ -f "src/lib/logger.ts" ] && pass "src/lib/logger.ts" || warn "src/lib/logger.ts not found — create pino singleton"
-[ -f "src/lib/http.ts" ] && pass "src/lib/http.ts" || warn "src/lib/http.ts not found — create got wrapper"
-[ -d "src/schemas" ] && pass "src/schemas/" || warn "src/schemas/ not found — create Zod schemas directory"
-[ -d "tests/unit" ] && pass "tests/unit/" || warn "tests/unit/ not found"
-[ -d "tests/e2e" ] && pass "tests/e2e/" || warn "tests/e2e/ not found"
+if [ -d "src" ]; then
+  pass "src/ directory"
+else
+  fail "src/ directory missing"
+fi
+if [ -f "src/env.ts" ]; then
+  pass "src/env.ts (t3-env)"
+else
+  warn "src/env.ts not found — create env schema"
+fi
+if [ -f "src/lib/logger.ts" ]; then
+  pass "src/lib/logger.ts"
+else
+  warn "src/lib/logger.ts not found — create pino singleton"
+fi
+if [ -f "src/lib/http.ts" ]; then
+  pass "src/lib/http.ts"
+else
+  warn "src/lib/http.ts not found — create got wrapper"
+fi
+if [ -d "src/schemas" ]; then
+  pass "src/schemas/"
+else
+  warn "src/schemas/ not found — create Zod schemas directory"
+fi
+if [ -d "tests/unit" ]; then
+  pass "tests/unit/"
+else
+  warn "tests/unit/ not found"
+fi
+if [ -d "tests/e2e" ]; then
+  pass "tests/e2e/"
+else
+  warn "tests/e2e/ not found"
+fi
 
 # ── Scripts ──────────────────────────────
 echo ""
 echo "package.json scripts"
 if [ -f "package.json" ]; then
-  grep -q '"lint"' package.json     && pass "lint script"     || fail "lint script missing"
-  grep -q '"typecheck"' package.json && pass "typecheck script" || fail "typecheck script missing"
-  grep -q '"test"' package.json     && pass "test script"     || fail "test script missing"
-  grep -q '"test:e2e"' package.json && pass "test:e2e script" || fail "test:e2e script missing"
-  grep -q '"release"' package.json  && pass "release script"  || fail "release script missing"
+  if grep -q '"lint"' package.json; then
+    pass "lint script"
+  else
+    fail "lint script missing"
+  fi
+  if grep -q '"typecheck"' package.json; then
+    pass "typecheck script"
+  else
+    fail "typecheck script missing"
+  fi
+  if grep -q '"test"' package.json; then
+    pass "test script"
+  else
+    fail "test script missing"
+  fi
+  if grep -q '"test:e2e"' package.json; then
+    pass "test:e2e script"
+  else
+    fail "test:e2e script missing"
+  fi
+  if grep -q '"release"' package.json; then
+    pass "release script"
+  else
+    fail "release script missing"
+  fi
 fi
 
 echo ""

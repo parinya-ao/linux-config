@@ -82,34 +82,6 @@ in
             body = "nix shell nixpkgs#$argv[1]";
           };
         };
-
-        interactiveShellInit = ''
-          fish_add_path $HOME/.nix-profile/bin
-          set -g fish_greeting ""
-          zoxide init fish | source
-          fzf --fish | source
-          bind \cr 'history | fzf --tac | read -l cmd; and commandline $cmd'
-          # pay-respects fish --alias | source  # Removed aliases
-          set -gx LD_LIBRARY_PATH /usr/lib64:${
-            lib.makeLibraryPath [
-              pkgs.stdenv.cc.cc.lib
-              pkgs.zlib
-              pkgs.zstd
-            ]
-          }:$LD_LIBRARY_PATH
-        '';
-          };
-          gbf = {
-            description = "Fuzzy git branch switcher";
-            body = ''
-              git branch -a | fzf --height 40% | string trim | xargs git switch
-            '';
-          };
-          ns = {
-            description = "nix-shell with package";
-            body = "nix shell nixpkgs#$argv[1]";
-          };
-        };
       };
 
       starship = {

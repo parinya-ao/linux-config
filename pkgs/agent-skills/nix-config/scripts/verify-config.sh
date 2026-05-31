@@ -2,35 +2,11 @@
 set -Eeuo pipefail
 
 # ── CONFIG ──────────────────────────────────────────────────────────────────
-readonly SCRIPT_DIR
-SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+REPO_ROOT="$(git rev-parse --show-toplevel)"
 readonly REPO_ROOT
-REPO_ROOT="$(cd -- "$SCRIPT_DIR/../../.." && pwd -P)"
 
 # Expected skill sources in pkgs/agent-skills/
 readonly EXPECTED_SKILL_SRCS=(
-  conventional-commit
-  gum-bash
-  nix-config
-  recall
-  recap
-  remember
-  typescript
-)
-
-# Expected list in modules/programs/agent-skills.nix
-readonly EXPECTED_HM_LIST=(
-  conventional-commit
-  gum-bash
-  nix-config
-  recall
-  recap
-  remember
-  typescript
-)
-
-# Expected list in share/install-agent-skills.sh
-readonly EXPECTED_INSTALL_LIST=(
   conventional-commit
   gum-bash
   nix-config
@@ -52,7 +28,7 @@ check_skill_src() {
     size=$(wc -c < "$dir/SKILL.md")
     echo "  ✓ source $name ($size bytes)"
   else
-    echo "  ✗ source $name — missing SKILL.md"
+    echo "  ✗ source $name — missing SKILL.md ($dir)"
     return 1
   fi
 }

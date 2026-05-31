@@ -60,10 +60,12 @@ setup_fedora_repos() {
 
   # 2. Configure fedora.repo (Main OS)
   info "Patching /etc/yum.repos.d/fedora.repo..."
+  # shellcheck disable=SC2016
   sed -i '/^\[fedora\]/,/^\[/ { /^baseurl=/d; /^#baseurl=/d; s|^metalink=\(.*\)|#metalink=\1\nbaseurl=https://dl.fedoraproject.org/pub/fedora/linux/releases/$releasever/Everything/$basearch/os/\n       https://mirrors.kernel.org/fedora/releases/$releasever/Everything/$basearch/os/| }' /etc/yum.repos.d/fedora.repo
 
   # 3. Configure fedora-updates.repo (Updates)
   info "Patching /etc/yum.repos.d/fedora-updates.repo..."
+  # shellcheck disable=SC2016
   sed -i '/^\[updates\]/,/^\[/ { /^baseurl=/d; /^#baseurl=/d; s|^metalink=\(.*\)|#metalink=\1\nbaseurl=https://dl.fedoraproject.org/pub/fedora/linux/updates/$releasever/Everything/$basearch/\n       https://mirrors.kernel.org/fedora/updates/$releasever/Everything/$basearch/| }' /etc/yum.repos.d/fedora-updates.repo
 
   # 4. Optimize DNF Configuration
@@ -301,14 +303,14 @@ dnf_install() {
 }
 
 dnf_upgrade() {
-  local args="${*:-}"
-  info "Upgrading system using: dnf upgrade $args -y"
-  if dnf upgrade $args -y; then
-    ok "System upgrade ($args) completed successfully."
+  # shellcheck disable=SC2086
+  info "Upgrading system using: dnf upgrade $* -y"
+  if dnf upgrade "$@" -y; then
+    ok "System upgrade ($*) completed successfully."
     info "Summary of changes (Last transaction):"
     dnf history info | head -n 15 || true
   else
-    warn "System upgrade ($args) failed or partially completed."
+    warn "System upgrade ($*) failed or partially completed."
   fi
 }
 

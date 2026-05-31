@@ -14,33 +14,33 @@ in
     programs.fish = {
       enable = true;
 
-       interactiveShellInit = ''
-         # PATH
-         fish_add_path $HOME/.nix-profile/bin
+      interactiveShellInit = ''
+        # PATH
+        fish_add_path $HOME/.nix-profile/bin
 
-         # Suppress greeting
-         set -g fish_greeting ""
+        # Suppress greeting
+        set -g fish_greeting ""
 
-         # zoxide integration
-         zoxide init fish | source
+        # zoxide integration
+        zoxide init fish | source
 
-         # fzf integration
-         fzf --fish | source
+        # fzf integration
+        fzf --fish | source
 
-         # Keybindings: Ctrl+R → fzf history
-         bind \cr 'history | fzf --tac | read -l cmd; and commandline $cmd'
+        # Keybindings: Ctrl+R → fzf history
+        bind \cr 'history | fzf --tac | read -l cmd; and commandline $cmd'
 
-         # pay-respects fish --alias | source  # Removed aliases
+        # pay-respects fish --alias | source  # Removed aliases
 
-         # uv 
-         set -gx LD_LIBRARY_PATH /usr/lib64:${
-           lib.makeLibraryPath [
-             pkgs.stdenv.cc.cc.lib
-             pkgs.zlib
-             pkgs.zstd
-           ]
-         }:$LD_LIBRARY_PATH
-       '';
+        # uv 
+        set -gx LD_LIBRARY_PATH /usr/lib64:${
+          lib.makeLibraryPath [
+            pkgs.stdenv.cc.cc.lib
+            pkgs.zlib
+            pkgs.zstd
+          ]
+        }:$LD_LIBRARY_PATH
+      '';
 
       functions = {
         # Create dir and cd into it
