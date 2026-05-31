@@ -17,13 +17,7 @@ GREEN=$'\033[1;32m'
 BLUE=$'\033[1;34m'
 RED=$'\033[1;31m'
 
-# other package
-# shellcheck disable=SC1091
-source "$(dirname "$0")/package/ghostty.sh"
-
-# ------------------------------------------
-# HELPERS
-# ------------------------------------------
+# helpers
 step()  { echo -e "\n${BLUE}[STEP]${RESET} $*"; }
 ok()    { echo -e "${GREEN}[OK]${RESET} $*"; }
 warn()  { echo -e "${YELLOW}[WARN]${RESET} $*"; }
@@ -41,6 +35,48 @@ pkg_installed() {
 skip() {
   # Skip message
   info "⊘ Skipping: $*"
+}
+
+# ------------------------------------------
+# SECURE REPOSITORY SETUP
+# ------------------------------------------
+setup_fedora_repos() {
+  step "[SAFE-REPO] Configuring Official Fedora + Kernel.org mirrors..."
+
+  # 1. Backup original repos (idempotent)
+  if [ ! -d "/etc/yum.repos.d.bak" ]; then
+    info "Creating backup of repo files to /etc/yum.repos.d.bak..."
+    cp -r /etc/yum.repos.d /etc/yum.repos.d.bak
+  else
+    info "Restoring original repo files from backup for a clean configuration..."
+    [ -f /etc/yum.repos.d.bak/fedora.repo ] && cp /etc/yum.repos.d.bak/fedora.repo /etc/yum.repos.d/fedora.repo
+    [ -f /etc/yum.repos.d.bak/fedora-updates.repo ] && cp /etc/yum.repos.d.bak/fedora-updates.repo /etc/yum.repos.d/fedora-updates.repo
+  fi
+
+  # 2. Configure fedora.repo (Main OS)
+  info "Patching /etc/yum.repos.d/fedora.repo..."
+  sed -i '/^\[fedora\]/,/^\[/ { /^baseurl=/d; /^#baseurl=/d; s|^metalink=\(.*\)|#metalink=\1\nbaseurl=https://dl.fedoraproject.org/pub/fedora/linux/releases/$releasever/Everything/$basearch/os/\n       https://mirrors.kernel.org/fedora/releases/$releasever/Everything/$basearch/os/| }' /etc/yum.repos.d/fedora.repo
+
+  # 3. Configure fedora-updates.repo (Updates)
+  info "Patching /etc/yum.repos.d/fedora-updates.repo..."
+  sed -i '/^\[updates\]/,/^\[/ { /^baseurl=/d; /^#baseurl=/d; s|^metalink=\(.*\)|#metalink=\1\nbaseurl=https://dl.fedoraproject.org/pub/fedora/linux/updates/$releasever/Everything/$basearch/\n       https://mirrors.kernel.org/fedora/updates/$releasever/Everything/$basearch/| }' /etc/yum.repos.d/fedora-updates.repo
+
+  # 4. Optimize DNF Configuration
+  info "Optimizing /etc/dnf/dnf.conf (max_parallel_downloads=20)..."
+  cp /etc/dnf/dnf.conf "/etc/dnf/dnf.conf.backup.$(date +%s)" 2>/dev/null || true
+  
+  if grep -q "^max_parallel_downloads=" /etc/dnf/dnf.conf; then
+    sed -i "s/^max_parallel_downloads=.*/max_parallel_downloads=20/" /etc/dnf/dnf.conf
+  else
+    echo "max_parallel_downloads=20" >> /etc/dnf/dnf.conf
+  fi
+
+  # 5. Refresh cache
+  info "Refreshing DNF cache..."
+  dnf clean all
+  dnf makecache
+  
+  ok "Secure Fedora mirrors and DNF optimizations applied."
 }
 
 # ------------------------------------------
@@ -406,6 +442,8 @@ info "State: RPM_Fusion=${RPM_FUSION_ACTIVE} | ffmpeg=${FFMPEG_ACTIVE} | NVIDIA=
 # =============================================================================
 # PHASE 0 — System refresh (always runs)
 # =============================================================================
+setup_fedora_repos
+
 step "[P0] System refresh..."
 dnf upgrade --refresh -y
 ok "System up to date."
@@ -451,41 +489,6 @@ if [[ "${RPM_FUSION_ACTIVE}" == "true" && "${FFMPEG_ACTIVE}" == "false" ]]; then
 
   step "[ROUND 2] Full driver, firmware & codec installation..."
   ok "RPM Fusion confirmed active."
-
-  # -----------------------------------------------------------------------
-  # PHASE 0.25 — DNF Optimization (Performance Tuning)
-  # -----------------------------------------------------------------------
-  step "[P0.25] Configuring DNF for optimal performance..."
-
-  # Backup dnf.conf
-  cp /etc/dnf/dnf.conf "/etc/dnf/dnf.conf.backup.$(date +%s)" 2>/dev/null || true
-
-  # Add or update DNF performance settings
-  # Check if max_parallel_downloads already exists
-  if grep -q "^max_parallel_downloads=" /etc/dnf/dnf.conf; then
-    sed -i 's/^max_parallel_downloads=.*/max_parallel_downloads=20/' /etc/dnf/dnf.conf
-  else
-    echo "max_parallel_downloads=20" >> /etc/dnf/dnf.conf
-  fi
-
-  # Add fastestmirror if not present
-  if ! grep -q "^fastestmirror=" /etc/dnf/dnf.conf; then
-    echo "fastestmirror=True" >> /etc/dnf/dnf.conf
-  else
-    sed -i 's/^fastestmirror=.*/fastestmirror=True/' /etc/dnf/dnf.conf
-  fi
-
-  # Add keepcache if not present (keep downloaded packages)
-  if ! grep -q "^keepcache=" /etc/dnf/dnf.conf; then
-    echo "keepcache=True" >> /etc/dnf/dnf.conf
-  else
-    sed -i 's/^keepcache=.*/keepcache=True/' /etc/dnf/dnf.conf
-  fi
-
-  ok "DNF optimizations configured:"
-  info "  • max_parallel_downloads = 20 (faster parallel downloads)"
-  info "  • fastestmirror = True (use fastest mirror)"
-  info "  • keepcache = True (keep downloaded packages)"
 
   # -----------------------------------------------------------------------
   # PHASE 0.5 — NVIDIA Driver (Smart Branch Selection)
@@ -742,7 +745,6 @@ if [[ "${RPM_FUSION_ACTIVE}" == "true" && "${FFMPEG_ACTIVE}" == "false" ]]; then
   dnf upgrade -y
   dnf autoremove -y
   ok "System cleanup done."
-  install_ghostty
 
   # -----------------------------------------------------------------------
   # SUMMARY

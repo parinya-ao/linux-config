@@ -184,24 +184,24 @@ else
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────
-# PART 4 — Home Manager switch (fully non-interactive)
+# PART 4 — Migration & Final Switch (Automated via migrate.sh)
 # ─────────────────────────────────────────────────────────────────────────────
 cd "$TARGET_DIR"
 
-dnf install -y dbus-x11 2>/dev/null || apt-get install -y dbus-x11 2>/dev/null || zypper --non-interactive install dbus-1-x11 2>/dev/null || true
+# Ensure dbus is available for the switch (needed for GNOME/dconf settings)
+# We also ensure git is available (needed by migrate.sh)
+dnf install -y dbus-x11 git 2>/dev/null || apt-get install -y dbus-x11 git 2>/dev/null || zypper --non-interactive install dbus-1-x11 git 2>/dev/null || true
 
-if gum spin --spinner dot --title "Building Home Manager environment..." -- \
-  sudo -u "${TARGET_USER}" -H \
-    dbus-run-session bash -c \
-      "source /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh && \
-       /nix/var/nix/profiles/default/bin/nix \
-         --extra-experimental-features 'nix-command flakes' \
-         run home-manager/master -- \
-         switch --flake '$TARGET_DIR#${TARGET_USER}' -b backup --show-trace"; then
-  ok "Home Manager switch complete."
+# Run migrate.sh as the target user to perform the final setup
+# We must preserve the bootstrapped gum PATH and target user's home
+if sudo -u "${TARGET_USER}" -H \
+  PATH="/tmp/gum-bin:$PATH" \
+  bash ./migrate.sh; then
+  ok "Migration and Home Manager switch complete."
 else
-  fail "Home Manager switch failed."
+  fail "Migration Assistant (migrate.sh) failed."
 fi
+
 
 # ── Summary ──────────────────────────────────────────────────────────────────
 gum style --border rounded --margin "1 2" --padding "1 2" --border-foreground "#04B575" \

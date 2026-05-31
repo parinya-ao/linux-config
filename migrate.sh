@@ -42,13 +42,48 @@ fix_git_state() {
 
 fix_trusted_user() {
     local conf_file="/etc/nix/nix.conf"
-    if [[ -f "$conf_file" ]] && ! grep -qE "^trusted-users\s*=.*(\b$USER\b|\b@wheel\b)" "$conf_file"; then
-        warn "Untrusted user detected. Fixing /etc/nix/nix.conf (Requires sudo)..."
-        if sudo bash -c "echo 'trusted-users = root @wheel $USER' >> $conf_file"; then
-            gum spin --spinner points --title "Restarting nix-daemon..." -- sudo systemctl restart nix-daemon || true
-            ok "Added $USER to trusted-users. Cache warnings resolved."
+    local custom_conf="/etc/nix/nix.custom.conf"
+    local target_conf="$conf_file"
+    
+    # Target custom_conf if it exists (Determinate Nix style)
+    [[ -f "$custom_conf" ]] && target_conf="$custom_conf"
+    
+    local current_user
+    current_user=$(whoami)
+
+    if ! grep -qE "^trusted-users\s*=.*(\b$current_user\b|\b@wheel\b)" "$target_conf" 2>/dev/null; then
+        warn "Untrusted user detected. Fixing $target_conf (Requires sudo)..."
+        
+        # Ensure the directory exists
+        sudo mkdir -p "$(dirname "$target_conf")"
+        
+        # If the file doesn't exist, create it
+        if [[ ! -f "$target_conf" ]]; then
+            sudo bash -c "echo 'trusted-users = root @wheel $current_user' > $target_conf"
+        # If trusted-users line exists, append the user
+        elif grep -q "^trusted-users\s*=" "$target_conf"; then
+            sudo sed -i "s/^trusted-users\s*=.*/& $current_user/" "$target_conf"
+        # Otherwise, append a new line
         else
-            fail "Could not modify nix.conf."
+            sudo bash -c "echo 'trusted-users = root @wheel $current_user' >> $target_conf"
+        fi
+
+        # Reload nix-daemon
+        if command -v systemctl >/dev/null 2>&1; then
+            gum spin --spinner points --title "Restarting nix-daemon..." -- sudo systemctl restart nix-daemon || true
+        fi
+        ok "Added $current_user to trusted-users in $target_conf."
+    fi
+}
+
+fix_dbus() {
+    local legacy_conf="/etc/dbus-1/session.conf"
+    if [[ -f "$legacy_conf" ]]; then
+        # If it's the problematic empty config on Fedora
+        if grep -q "<busconfig></busconfig>" "$legacy_conf"; then
+            warn "Legacy/broken DBus session config detected at $legacy_conf. Fixing..."
+            sudo rm -f "$legacy_conf"
+            ok "Removed legacy DBus session config."
         fi
     fi
 }
@@ -78,6 +113,7 @@ main() {
 
     step "Pre-flight Checks & Auto-Fixes"
     fix_trusted_user
+    fix_dbus
     auto_fix_versions
     fix_git_state
 
@@ -92,7 +128,20 @@ main() {
     fi
 
     step "Applying Configuration (Showing inner details...)"
-    if home-manager switch --flake . --verbose --show-trace -b backup; then
+    local hm_cmd=(home-manager)
+    if ! command -v home-manager >/dev/null 2>&1; then
+        warn "home-manager command not found in PATH, using 'nix run' fallback..."
+        hm_cmd=(nix --extra-experimental-features "nix-command flakes" run home-manager/master --)
+    fi
+
+    # Robust DBus handling for dconf activation
+    local run_cmd=("${hm_cmd[@]}")
+    if [[ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ]] && command -v dbus-run-session >/dev/null 2>&1; then
+        info "No DBus session found. Wrapping switch in dbus-run-session..."
+        run_cmd=(dbus-run-session -- "${hm_cmd[@]}")
+    fi
+
+    if "${run_cmd[@]}" switch --flake . --verbose --show-trace -b backup; then
         ok "System configured beautifully."
     else
         fail "Home Manager switch failed."
