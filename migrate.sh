@@ -124,15 +124,15 @@ main() {
     step "Securing Environment"
     [[ -f "flake.lock" ]] && cp flake.lock flake.lock.bak && ok "Lockfile backed up."
 
-    step "Fetching Updates (Direct execution for transparency...)"
-    # REPLACED gum spin with direct execution
+    step "Fetching Updates"
+    info "Running: nix flake update"
     if nix --extra-experimental-features "nix-command flakes" flake update; then
-        ok "Flake lockfile updated successfully."
+        ok "Flake lockfile updated successfully. All inputs are now at their latest versions."
     else
         fail "Failed to update flake inputs."
     fi
 
-    step "Applying Configuration (Direct execution for transparency...)"
+    step "Applying Configuration"
     local hm_cmd=(home-manager)
     if ! command -v home-manager >/dev/null 2>&1; then
         warn "home-manager command not found in PATH, using 'nix run' fallback..."
@@ -146,9 +146,9 @@ main() {
         run_cmd=(dbus-run-session -- "${hm_cmd[@]}")
     fi
 
-    # REPLACED gum spin with direct execution
+    info "Running: ${run_cmd[*]} switch --flake . --verbose --show-trace -b backup"
     if "${run_cmd[@]}" switch --flake . --verbose --show-trace -b backup; then
-        ok "System configured beautifully."
+        ok "Home Manager switch completed. System configuration applied beautifully."
     else
         fail "Home Manager switch failed."
     fi

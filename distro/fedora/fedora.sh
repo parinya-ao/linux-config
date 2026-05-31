@@ -294,7 +294,7 @@ dnf_install() {
   if dnf install -y "$@"; then
     ok "Installed packages: $*"
     info "Summary of changes (Last transaction):"
-    dnf history info | head -n 15
+    dnf history info | head -n 15 || true
   else
     warn "Some packages in [$*] unavailable or already present — continuing"
   fi
@@ -306,7 +306,7 @@ dnf_upgrade() {
   if dnf upgrade $args -y; then
     ok "System upgrade ($args) completed successfully."
     info "Summary of changes (Last transaction):"
-    dnf history info | head -n 15
+    dnf history info | head -n 15 || true
   else
     warn "System upgrade ($args) failed or partially completed."
   fi
