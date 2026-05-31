@@ -70,10 +70,11 @@ readonly AGENT_DIRS=(
   ".codex/skills"
 )
 
-# All 5 skill names built by pkgs/agent-skills
+# All skill names built by pkgs/agent-skills
 readonly ALL_SKILLS=(
   conventional-commit
   gum-bash
+  nix-config
   recall
   recap
   remember

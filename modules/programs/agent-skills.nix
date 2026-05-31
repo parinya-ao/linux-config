@@ -8,13 +8,14 @@
 let
   cfg = config.my.programs.agent-skills;
 
-  # ── All 5 skills sourced from pkgs.agent-skills (Nix store) ──
+  # ── All skills sourced from pkgs.agent-skills (Nix store) ──
   allSkills = [
     "conventional-commit"
+    "gum-bash"
+    "nix-config"
     "recall"
     "recap"
     "remember"
-    "gum-bash"
   ];
 
   # Default + user extras
@@ -27,6 +28,7 @@ let
   ++ cfg.extraTargetDirs;
 
   # Build a flat list of { name, value } for each skill × dir
+  # Links the entire skill directory (includes references/, scripts/ if present)
   entryList = builtins.foldl' (
     acc: dir:
     acc
@@ -35,8 +37,11 @@ let
       acc2
       ++ [
         {
-          name = "${dir}/${skill}/SKILL.md";
-          value.source = "${pkgs.agent-skills}/${skill}/SKILL.md";
+          name = "${dir}/${skill}";
+          value = {
+            source = "${pkgs.agent-skills}/${skill}";
+            recursive = true;
+          };
         }
       ]
     ) [ ] allSkills

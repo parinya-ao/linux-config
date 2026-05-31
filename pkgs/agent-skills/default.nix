@@ -4,20 +4,20 @@ stdenvNoCC.mkDerivation {
   pname = "agent-skills";
   version = "1.0.0";
 
+  src = ./.;
+
   meta = {
     description = "AI agent skill files for OpenCode, Claude Code, and AI Agents";
     longDescription = ''
-      Collects all SKILL.md files from .agents/skills/ and .claude/skills/
+      Packages all SKILL.md files from the pkgs/agent-skills/ directory
       into a single Nix store path. Each skill becomes a subdirectory
-      containing its SKILL.md. The store path is globally readable by all
-      users on the system.
+      containing its SKILL.md plus any optional references/ and scripts/.
+      The store path is globally readable by all users on the system.
     '';
     license = lib.licenses.mit;
     maintainers = [ "parinya" ];
     platforms = lib.platforms.all;
   };
-
-  src = ../..;
 
   phases = [ "installPhase" ];
 
@@ -26,65 +26,61 @@ stdenvNoCC.mkDerivation {
 
     echo "=== Packaging AI agent skills ==="
 
-      # ── From .agents/skills/ (skills to keep) ──
-      for dir in \
-        conventional-commit \
-        recall \
-        recap \
-        remember
-      do
-        if [ -d "$src/.agents/skills/$dir" ]; then
-          mkdir -p "$out/$dir"
-          cp "$src/.agents/skills/$dir/SKILL.md" "$out/$dir/SKILL.md"
-          echo "  ✓ agents/$dir"
-        else
-          echo "  ⚠ agents/$dir not found, skipping"
-        fi
-      done
+    for skill_dir in "$src"/*/; do
+      skill_dir=''${skill_dir%/}
 
-      # ── From .claude/skills/ (skills to keep) ──
-      for dir in \
-        gum-bash
-      do
-        if [ -d "$src/.claude/skills/$dir" ]; then
-          mkdir -p "$out/$dir"
-          cp "$src/.claude/skills/$dir/SKILL.md" "$out/$dir/SKILL.md"
-          echo "  ✓ claude/$dir"
-        else
-          echo "  ⚠ claude/$dir not found, skipping"
-        fi
-      done
+      # Skip standard files, only process real directories
+      [ -f "$skill_dir" ] && continue
+
+      skill_name=$(basename "$skill_dir")
+
+      if [ -f "$skill_dir/SKILL.md" ]; then
+        mkdir -p "$out/$skill_name"
+        cp "$skill_dir"/SKILL.md "$out/$skill_name/SKILL.md"
+        echo "  ✓ $skill_name (SKILL.md)"
+
+        # Optionally ship references/ and scripts/
+        [ -d "$skill_dir/references" ] && (
+          mkdir -p "$out/$skill_name/references"
+          cp -r "$skill_dir/references/"* "$out/$skill_name/references/"
+          echo "    └─ references/"
+        )
+        [ -d "$skill_dir/scripts" ] && (
+          mkdir -p "$out/$skill_name/scripts"
+          cp -r "$skill_dir/scripts/"* "$out/$skill_name/scripts/"
+          echo "    └─ scripts/"
+        )
+      fi
+    done
 
     echo "=== Done — $(( $(ls -1 "$out" | wc -l) )) skills packaged ==="
   '';
 
   doInstallCheck = true;
 
-   installCheckPhase = ''
-     echo "=== Verifying agent-skills package ==="
+  installCheckPhase = ''
+    echo "=== Verifying agent-skills package ==="
 
-      expected_skills="conventional-commit recall recap remember gum-bash"
+    expected_skills="conventional-commit gum-bash nix-config recall recap remember"
 
-     failures=0
-     for skill in $expected_skills; do
-       if [ -f "$out/$skill/SKILL.md" ]; then
-         size=$(wc -c < "$out/$skill/SKILL.md")
-         if [ "$size" -gt 0 ]; then
-           echo "  ✓ $skill ($size bytes)"
-         else
-           echo "  ✗ $skill/SKILL.md is empty"
-           failures=$((failures + 1))
-         fi
-       else
-         # Non-fatal: skill may not exist in source (CI runs from repo root)
-         echo "  - $skill not found in output (may not exist in source)"
-       fi
-     done
+    failures=0
+    for skill in $expected_skills; do
+      if [ -f "$out/$skill/SKILL.md" ]; then
+        size=$(wc -c < "$out/$skill/SKILL.md")
+        if [ "$size" -gt 0 ]; then
+          echo "  ✓ $skill ($size bytes)"
+        else
+          echo "  ✗ $skill/SKILL.md is empty"
+          failures=$((failures + 1))
+        fi
+      else
+        echo "  ✗ $skill not found in output"
+        failures=$((failures + 1))
+      fi
+    done
 
-     # Count total skills packaged
-     total=$(ls -1 "$out" | wc -l)
-     echo "=== $total skill directories, $failures failures ==="
-     [ "$failures" -eq 0 ] || exit 1
-   '';
-
+    total=$(ls -1 "$out" | wc -l)
+    echo "=== $total skill directories, $failures failures ==="
+    [ "$failures" -eq 0 ] || exit 1
+  '';
 }
