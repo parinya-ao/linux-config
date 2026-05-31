@@ -290,9 +290,35 @@ vainfo_has() {
 }
 
 dnf_install() {
-  dnf install -y "$@" \
-    && ok "Installed: $*" \
-    || warn "Some packages in [$*] unavailable or already present — continuing"
+  info "Installing packages using: dnf install -y $*"
+  if dnf install -y "$@"; then
+    ok "Installed packages: $*"
+    info "Summary of changes (Last transaction):"
+    dnf history info | head -n 15
+  else
+    warn "Some packages in [$*] unavailable or already present — continuing"
+  fi
+}
+
+dnf_upgrade() {
+  local args="${*:-}"
+  info "Upgrading system using: dnf upgrade $args -y"
+  if dnf upgrade $args -y; then
+    ok "System upgrade ($args) completed successfully."
+    info "Summary of changes (Last transaction):"
+    dnf history info | head -n 15
+  else
+    warn "System upgrade ($args) failed or partially completed."
+  fi
+}
+
+dnf_group_upgrade() {
+  info "Upgrading group using: dnf group upgrade -y $*"
+  if dnf group upgrade -y "$@"; then
+    ok "Group upgrade completed: $*"
+  else
+    warn "Group upgrade failed: $*"
+  fi
 }
 
 # ------------------------------------------
@@ -310,7 +336,7 @@ fi
 # Ensure lspci is available for hardware detection
 if ! command -v lspci &>/dev/null; then
   info "Installing pciutils for hardware detection..."
-  dnf install -y pciutils || warn "Could not install pciutils"
+  dnf_install pciutils
 fi
 
 FEDORA_VER=$(rpm -E %fedora)
@@ -450,7 +476,7 @@ info "State: RPM_Fusion=${RPM_FUSION_ACTIVE} | ffmpeg=${FFMPEG_ACTIVE} | NVIDIA=
 setup_fedora_repos
 
 step "[P0] System refresh..."
-dnf upgrade --refresh -y
+dnf_upgrade --refresh
 ok "System up to date."
 
 # =============================================================================
@@ -461,10 +487,9 @@ if [[ "${RPM_FUSION_ACTIVE}" == "false" ]]; then
   step "[ROUND 1] Enabling RPM Fusion (free + nonfree + tainted)..."
 
   # Install RPM Fusion release packages
-  dnf install -y \
+  dnf_install \
     "https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-${FEDORA_VER}.noarch.rpm" \
-    "https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-${FEDORA_VER}.noarch.rpm" \
-    || warn "RPM Fusion may already be present."
+    "https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-${FEDORA_VER}.noarch.rpm"
 
   # Tainted repos
   dnf_install rpmfusion-free-release-tainted rpmfusion-nonfree-release-tainted
@@ -474,7 +499,7 @@ if [[ "${RPM_FUSION_ACTIVE}" == "false" ]]; then
     || dnf config-manager --enable fedora-cisco-openh264 2>/dev/null \
     || warn "Could not enable OpenH264 repo — try manually."
 
-  dnf upgrade --refresh -y
+  dnf_upgrade --refresh
   ok "RPM Fusion enabled and system refreshed."
 
   echo ""
@@ -507,7 +532,7 @@ if [[ "${RPM_FUSION_ACTIVE}" == "true" && "${FFMPEG_ACTIVE}" == "false" ]]; then
       # Ensure kernel-devel is present
       if ! pkg_installed "kernel-devel"; then
         info "Installing kernel-devel..."
-        dnf install -y kernel-devel || warn "kernel-devel install failed"
+        dnf_install kernel-devel
       fi
 
       # Blacklist nouveau ONLY if not already done
@@ -747,7 +772,7 @@ if [[ "${RPM_FUSION_ACTIVE}" == "true" && "${FFMPEG_ACTIVE}" == "false" ]]; then
   # PHASE 9 — Final upgrade & cleanup
   # -----------------------------------------------------------------------
   step "[P9] Final upgrade & cleanup..."
-  dnf upgrade -y
+  dnf_upgrade
   dnf autoremove -y
   ok "System cleanup done."
 
