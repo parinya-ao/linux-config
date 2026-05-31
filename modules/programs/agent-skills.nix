@@ -16,6 +16,7 @@ let
     "recall"
     "recap"
     "remember"
+    "typescript"
   ];
 
   # Default + user extras

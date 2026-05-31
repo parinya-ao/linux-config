@@ -78,6 +78,7 @@ readonly ALL_SKILLS=(
   recall
   recap
   remember
+  typescript
 )
 
 # ── STATE ───────────────────────────────────────────────────────────────────

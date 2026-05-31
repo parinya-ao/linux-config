@@ -15,6 +15,7 @@ readonly EXPECTED_SKILL_SRCS=(
   recall
   recap
   remember
+  typescript
 )
 
 # Expected list in modules/programs/agent-skills.nix
@@ -25,6 +26,7 @@ readonly EXPECTED_HM_LIST=(
   recall
   recap
   remember
+  typescript
 )
 
 # Expected list in share/install-agent-skills.sh
@@ -35,6 +37,7 @@ readonly EXPECTED_INSTALL_LIST=(
   recall
   recap
   remember
+  typescript
 )
 
 # ── CHECKS ──────────────────────────────────────────────────────────────────
