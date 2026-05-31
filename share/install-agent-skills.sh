@@ -70,21 +70,13 @@ readonly AGENT_DIRS=(
   ".codex/skills"
 )
 
-# All 13 skill names built by pkgs/agent-skills
+# All 5 skill names built by pkgs/agent-skills
 readonly ALL_SKILLS=(
-  bash-defensive-patterns
-  commit-context
-  commit-history
   conventional-commit
-  forget
   gum-bash
-  handoff
-  nix-backup
-  react-doctor
   recall
   recap
   remember
-  session-history
 )
 
 # ── STATE ───────────────────────────────────────────────────────────────────

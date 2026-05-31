@@ -8,21 +8,13 @@
 let
   cfg = config.my.programs.agent-skills;
 
-  # ── All 13 skills sourced from pkgs.agent-skills (Nix store) ──
+  # ── All 5 skills sourced from pkgs.agent-skills (Nix store) ──
   allSkills = [
-    "bash-defensive-patterns"
-    "commit-context"
-    "commit-history"
     "conventional-commit"
-    "forget"
-    "handoff"
     "recall"
     "recap"
     "remember"
-    "session-history"
     "gum-bash"
-    "nix-backup"
-    "react-doctor"
   ];
 
   # Default + user extras
