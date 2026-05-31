@@ -15,8 +15,8 @@ in
       temurin-bin
       maven
       gradle
-      # gcc
-      clang
+      (lib.hiPrio gcc)
+      # clang
       go
       nodejs
       python3

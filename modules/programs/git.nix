@@ -29,21 +29,6 @@ in
 
       # Use settings attribute set instead of extraConfig for better modularity
       settings = {
-        alias = {
-          amend = "commit --amend --no-edit";
-          wip = "!git add -A && git commit -m 'wip: checkpoint'";
-          unwip = "!git log -n 1 --pretty=%B | rg -q 'wip' && git reset HEAD~";
-          undo = "reset --soft HEAD~1";
-          unstage = "restore --staged";
-          lg = "log --oneline --graph --decorate --all";
-          stash-all = "stash push --include-untracked";
-          recent = "branch --sort=-committerdate --format='%(committerdate:relative)%09%(refname:short)'";
-          pushf = "push --force-with-lease";
-          pushforce = "push --force-with-lease --force-if-includes";
-          fixup = "commit --fixup";
-          squash = "commit --squash";
-        };
-
         user = {
           name = "parinya-ao";
           email = "flim.parinya.ao@gmail.com";
