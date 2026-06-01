@@ -324,9 +324,37 @@ dnf_group_upgrade() {
 }
 
 # ------------------------------------------
-# PRE-CHECKS
+# INTERACTIVE SELECTION
 # ------------------------------------------
+select_packages() {
+  info "Selecting packages to install..."
+  local selection
+  # Using gum to allow selection. Default selected: Docker, Firefox Dev, Firefox ESR
+  selection=$(gum choose --no-limit --selected="Docker,Firefox Dev,Firefox ESR" "Docker" "Firefox Dev" "Firefox ESR" --header "Select packages to install (Space to select, Enter to confirm):")
+
+  # Initialize flags
+  INSTALL_DOCKER=false
+  INSTALL_FIREFOX_DEV=false
+  INSTALL_FIREFOX_ESR=false
+
+  # Set flags based on selection
+  [[ "$selection" == *"Docker"* ]] && INSTALL_DOCKER=true
+  [[ "$selection" == *"Firefox Dev"* ]] && INSTALL_FIREFOX_DEV=true
+  [[ "$selection" == *"Firefox ESR"* ]] && INSTALL_FIREFOX_ESR=true
+}
+
+# Pre-checks
 [[ $EUID -ne 0 ]] && fail "Must run as root: sudo bash $0"
+
+# Interactive Selection (only if terminal is interactive)
+if [[ -t 0 ]]; then
+  select_packages
+else
+  # Default to all if non-interactive
+  INSTALL_DOCKER=true
+  INSTALL_FIREFOX_DEV=true
+  INSTALL_FIREFOX_ESR=true
+fi
 
 command -v dnf &>/dev/null || fail "dnf not found. This script is for Fedora Workstation only."
 
@@ -742,13 +770,15 @@ if [[ "${RPM_FUSION_ACTIVE}" == "true" && "${FFMPEG_ACTIVE}" == "false" ]]; then
   # -----------------------------------------------------------------------
   # PHASE 8.7 — Docker Engine (Modular Script)
   # -----------------------------------------------------------------------
-  step "[P8.7] Docker Engine (Modular Script)..."
-  bash "$(dirname "$0")/package/docker/docker.sh"
+  if [[ "$INSTALL_DOCKER" == "true" ]]; then
+    step "[P8.7] Docker Engine (Modular Script)..."
+    bash "$(dirname "$0")/package/docker/docker.sh"
+  fi
 
   # -----------------------------------------------------------------------
-  # PHASE 8.8 — Custom Browsers (Brave Beta & Firefox Dev Edition)
+  # PHASE 8.8 — Custom Browsers (Brave Beta, Firefox Dev Edition & ESR)
   # -----------------------------------------------------------------------
-  step "[P8.8] Custom Browsers (Brave Beta & Firefox Dev Edition)..."
+  step "[P8.8] Custom Browsers (Brave Beta, Firefox Dev & ESR)..."
 
   # 1. Brave Browser Beta
   step "Installing Brave Browser Beta..."
@@ -762,13 +792,23 @@ if [[ "${RPM_FUSION_ACTIVE}" == "true" && "${FFMPEG_ACTIVE}" == "false" ]]; then
   dnf_install brave-browser-beta
 
   # 2. Firefox Developer Edition
-  step "Installing Firefox Developer Edition..."
-  bash "$(dirname "$0")/package/firefox-dev/firefox-dev.sh"
+  if [[ "$INSTALL_FIREFOX_DEV" == "true" ]]; then
+    step "Installing Firefox Developer Edition..."
+    bash "$(dirname "$0")/package/firefox-dev/firefox-dev.sh"
+  fi
 
-  # 3. Uninstall Native Firefox
-  step "Uninstalling Native Firefox..."
-  dnf remove -y firefox
-  ok "Native Firefox removed."
+  # 3. Firefox ESR
+  if [[ "$INSTALL_FIREFOX_ESR" == "true" ]]; then
+    step "Installing Firefox ESR..."
+    bash "$(dirname "$0")/package/firefox-esr/firefox-esr.sh"
+  fi
+
+  # 4. Uninstall Native Firefox (conditional)
+  if [[ "$INSTALL_FIREFOX_DEV" == "true" || "$INSTALL_FIREFOX_ESR" == "true" ]]; then
+    step "Uninstalling Native Firefox..."
+    dnf remove -y firefox
+    ok "Native Firefox removed."
+  fi
 
   # -----------------------------------------------------------------------
   # PHASE 9 — Final upgrade & cleanup

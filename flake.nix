@@ -23,6 +23,9 @@
 
     # Third-party flake providing the Codex CLI.
     codex-cli-nix.url = "github:sadjow/codex-cli-nix";
+
+    # Declarative Flatpak management.
+    nix-flatpak.url = "github:gmodena/nix-flatpak";
   };
 
   # Entry point that processes inputs and defines system configurations.
