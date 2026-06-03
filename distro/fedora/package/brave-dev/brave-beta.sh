@@ -8,7 +8,6 @@ readonly C_WARNING="#FFA500"    # Amber
 readonly C_DANGER="#FF4500"     # Red-Orange
 readonly C_MUTED="#666666"      # Dim Gray
 readonly C_ACCENT="#C678DD"     # Soft Purple
-readonly C_HIGHLIGHT="#98C379"  # Soft Green
 
 export GUM_SPIN_SPINNER="line"
 export GUM_LOG_LEVEL="info"
@@ -81,6 +80,7 @@ check_root() {
 
 detect_os() {
   if [[ -f /etc/os-release ]]; then
+    # shellcheck disable=SC1091
     . /etc/os-release
     OS_ID=$ID
   else

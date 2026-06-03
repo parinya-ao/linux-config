@@ -7,7 +7,6 @@ readonly C_SUCCESS="#04B575"
 readonly C_WARNING="#FFA500"
 readonly C_DANGER="#FF4500"
 readonly C_MUTED="#666666"
-readonly C_ACCENT="#C678DD"
 
 export GUM_SPIN_SPINNER="line"
 
@@ -35,6 +34,7 @@ run_step() {
 
 get_distro() {
     if [ -f /etc/os-release ]; then
+        # shellcheck disable=SC1091
         source /etc/os-release
         echo "$ID"
     else

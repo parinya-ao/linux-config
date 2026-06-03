@@ -4,7 +4,6 @@ set -Eeuo pipefail
 # ── CONFIG ──────────────────────────────────────────────────────────────────
 readonly C_PRIMARY="#00BFFF"
 readonly C_SUCCESS="#04B575"
-readonly C_WARNING="#FFA500"
 readonly C_DANGER="#FF4500"
 
 # ── LAYER 1: UI PRIMITIVES ──────────────────────────────────────────────────
