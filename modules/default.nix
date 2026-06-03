@@ -12,6 +12,7 @@
     ./programs/bash.nix
     ./programs/cli-tools.nix
     ./programs/fish.nix
+    ./programs/flatpak.nix
     ./programs/git.nix
     ./programs/gnome.nix
     ./programs/neovim.nix

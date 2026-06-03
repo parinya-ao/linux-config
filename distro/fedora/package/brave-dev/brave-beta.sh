@@ -1,132 +1,175 @@
 #!/usr/bin/env bash
-# ==============================================================================
-# Script: brave-beta.sh
-# Description: Production-grade installer for Brave Browser Beta (Fedora/RHEL)
-# Architecture: Modular, KISS, State-driven
-# ==============================================================================
+set -Eeuo pipefail
 
-# Strict mode for safety (fail on error, undefined var, or pipe fail)
-set -euo pipefail
+# ── CONFIG ──────────────────────────────────────────────────────────────────
+readonly C_PRIMARY="#00BFFF"    # Deep Sky Blue
+readonly C_SUCCESS="#04B575"    # Mint Green
+readonly C_WARNING="#FFA500"    # Amber
+readonly C_DANGER="#FF4500"     # Red-Orange
+readonly C_MUTED="#666666"      # Dim Gray
+readonly C_ACCENT="#C678DD"     # Soft Purple
 
-# --- Configuration & Logging ---
+export GUM_SPIN_SPINNER="line"
+export GUM_LOG_LEVEL="info"
+export GUM_LOG_TIME="rfc822"
+
 LOG_FILE="/var/log/brave_install_debug.log"
-CURRENT_STATE="INIT"
 
-# --- Colors ---
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[0;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+# ── LAYER 1: UI PRIMITIVES ──────────────────────────────────────────────────
+banner() {
+  gum style --border double --border-foreground "$C_PRIMARY" --align center --padding "1 4" --bold "$*"
+}
 
-# --- Logger Functions ---
-log() { echo -e "[$(date +'%Y-%m-%dT%H:%M:%S%z')] $1" | tee -a "$LOG_FILE"; }
-log_info() { log "${BLUE}[INFO]${NC} $1"; }
-log_success() { log "${GREEN}[SUCCESS]${NC} $1"; }
-log_error() { log "${RED}[ERROR]${NC} $1"; }
-log_debug() { log "${YELLOW}[DEBUG] State: ${CURRENT_STATE} | $1${NC}"; }
+step() {
+  gum style --foreground "$C_PRIMARY" --bold "▶  Step ${1}: ${2}"
+}
 
-# --- Helper Functions ---
+ok() {
+  gum style --foreground "$C_SUCCESS" "  ✔  $*"
+}
+
+warn() {
+  gum style --foreground "$C_WARNING" "  ⚠  $*"
+}
+
+fail() {
+  gum style --border thick --border-foreground "$C_DANGER" --foreground "$C_DANGER" --bold --padding "0 2" "✖  ERROR: $*"
+  exit 1
+}
+
+info() {
+  gum style --foreground "$C_MUTED" "  ℹ  $*"
+}
+
+kv() {
+  local label value
+  label=$(gum style --foreground "$C_MUTED" --width 14 "$1")
+  value=$(gum style --foreground "$C_ACCENT" "$2")
+  gum join --horizontal "$label" "$value"
+}
+
+# ── LAYER 2: RUNNER HELPER ──────────────────────────────────────────────────
+run_step() {
+  local spinner="$1" title="$2"
+  shift 2
+  
+  if [[ "${DRY_RUN:-0}" == "1" ]]; then
+    info "DRY RUN: $title (would execute: $*)"
+    return 0
+  fi
+
+  if gum spin --spinner "$spinner" --title "  ${title}..." -- "$@"; then
+    ok "$title"
+  else
+    local code=$?
+    fail "$title (exit $code)"
+  fi
+}
+
+# ── LAYER 3: TASK FUNCTIONS ──────────────────────────────────────────────────
 check_root() {
-    CURRENT_STATE="CHECK_ROOT"
-    log_debug "Verifying root privileges..."
-    if [[ "$EUID" -ne 0 ]]; then
-        log_error "Please run as root or using sudo."
-        exit 1
-    fi
-    log_success "Root privileges verified."
+  if [[ "${DRY_RUN:-0}" == "1" ]]; then
+    info "DRY RUN: Skipping root check."
+    return 0
+  fi
+
+  if [[ "$EUID" -ne 0 ]]; then
+    fail "This script must be run as root."
+  fi
 }
 
 detect_os() {
-    CURRENT_STATE="DETECT_OS"
-    log_debug "Detecting Operating System from /etc/os-release..."
-    if [[ -f /etc/os-release ]]; then
-        # shellcheck disable=SC1091
-        . /etc/os-release
-        OS_ID=$ID
-        log_debug "OS detected as: $OS_ID"
-    else
-        log_error "Cannot detect OS. /etc/os-release not found."
-        exit 1
-    fi
+  if [[ -f /etc/os-release ]]; then
+    # shellcheck disable=SC1091
+    . /etc/os-release
+    OS_ID=$ID
+  else
+    fail "Cannot detect OS."
+  fi
 }
 
 install_dependencies() {
-    CURRENT_STATE="INSTALL_DEPS"
-    log_debug "Installing dnf-plugins-core..."
-    if dnf install -y dnf-plugins-core >> "$LOG_FILE" 2>&1; then
-        log_success "dnf-plugins-core installed successfully."
-    else
-        log_error "Failed to install dnf-plugins-core. Check $LOG_FILE"
-        exit 1
-    fi
+  if rpm -q dnf-plugins-core >/dev/null 2>&1; then
+    info "dnf-plugins-core already installed, skipping."
+    return 0
+  fi
+  run_step line "Installing dnf-plugins-core" dnf install -y dnf-plugins-core
 }
 
 configure_repository() {
-    CURRENT_STATE="CONFIG_REPO"
-    log_debug "Configuring Brave Beta repository for $OS_ID..."
-    
-    local REPO_URL="https://brave-browser-rpm-beta.s3.brave.com/brave-browser-beta.repo"
-    
-    if [[ "$OS_ID" == "fedora" ]]; then
-        log_debug "Using Fedora specific command: addrepo --from-repofile"
-        dnf config-manager addrepo --from-repofile="$REPO_URL" >> "$LOG_FILE" 2>&1
-    elif [[ "$OS_ID" =~ ^(rhel|rocky|almalinux|centos)$ ]]; then
-        log_debug "Using RHEL/Rocky specific command: --add-repo"
-        dnf config-manager --add-repo "$REPO_URL" >> "$LOG_FILE" 2>&1
-    else
-        log_error "Unsupported OS for this script: $OS_ID"
-        exit 1
-    fi
-    
-    # Verify repo was added
-    if dnf repolist | grep -qi "brave-browser-beta"; then
-        log_success "Repository configured and verified."
-    else
-        log_error "Failed to configure repository."
-        exit 1
-    fi
+  if dnf repolist | grep -qi "brave-browser-beta"; then
+    info "Brave Beta repository already configured, skipping."
+    return 0
+  fi
+  
+  local REPO_URL="https://brave-browser-rpm-beta.s3.brave.com/brave-browser-beta.repo"
+  
+  if [[ "$OS_ID" == "fedora" ]]; then
+    run_step globe "Configuring repository" dnf config-manager addrepo --from-repofile="$REPO_URL"
+  elif [[ "$OS_ID" =~ ^(rhel|rocky|almalinux|centos)$ ]]; then
+    run_step globe "Configuring repository" dnf config-manager --add-repo "$REPO_URL"
+  else
+    fail "Unsupported OS: $OS_ID"
+  fi
 }
 
 install_brave_beta() {
-    CURRENT_STATE="INSTALL_BRAVE"
-    log_debug "Installing brave-browser-beta..."
-    if dnf install -y brave-browser-beta >> "$LOG_FILE" 2>&1; then
-        log_success "Brave Browser Beta installed successfully."
-    else
-        log_error "Installation failed. Check $LOG_FILE"
-        exit 1
-    fi
+  if rpm -q brave-browser-beta >/dev/null 2>&1; then
+    info "Brave Browser Beta already installed, skipping."
+    return 0
+  fi
+  run_step line "Installing brave-browser-beta" dnf install -y brave-browser-beta
 }
 
 verify_installation() {
-    CURRENT_STATE="VERIFY_INSTALL"
-    log_debug "Verifying installation by checking brave-browser-beta version..."
-    if command -v brave-browser-beta >/dev/null 2>&1; then
-        local version
-        version=$(brave-browser-beta --version 2>/dev/null)
-        log_success "Installation fully verified! Version: $version"
-    else
-        log_error "Binary not found in PATH."
-        exit 1
-    fi
+  if [[ "${DRY_RUN:-0}" == "1" ]]; then
+    info "DRY RUN: Skipping verification."
+    return 0
+  fi
+  
+  if command -v brave-browser-beta >/dev/null 2>&1; then
+    ok "Brave Browser Beta is installed: $(brave-browser-beta --version 2>/dev/null)"
+  else
+    fail "Binary not found in PATH."
+  fi
 }
 
-# --- Main Entry Point ---
+# ── LAYER 4: ORCHESTRATION ──────────────────────────────────────────────────
+show_summary() {
+  local title
+  title=$(gum style --foreground "$C_SUCCESS" --bold "🎉  INSTALLATION COMPLETE")
+  
+  local body
+  body=$(gum join --vertical --align left "$title" "" "$(kv "Package" "Brave Beta")" "$(kv "Status" "Installed")")
+  
+  gum style --border rounded --border-foreground "$C_SUCCESS" --padding "1 3" "$body"
+}
+
 main() {
-    touch "$LOG_FILE" || { echo "Cannot write to log file. Run as root."; exit 1; }
-    log_info "Starting Brave Browser Beta Installation"
-    
-    check_root
-    detect_os
-    install_dependencies
-    configure_repository
-    install_brave_beta
-    verify_installation
-    
-    CURRENT_STATE="DONE"
-    log_info "Process completed cleanly."
+  if [[ "${DRY_RUN:-0}" != "1" ]]; then
+    touch "$LOG_FILE" || fail "Cannot write to log file."
+  fi
+  trap 'fail "Unexpected failure at line $LINENO"' ERR
+  
+  banner "BRAVE BETA INSTALLER"
+  
+  local PIPELINE=(
+    "check_root"
+    "detect_os"
+    "install_dependencies"
+    "configure_repository"
+    "install_brave_beta"
+    "verify_installation"
+  )
+  
+  local step_num=1
+  for task in "${PIPELINE[@]}"; do
+    step "$step_num" "$task"
+    "$task"
+    (( step_num++ ))
+  done
+  
+  show_summary
 }
 
-# Execute main with all arguments
 main "$@"

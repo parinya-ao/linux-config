@@ -101,19 +101,14 @@ auto_fix_versions() {
     fi
 }
 
-# ------------------------------------------------------------------------------
-# 4. Core Business Logic
-# ------------------------------------------------------------------------------
+# ==============================================================================
+# 4. Core Business Logic (แก้ไขใหม่ เพิ่มรายละเอียดการอัปเกรดแบบสุดขีด)
+# ==============================================================================
 main() {
     trap 'rollback_on_error' ERR INT TERM
+    if [[ "${DEBUG:-0}" == "1" ]]; then set -x; fi
 
-    # DEBUG MODE: If DEBUG=1 is set, enable shell tracing
-    if [[ "${DEBUG:-0}" == "1" ]]; then
-        set -x
-    fi
-
-    # clear  # REMOVED: No black box, keep terminal history
-    gum style --border double --margin "1" --padding "1 2" --border-foreground "#00BFFF" "❄️  Nix Flake Migration Assistant [DEBUG ENABLED]"
+    gum style --border double --margin "1" --padding "1 2" --border-foreground "#00BFFF" "❄️  Nix Flake Migration Assistant"
 
     step "Pre-flight Checks & Auto-Fixes"
     fix_trusted_user
@@ -124,40 +119,66 @@ main() {
     step "Securing Environment"
     [[ -f "flake.lock" ]] && cp flake.lock flake.lock.bak && ok "Lockfile backed up."
 
-    step "Fetching Updates"
+    step "Fetching Updates (Flake Inputs)"
     info "Running: nix flake update"
-    if nix --extra-experimental-features "nix-command flakes" flake update; then
-        ok "Flake lockfile updated successfully. All inputs are now at their latest versions."
+    
+    local update_log
+    update_log=$(mktemp)
+    
+    if nix --extra-experimental-features "nix-command flakes" flake update 2>&1 | tee "$update_log"; then
+        echo ""
+        local updates
+        updates=$(grep -E "(Updated input|Added input|Removed input)" "$update_log" || true)
+        
+        if [[ -n "$updates" ]]; then
+            gum style --foreground "#FF69B4" --bold "📦 Flake Inputs Changed:"
+            echo "$updates" | while read -r line; do gum style --foreground "#D8BFD8" " $line"; done
+        else
+            gum style --foreground "#A9A9A9" --italic " (No flake inputs changed)"
+        fi
+        ok "Flake lockfile updated."
     else
         fail "Failed to update flake inputs."
     fi
+    rm -f "$update_log"
+    echo ""
 
     step "Applying Configuration"
     local hm_cmd=(home-manager)
     if ! command -v home-manager >/dev/null 2>&1; then
-        warn "home-manager command not found in PATH, using 'nix run' fallback..."
         hm_cmd=(nix --extra-experimental-features "nix-command flakes" run home-manager/master --)
     fi
-
-    # Robust DBus handling for dconf activation
+    
     local run_cmd=("${hm_cmd[@]}")
     if [[ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ]] && command -v dbus-run-session >/dev/null 2>&1; then
-        info "No DBus session found. Wrapping switch in dbus-run-session..."
         run_cmd=(dbus-run-session -- "${hm_cmd[@]}")
     fi
-
-    info "Running: ${run_cmd[*]} switch --flake . --verbose --show-trace -b backup"
-    if "${run_cmd[@]}" switch --flake . --verbose --show-trace -b backup; then
-        ok "Home Manager switch completed. System configuration applied beautifully."
+    
+    info "Building and applying new generation..."
+    if "${run_cmd[@]}" switch --flake . -b backup; then
+        ok "Home Manager switch completed."
     else
         fail "Home Manager switch failed."
     fi
+    echo ""
 
+    step "Analyzing Upgrade Details (NVD)"
+    local user_profile
+    user_profile="/nix/var/nix/profiles/per-user/$(whoami)/home-manager"
+    # shellcheck disable=SC2207
+    local gens=($(printf '%s\n' "${user_profile}"-*-link 2>/dev/null | sort -V | tail -n 2))
+    
+    if [ ${#gens[@]} -eq 2 ]; then
+        info "Comparing Generation $(basename "${gens[0]}") vs $(basename "${gens[1]}")..."
+        echo ""
+        nix --extra-experimental-features "nix-command flakes" run nixpkgs#nvd -- diff "${gens[0]}" "${gens[1]}" || true
+        echo ""
+    else
+        warn "Not enough generations to compare."
+    fi
+    
     rm -f flake.lock.bak
-
-    echo ""
-    gum format -- "- **Migration Complete!** Your environment is now up-to-date and pristine." "- Run \`home-manager news\` if you want to check recent changes."
-    echo ""
+    gum format -- "- **Migration Complete!** Your environment is now up-to-date and pristine."
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then

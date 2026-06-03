@@ -20,6 +20,8 @@
     desktop.enable = true;
   };
 
+  my.programs.flatpak.enable = true;
+
   programs.home-manager.enable = true;
 
   # Disable noisy news notifications

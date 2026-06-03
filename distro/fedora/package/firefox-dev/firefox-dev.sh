@@ -1,180 +1,147 @@
 #!/usr/bin/env bash
-# ==============================================================================
-# Script: firefox-dev.sh
-# Description: Production-grade, modular Firefox Developer Edition installer.
-# OS Target: Fedora (using DNF / DNF5 package managers).
-# Architecture: KISS, highly decoupled, deterministic error handling.
-# ==============================================================================
-# Fail immediately if a command fails, an unset variable is used, or a pipe fails
-set -euo pipefail
+set -Eeuo pipefail
 
-# DEBUG MODE: If DEBUG=1 is set, enable shell tracing
-if [[ "${DEBUG:-0}" == "1" ]]; then
-    set -x
-fi
+# ── CONFIG ──────────────────────────────────────────────────────────────────
+readonly C_PRIMARY="#00BFFF"
+readonly C_SUCCESS="#04B575"
+readonly C_WARNING="#FFA500"
+readonly C_DANGER="#FF4500"
+readonly C_MUTED="#666666"
 
-# ------------------------------------------------------------------------------
+export GUM_SPIN_SPINNER="line"
+export GUM_LOG_LEVEL="info"
+export GUM_LOG_TIME="rfc822"
 
-# Global Settings & State Monitoring Tracker
-# ------------------------------------------------------------------------------
-LOG_FILE="/tmp/firefox_dev_install_$(date +%s).log"
-MOZ_REPO_FILE="/etc/yum.repos.d/mozilla.repo"
+LOG_FILE="/tmp/firefox_dev_install.log"
 
-# Visual Signaling Palette (ANSI Escape Sequences)
-COLOR_RESET='\033[0m'
-COLOR_INFO='\033[0;34m'    # Blue
-COLOR_SUCCESS='\033[0;32m' # Green
-COLOR_WARN='\033[1;33m'    # Yellow
-COLOR_ERROR='\033[0;31m'   # Red
-COLOR_DEBUG='\033[0;36m'   # Cyan
-
-# ------------------------------------------------------------------------------
-# Diagnostic Logging Engine
-# ------------------------------------------------------------------------------
-log_state() {
-    local level="$1"
-    local message="$2"
-    local timestamp
-    timestamp=$(date "+%Y-%m-%d %H:%M:%S")
-
-    # Record unformatted text to permanent log file
-    echo "[$timestamp] [$level] $message" >> "$LOG_FILE"
-
-    # Route distinct color profiles to standard streams
-    case "$level" in
-        "INFO")    echo -e "${COLOR_INFO}[*] [$timestamp] INFO:${COLOR_RESET} $message" ;;
-        "SUCCESS") echo -e "${COLOR_SUCCESS}[+] [$timestamp] SUCCESS:${COLOR_RESET} $message" ;;
-        "WARN")    echo -e "${COLOR_WARN}[!] [$timestamp] WARNING:${COLOR_RESET} $message" ;;
-        "ERROR")   echo -e "${COLOR_ERROR}[X] [$timestamp] CRITICAL ERROR:${COLOR_RESET} $message" >&2 ;;
-        "DEBUG")   echo -e "${COLOR_DEBUG}[~] [$timestamp] DEBUG STATE:${COLOR_RESET} $message" ;;
-    esac
+# ── LAYER 1: UI PRIMITIVES ──────────────────────────────────────────────────
+banner() {
+  gum style --border double --border-foreground "$C_PRIMARY" --align center --padding "1 4" --bold "$*"
 }
 
-critical_intercept() {
-    log_state "ERROR" "$1"
-    log_state "INFO" "Execution halted gracefully. Diagnostics captured inside: $LOG_FILE"
-    exit 1
+step() {
+  gum style --foreground "$C_PRIMARY" --bold "▶  Step ${1}: ${2}"
 }
 
-# ------------------------------------------------------------------------------
-# Modular Verification & Operational Units
-# ------------------------------------------------------------------------------
+ok() {
+  gum style --foreground "$C_SUCCESS" "  ✔  $*"
+}
+
+warn() {
+  gum style --foreground "$C_WARNING" "  ⚠  $*"
+}
+
+fail() {
+  gum style --border thick --border-foreground "$C_DANGER" --foreground "$C_DANGER" --bold --padding "0 2" "✖  ERROR: $*"
+  exit 1
+}
+
+info() {
+  gum style --foreground "$C_MUTED" "  ℹ  $*"
+}
+
+# ── LAYER 2: RUNNER HELPER ──────────────────────────────────────────────────
+run_step() {
+  local spinner="$1" title="$2"
+  shift 2
+  
+  if [[ "${DRY_RUN:-0}" == "1" ]]; then
+    info "DRY RUN: $title (would execute: $*)"
+    return 0
+  fi
+
+  if gum spin --spinner "$spinner" --title "  ${title}..." -- "$@"; then
+    ok "$title"
+  else
+    local code=$?
+    fail "$title (exit $code)"
+  fi
+}
+
+# ── LAYER 3: TASK FUNCTIONS ──────────────────────────────────────────────────
 assert_environment() {
-    log_state "DEBUG" "Verifying environment prerequisites..."
-    
-    # Assert DNF package manager exists
-    if ! command -v dnf >/dev/null 2>&1; then
-        critical_intercept "Package manager 'dnf' or 'dnf5' missing. Target system is not Fedora."
-    fi
-
-    # Assert passwordless or active sudo escalation path
-    if ! sudo -v >/dev/null 2>&1; then
-        critical_intercept "Administrative execution failure. Non-privileged user lacks sudo clearance."
-    fi
-
-    log_state "SUCCESS" "Host environment validates safely."
+  if [[ "${DRY_RUN:-0}" == "1" ]]; then
+    info "DRY RUN: Skipping prerequisite checks."
+    return 0
+  fi
+  
+  if ! command -v dnf >/dev/null 2>&1; then
+    fail "'dnf' missing. Not Fedora."
+  fi
+  
+  if ! sudo -v >/dev/null 2>&1; then
+    fail "No sudo privileges."
+  fi
 }
 
 purge_deprecated_copr() {
-    log_state "DEBUG" "Auditing for conflicting legacy COPR dependencies..."
-
-    # Safely look for old COPR package 'firefox-dev' without breaking on zero exits
-    if rpm -q firefox-dev 2>&1 | sudo tee -a "$LOG_FILE"; then
-        log_state "WARN" "Legacy community COPR installation found. Purging package 'firefox-dev'..."
-        sudo dnf remove -y firefox-dev 2>&1 | sudo tee -a "$LOG_FILE" || critical_intercept "Failed to uninstall legacy COPR package."
-        log_state "SUCCESS" "Legacy 'firefox-dev' package dropped."
-    else
-        log_state "DEBUG" "No legacy COPR package traces found."
-    fi
-
-    # Safely disable the old repository mapping if present
-    log_state "DEBUG" "Disabling 'the4runner/firefox-dev' repository if configured..."
-    sudo dnf copr disable -y the4runner/firefox-dev 2>&1 | sudo tee -a "$LOG_FILE" || true
-    log_state "SUCCESS" "COPR isolation cleared cleanly."
+  if rpm -q firefox-dev >/dev/null 2>&1; then
+    run_step line "Removing legacy COPR package" sudo dnf remove -y firefox-dev
+  fi
+  run_step points "Disabling legacy COPR repo" sudo dnf copr disable -y the4runner/firefox-dev
 }
 
 synchronize_base_metadata() {
-    log_state "DEBUG" "Forcing structural refresh of standard DNF repository metadata..."
-    sudo dnf upgrade --refresh -y --downloadonly 2>&1 | sudo tee -a "$LOG_FILE" || critical_intercept "Metadata synchronization loop broke."
-    log_state "SUCCESS" "System metadata cache successfully synced."
+  run_step points "Refreshing metadata" sudo dnf upgrade --refresh -y --downloadonly
 }
 
 inject_mozilla_repository() {
-    log_state "DEBUG" "Injecting official authenticated Mozilla RPM Repo with scoping variables..."
-
-    # Construct clean parameters targeting exclusively 'firefox-devedition' packages via explicit priority tags
-    if sudo dnf config-manager addrepo \
-        --id=mozilla \
-        --set=baseurl=https://packages.mozilla.org/rpm/firefox \
-        --set=gpgkey=https://packages.mozilla.org/rpm/firefox/signing-key.gpg \
-        --set=gpgcheck=1 \
-        --set=repo_gpgcheck=0 \
-        --set=priority=10 \
-        --set=includepkgs=firefox-devedition\* 2>&1 | sudo tee -a "$LOG_FILE"; then
-        
-        log_state "SUCCESS" "Mozilla repository metadata record mapped to $MOZ_REPO_FILE"
-    else
-        critical_intercept "Failed to configure secure repository mapping via dnf config-manager."
-    fi
+  run_step globe "Adding Mozilla repository" sudo dnf config-manager addrepo \
+    --id=mozilla \
+    --set=baseurl=https://packages.mozilla.org/rpm/firefox \
+    --set=gpgkey=https://packages.mozilla.org/rpm/firefox/signing-key.gpg \
+    --set=gpgcheck=1 \
+    --set=repo_gpgcheck=0 \
+    --set=priority=10 \
+    --set=includepkgs=firefox-devedition\*
 }
 
 refresh_target_cache() {
-    log_state "DEBUG" "Binding and checking signatures for newly attached Mozilla repo..."
-    sudo dnf makecache --refresh --repo mozilla 2>&1 | sudo tee -a "$LOG_FILE" || critical_intercept "Failed validation check on Mozilla signing keys."
-    log_state "SUCCESS" "Mozilla package index cached locally."
+  run_step points "Caching Mozilla repo" sudo dnf makecache --refresh --repo mozilla
 }
 
 execute_package_provisioning() {
-    log_state "DEBUG" "Provisioning 'firefox-devedition' tracking binaries via DNF..."
-    sudo dnf install -y firefox-devedition 2>&1 | sudo tee -a "$LOG_FILE" || critical_intercept "Package payload transaction aborted during runtime execution."
-    log_state "SUCCESS" "DNF transaction finalized successfully."
+  run_step line "Installing Firefox DevEdition" sudo dnf install -y firefox-devedition
 }
 
 verify_operational_integrity() {
-    log_state "DEBUG" "Running functional tests on runtime layer components..."
-
-    # 1. Structural RPM database query
-    if ! rpm -q firefox-devedition 2>&1 | sudo tee -a "$LOG_FILE"; then
-        critical_intercept "Post-install validation fault: Package not registered in system engine database."
-    fi
-
-    # 2. Binary resolution tracking path
-    local binary_path
-    binary_path=$(command -v firefox-devedition 2>>"$LOG_FILE" || echo "")
-    if [ -z "$binary_path" ]; then
-        critical_intercept "Post-install validation fault: Executive target command path unresolved inside path scopes."
-    fi
-    log_state "DEBUG" "Executable binary localized at: $binary_path"
-
-    # 3. Dynamic runtime test
-    local execution_version
-    execution_version=$(firefox-devedition --version 2>>"$LOG_FILE" || echo "Execution Fault")
-    log_state "SUCCESS" "System testing complete. Verified Release Platform: $execution_version"
+  if [[ "${DRY_RUN:-0}" == "1" ]]; then
+    info "DRY RUN: Skipping verification."
+    return 0
+  fi
+  
+  if command -v firefox-devedition >/dev/null 2>&1; then
+    ok "Firefox DevEdition version: $(firefox-devedition --version 2>/dev/null)"
+  else
+    fail "Binary not found in PATH."
+  fi
 }
 
-# ------------------------------------------------------------------------------
-# Master Pipeline Coordinator
-# ------------------------------------------------------------------------------
+# ── LAYER 4: ORCHESTRATION ──────────────────────────────────────────────────
 main() {
-    echo "======================================================================"
-    log_state "INFO" "Initializing Firefox Developer Edition Automation Script."
-    log_state "INFO" "Logging tracking channel directly to: $LOG_FILE"
-    echo "======================================================================"
-
-    assert_environment
-    purge_deprecated_copr
-    synchronize_base_metadata
-    inject_mozilla_repository
-    refresh_target_cache
-    execute_package_provisioning
-    verify_operational_integrity
-
-    echo "======================================================================"
-    log_state "SUCCESS" "Deployment complete. Firefox Developer Edition is now ready to use!"
-    echo "======================================================================"
+  touch "$LOG_FILE"
+  trap 'fail "Unexpected failure at line $LINENO"' ERR
+  
+  banner "FIREFOX DEV INSTALLER"
+  
+  local PIPELINE=(
+    "assert_environment"
+    "purge_deprecated_copr"
+    "synchronize_base_metadata"
+    "inject_mozilla_repository"
+    "refresh_target_cache"
+    "execute_package_provisioning"
+    "verify_operational_integrity"
+  )
+  
+  local step_num=1
+  for task in "${PIPELINE[@]}"; do
+    step "$step_num" "$task"
+    "$task"
+    (( step_num++ ))
+  done
+  
+  gum style --foreground "$C_SUCCESS" --bold "\n🎉 Firefox Dev setup complete!"
 }
 
-# Explicit invocation isolation guard rule
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    main
-fi
+main "$@"
