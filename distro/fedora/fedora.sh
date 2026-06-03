@@ -776,6 +776,12 @@ if [[ "${RPM_FUSION_ACTIVE}" == "true" && "${FFMPEG_ACTIVE}" == "false" ]]; then
   fi
 
   # -----------------------------------------------------------------------
+  # PHASE 8.7.5 — Ansible (Modular Script)
+  # -----------------------------------------------------------------------
+  step "[P8.7.5] Installing Ansible..."
+  bash "$(dirname "$0")/package/ansible/ansible.sh"
+
+  # -----------------------------------------------------------------------
   # PHASE 8.8 — Custom Browsers (Brave Beta, Firefox Dev Edition & ESR)
   # -----------------------------------------------------------------------
   step "[P8.8] Custom Browsers (Brave Beta, Firefox Dev & ESR)..."

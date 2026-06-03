@@ -1,0 +1,38 @@
+{
+  "gpu": {
+    "nvidia": {
+      "fedora": ["akmod-nvidia", "xorg-x11-drv-nvidia", "nvidia-gpu-firmware"],
+      "ubuntu": ["nvidia-driver-latest", "nvidia-utils", "nvidia-settings"],
+      "opensuse": ["nvidia-driver-G06", "nvidia-compute-utils"]
+    },
+    "intel": {
+      "fedora": ["intel-media-driver", "libva-intel-driver"],
+      "ubuntu": ["intel-media-va-driver", "intel-media-va-driver-non-free"],
+      "opensuse": ["intel-media-driver", "libva-intel-driver"]
+    },
+    "amd": {
+      "fedora": ["libdrm-amd", "mesa-dri-drivers"],
+      "ubuntu": ["libdrm-amd64", "libdrm-amdgpu1"],
+      "opensuse": ["libdrm-amd", "Mesa-dri"]
+    }
+  },
+  "network": {
+    "broadcom": {
+      "fedora": ["broadcom-bt-firmware"],
+      "ubuntu": ["bcmwl-kernel-source"],
+      "opensuse": ["broadcom-wl"]
+    },
+    "intel": {
+      "fedora": ["iwlwifi-dvm-firmware", "iwlwifi-mvm-firmware"],
+      "ubuntu": ["firmware-iwlwifi"],
+      "opensuse": ["kernel-firmware-iwlwifi"]
+    }
+  },
+  "system": {
+    "power": {
+      "fedora": ["thermald", "power-profiles-daemon"],
+      "ubuntu": ["thermald", "power-profiles-daemon"],
+      "opensuse": ["thermald", "power-profiles-daemon"]
+    }
+  }
+}

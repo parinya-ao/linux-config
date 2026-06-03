@@ -859,6 +859,12 @@ if [[ "${RESTRICTED_ACTIVE}" == "true" \
   bash "$(dirname "$0")/package/docker/docker.sh"
 
   # -----------------------------------------------------------------------
+  # PHASE 10.8 — Ansible
+  # -----------------------------------------------------------------------
+  step "[P10.8] Installing Ansible..."
+  bash "$(dirname "$0")/package/ansible/ansible.sh"
+
+  # -----------------------------------------------------------------------
   # PHASE 11 — Final upgrade & cleanup
   # -----------------------------------------------------------------------
   step "[P11] Final upgrade & cleanup..."

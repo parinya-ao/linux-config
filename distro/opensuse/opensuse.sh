@@ -818,6 +818,12 @@ if [[ "${PACKMAN_ACTIVE}" == "true" \
   bash "$(dirname "$0")/package/docker/docker.sh"
 
   # -----------------------------------------------------------------------
+  # PHASE 9.5 — Ansible
+  # -----------------------------------------------------------------------
+  step "[P9.5] Installing Ansible..."
+  bash "$(dirname "$0")/package/ansible/ansible.sh"
+
+  # -----------------------------------------------------------------------
   # PHASE 10 — Final upgrade & cleanup
   # -----------------------------------------------------------------------
   step "[P10] Final upgrade & cleanup..."

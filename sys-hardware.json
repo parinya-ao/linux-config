@@ -1,0 +1,15 @@
+{
+  "timestamp": "2026-06-03T10:12:00Z",
+  "gpu": {
+    "nvidia": {"detected": false},
+    "intel": {"detected": true, "vendor": "intel", "generation": "arrow_lake", "id": "0xa7a0"},
+    "amd": {"detected": false},
+    "hybrid_mode": false
+  },
+  "network": {
+    "wifi_vendor": "generic"
+  },
+  "system": {
+    "secure_boot_enabled": true
+  }
+}
