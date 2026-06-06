@@ -72,6 +72,7 @@ readonly AGENT_DIRS=(
 
 # All skill names built by pkgs/agent-skills
 readonly ALL_SKILLS=(
+  architect
   conventional-commit
   gum-bash
   nix-config
@@ -79,6 +80,10 @@ readonly ALL_SKILLS=(
   recap
   remember
   typescript
+  python-fastapi
+  nix-module
+  servicenow-api
+  security-review
 )
 
 # ── STATE ───────────────────────────────────────────────────────────────────

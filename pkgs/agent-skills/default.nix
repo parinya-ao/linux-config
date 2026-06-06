@@ -61,7 +61,7 @@ stdenvNoCC.mkDerivation {
   installCheckPhase = ''
     echo "=== Verifying agent-skills package ==="
 
-    expected_skills="conventional-commit gum-bash nix-config recall recap remember typescript"
+    expected_skills="architect conventional-commit gum-bash nix-config recall recap remember typescript python-fastapi nix-module servicenow-api security-review"
 
     failures=0
     for skill in $expected_skills; do
