@@ -10,6 +10,7 @@ let
 
   # ── All skills sourced from pkgs.agent-skills (Nix store) ──
   allSkills = [
+    "architect"
     "conventional-commit"
     "gum-bash"
     "nix-config"
@@ -17,6 +18,10 @@ let
     "recap"
     "remember"
     "typescript"
+    "python-fastapi"
+    "nix-module"
+    "servicenow-api"
+    "security-review"
   ];
 
   # Default + user extras
