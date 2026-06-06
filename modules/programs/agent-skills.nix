@@ -8,21 +8,8 @@
 let
   cfg = config.my.programs.agent-skills;
 
-  # ── All skills sourced from pkgs.agent-skills (Nix store) ──
-  allSkills = [
-    "architect"
-    "conventional-commit"
-    "gum-bash"
-    "nix-config"
-    "recall"
-    "recap"
-    "remember"
-    "typescript"
-    "python-fastapi"
-    "nix-module"
-    "servicenow-api"
-    "security-review"
-  ];
+  # ── Auto-discover skills from pkgs.agent-skills (Nix store) ──
+  allSkills = builtins.attrNames (builtins.readDir pkgs.agent-skills);
 
   # Default + user extras
   targetDirs = [
