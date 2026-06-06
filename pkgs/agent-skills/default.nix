@@ -58,23 +58,25 @@ stdenvNoCC.mkDerivation {
 
   doInstallCheck = true;
 
+  # Auto-discover: verify every directory in $out has a valid SKILL.md
   installCheckPhase = ''
     echo "=== Verifying agent-skills package ==="
 
-    expected_skills="architect conventional-commit gum-bash nix-config recall recap remember typescript python-fastapi nix-module servicenow-api security-review"
-
     failures=0
-    for skill in $expected_skills; do
-      if [ -f "$out/$skill/SKILL.md" ]; then
-        size=$(wc -c < "$out/$skill/SKILL.md")
+    for skill_dir in "$out"/*/; do
+      skill_dir=''${skill_dir%/}
+      skill_name=$(basename "$skill_dir")
+
+      if [ -f "$skill_dir/SKILL.md" ]; then
+        size=$(wc -c < "$skill_dir/SKILL.md")
         if [ "$size" -gt 0 ]; then
-          echo "  ✓ $skill ($size bytes)"
+          echo "  ✓ $skill_name ($size bytes)"
         else
-          echo "  ✗ $skill/SKILL.md is empty"
+          echo "  ✗ $skill_name/SKILL.md is empty"
           failures=$((failures + 1))
         fi
       else
-        echo "  ✗ $skill not found in output"
+        echo "  ✗ $skill_name missing SKILL.md"
         failures=$((failures + 1))
       fi
     done
