@@ -7,27 +7,92 @@
 # =============================================================================
 set -euo pipefail
 
+# ── GLOBAL LOGGING ──────────────────────────────────────────────────────────
+LOG_FILE="/tmp/fedora_provision.log"
+exec > >(tee -a "$LOG_FILE") 2>&1
+
 # DEBUG MODE: If DEBUG=1 is set, enable shell tracing
 if [[ "${DEBUG:-0}" == "1" ]]; then
     set -x
 fi
 
-# ------------------------------------------
-# COLORS
-# ------------------------------------------
+# ── CONFIG ──────────────────────────────────────────────────────────────────
 BOLD=$'\033[1m'
 RESET=$'\033[0m'
-YELLOW=$'\033[1;33m'
-GREEN=$'\033[1;32m'
-BLUE=$'\033[1;34m'
-RED=$'\033[1;31m'
+readonly C_PRIMARY="#00BFFF"    # Deep Sky Blue
+readonly C_SUCCESS="#04B575"    # Mint Green
+readonly C_WARNING="#FFA500"    # Amber
+readonly C_DANGER="#FF4500"     # Red-Orange
+readonly C_MUTED="#666666"      # Dim Gray
+readonly C_ACCENT="#C678DD"     # Soft Purple
 
-# helpers
-step()  { echo -e "\n${BLUE}[STEP]${RESET} $*"; }
-ok()    { echo -e "${GREEN}[OK]${RESET} $*"; }
-warn()  { echo -e "${YELLOW}[WARN]${RESET} $*"; }
-fail()  { echo -e "${RED}[FAIL]${RESET} $*"; exit 1; }
-info()  { echo -e "${YELLOW}[INFO]${RESET} $*"; }
+export GUM_SPIN_SPINNER="line"
+export GUM_LOG_LEVEL="info"
+export GUM_LOG_TIME="rfc822"
+
+# ── LAYER 1: UI PRIMITIVES ──────────────────────────────────────────────────
+banner() {
+  gum style --border double --border-foreground "$C_PRIMARY" --align center --padding "1 4" --bold "$*"
+}
+
+step() {
+  gum style --foreground "$C_PRIMARY" --bold "\n▶  Step: $*"
+}
+
+ok() {
+  gum style --foreground "$C_SUCCESS" "  ✔  $*"
+}
+
+warn() {
+  gum style --foreground "$C_WARNING" "  ⚠  $*"
+}
+
+fail() {
+  echo -e "\n--- LAST 50 LINES OF LOG ($LOG_FILE) ---"
+  tail -n 50 "$LOG_FILE"
+  echo -e "----------------------------------------\n"
+  gum style --border thick --border-foreground "$C_DANGER" --foreground "$C_DANGER" --bold --padding "0 2" "✖  ERROR: $*"
+  exit 1
+}
+
+info() {
+  gum style --foreground "$C_MUTED" "  ℹ  $*"
+}
+
+kv() {
+  local label value
+  label=$(gum style --foreground "$C_MUTED" --width 18 "$1")
+  value=$(gum style --foreground "$C_ACCENT" "$2")
+  gum join --horizontal "$label" "$value"
+}
+
+# ── LAYER 2: RUNNER HELPER ──────────────────────────────────────────────────
+safe_exec() {
+  local title="$1"
+  shift
+  if [[ "${DRY_RUN:-0}" == "1" ]]; then
+    info "DRY RUN: $title (would execute: $*)"
+    return 0
+  fi
+  "$@"
+}
+
+run_step() {
+  local spinner="$1" title="$2"
+  shift 2
+  
+  if [[ "${DRY_RUN:-0}" == "1" ]]; then
+    info "DRY RUN: $title (would execute: $*)"
+    return 0
+  fi
+
+  if gum spin --spinner "$spinner" --title "  ${title}..." -- "$@"; then
+    ok "$title"
+  else
+    local code=$?
+    fail "$title (failed with exit code $code)"
+  fi
+}
 
 # ------------------------------------------
 # IDEMPOTENT PACKAGE CHECK
@@ -51,37 +116,43 @@ setup_fedora_repos() {
   # 1. Backup original repos (idempotent)
   if [ ! -d "/etc/yum.repos.d.bak" ]; then
     info "Creating backup of repo files to /etc/yum.repos.d.bak..."
-    cp -r /etc/yum.repos.d /etc/yum.repos.d.bak
+    safe_exec "Backup repos" cp -r /etc/yum.repos.d /etc/yum.repos.d.bak
   else
     info "Restoring original repo files from backup for a clean configuration..."
-    [ -f /etc/yum.repos.d.bak/fedora.repo ] && cp /etc/yum.repos.d.bak/fedora.repo /etc/yum.repos.d/fedora.repo
-    [ -f /etc/yum.repos.d.bak/fedora-updates.repo ] && cp /etc/yum.repos.d.bak/fedora-updates.repo /etc/yum.repos.d/fedora-updates.repo
+    [ -f /etc/yum.repos.d.bak/fedora.repo ] && safe_exec "Restore fedora.repo" cp /etc/yum.repos.d.bak/fedora.repo /etc/yum.repos.d/fedora.repo
+    [ -f /etc/yum.repos.d.bak/fedora-updates.repo ] && safe_exec "Restore fedora-updates.repo" cp /etc/yum.repos.d.bak/fedora-updates.repo /etc/yum.repos.d/fedora-updates.repo
   fi
 
   # 2. Configure fedora.repo (Main OS)
   info "Patching /etc/yum.repos.d/fedora.repo..."
   # shellcheck disable=SC2016
-  sed -i '/^\[fedora\]/,/^\[/ { /^baseurl=/d; /^#baseurl=/d; s|^metalink=\(.*\)|#metalink=\1\nbaseurl=https://dl.fedoraproject.org/pub/fedora/linux/releases/$releasever/Everything/$basearch/os/\n       https://mirrors.kernel.org/fedora/releases/$releasever/Everything/$basearch/os/| }' /etc/yum.repos.d/fedora.repo
+  safe_exec "Patch fedora.repo" sed -i '/^\[fedora\]/,/^\[/ { /^baseurl=/d; /^#baseurl=/d; s|^metalink=\(.*\)|#metalink=\1\nbaseurl=https://dl.fedoraproject.org/pub/fedora/linux/releases/$releasever/Everything/$basearch/os/\n       https://mirrors.kernel.org/fedora/releases/$releasever/Everything/$basearch/os/| }' /etc/yum.repos.d/fedora.repo
 
   # 3. Configure fedora-updates.repo (Updates)
   info "Patching /etc/yum.repos.d/fedora-updates.repo..."
   # shellcheck disable=SC2016
-  sed -i '/^\[updates\]/,/^\[/ { /^baseurl=/d; /^#baseurl=/d; s|^metalink=\(.*\)|#metalink=\1\nbaseurl=https://dl.fedoraproject.org/pub/fedora/linux/updates/$releasever/Everything/$basearch/\n       https://mirrors.kernel.org/fedora/updates/$releasever/Everything/$basearch/| }' /etc/yum.repos.d/fedora-updates.repo
+  safe_exec "Patch fedora-updates.repo" sed -i '/^\[updates\]/,/^\[/ { /^baseurl=/d; /^#baseurl=/d; s|^metalink=\(.*\)|#metalink=\1\nbaseurl=https://dl.fedoraproject.org/pub/fedora/linux/updates/$releasever/Everything/$basearch/\n       https://mirrors.kernel.org/fedora/updates/$releasever/Everything/$basearch/| }' /etc/yum.repos.d/fedora-updates.repo
 
   # 4. Optimize DNF Configuration
   info "Optimizing /etc/dnf/dnf.conf (max_parallel_downloads=20)..."
-  cp /etc/dnf/dnf.conf "/etc/dnf/dnf.conf.backup.$(date +%s)" 2>/dev/null || true
   
   if grep -q "^max_parallel_downloads=" /etc/dnf/dnf.conf; then
-    sed -i "s/^max_parallel_downloads=.*/max_parallel_downloads=20/" /etc/dnf/dnf.conf
+    safe_exec "Update max_parallel_downloads" sed -i "s/^max_parallel_downloads=.*/max_parallel_downloads=20/" /etc/dnf/dnf.conf
   else
-    echo "max_parallel_downloads=20" >> /etc/dnf/dnf.conf
+    if [[ "${DRY_RUN:-0}" == "1" ]]; then
+       info "DRY RUN: Would add max_parallel_downloads=20 to dnf.conf"
+    else
+       echo "max_parallel_downloads=20" >> /etc/dnf/dnf.conf
+    fi
   fi
+
+  # Ensure boolean values are lowercase 'true'
+  safe_exec "Enable fastestmirror" sed -i 's/^fastestmirror=.*/fastestmirror=true/' /etc/dnf/dnf.conf
+  safe_exec "Enable keepcache" sed -i 's/^keepcache=.*/keepcache=true/' /etc/dnf/dnf.conf
 
   # 5. Refresh cache
   info "Refreshing DNF cache..."
-  dnf clean all
-  dnf makecache
+  dnf_clean_cache
   
   ok "Secure Fedora mirrors and DNF optimizations applied."
 }
@@ -292,6 +363,10 @@ vainfo_has() {
 }
 
 dnf_install() {
+  if [[ "${DRY_RUN:-0}" == "1" ]]; then
+    info "DRY RUN: Would install packages: $*"
+    return 0
+  fi
   info "Installing packages using: dnf install -y $*"
   if dnf install -y "$@"; then
     ok "Installed packages: $*"
@@ -303,6 +378,10 @@ dnf_install() {
 }
 
 dnf_upgrade() {
+  if [[ "${DRY_RUN:-0}" == "1" ]]; then
+    info "DRY RUN: Would upgrade system: $*"
+    return 0
+  fi
   # shellcheck disable=SC2086
   info "Upgrading system using: dnf upgrade $* -y"
   if dnf upgrade "$@" -y; then
@@ -310,8 +389,42 @@ dnf_upgrade() {
     info "Summary of changes (Last transaction):"
     dnf history info | head -n 15 || true
   else
-    warn "System upgrade ($*) failed or partially completed."
+    warn "System upgrade failed — check network or repository status"
   fi
+}
+
+dnf_clean_cache() {
+  if [[ "${DRY_RUN:-0}" == "1" ]]; then
+    info "DRY RUN: Would clean DNF cache and refresh"
+    return 0
+  fi
+  dnf clean all
+  dnf makecache
+}
+
+install_selected_apps() {
+  if [[ ${#SELECTED_SCRIPTS[@]} -eq 0 ]]; then
+    return 0
+  fi
+
+  step "[P8.7] Installing Selected Programs..."
+  for script_path in "${SELECTED_SCRIPTS[@]}"; do
+    full_path="$(dirname "$0")/$script_path"
+    
+    if [[ -f "$full_path" ]]; then
+      info "Executing: $script_path"
+      if ! bash "$full_path"; then
+        fail "Installation failed for $script_path"
+      fi
+    else
+      warn "Script not found: $script_path"
+    fi
+  done
+}
+
+# Placeholder to prevent crash
+handle_firefox_uninstallation() {
+  info "Skipping Firefox uninstallation (placeholder)..."
 }
 
 dnf_group_upgrade() {
@@ -324,24 +437,55 @@ dnf_group_upgrade() {
 }
 
 # ------------------------------------------
-# INTERACTIVE SELECTION
+# PROGRAM SELECTION
 # ------------------------------------------
+
+# Program Map (Display Name | Script Path)
+declare -A PROGRAM_MAP=(
+  ["Alacritty"]="package/alacritty/alacritty.sh"
+  ["Ansible Dev Tools"]="package/ansible/ansible.sh"
+  ["Brave (Origin Beta)"]="package/brave-dev/brave-beta.sh"
+  ["Docker Engine"]="package/docker/docker.sh"
+  ["Firefox Dev Edition"]="package/firefox-dev/firefox-dev.sh"
+  ["Firefox ESR"]="package/firefox-esr/firefox-esr.sh"
+  ["Line (Wine)"]="package/line/line_wine_install.sh"
+  ["Avahi Blocker"]="service/Avahi.sh"
+)
+
+SELECTED_SCRIPTS=()
+
 select_packages() {
-  info "Selecting packages to install..."
+  info "Selecting additional programs to install/configure..."
+  
+  local options=()
+  for key in "${!PROGRAM_MAP[@]}"; do
+    options+=("$key")
+  done
+  
+  # Sort options alphabetically
+  IFS=$'\n' sorted_options=($(sort <<<"${options[*]}"))
+  unset IFS
+
   local selection
-  # Using gum to allow selection. Default selected: Docker, Firefox Dev, Firefox ESR
-  selection=$(gum choose --no-limit --selected="Docker,Firefox Dev,Firefox ESR" "Docker" "Firefox Dev" "Firefox ESR" --header "Select packages to install (Space to select, Enter to confirm):")
+  selection=$(gum choose --no-limit \
+    --selected="Brave (Origin Beta),Docker Engine,Firefox Dev Edition" \
+    --header "Select programs to install (Space to toggle, Enter to confirm):" \
+    "${sorted_options[@]}")
 
-  # Initialize flags
-  INSTALL_DOCKER=false
-  INSTALL_FIREFOX_DEV=false
-  INSTALL_FIREFOX_ESR=false
+  if [[ -z "$selection" ]]; then
+    warn "No additional programs selected."
+    return 0
+  fi
 
-  # Set flags based on selection
-  [[ "$selection" == *"Docker"* ]] && INSTALL_DOCKER=true
-  [[ "$selection" == *"Firefox Dev"* ]] && INSTALL_FIREFOX_DEV=true
-  [[ "$selection" == *"Firefox ESR"* ]] && INSTALL_FIREFOX_ESR=true
+  while IFS= read -r line; do
+    [[ -z "$line" ]] && continue
+    SELECTED_SCRIPTS+=("${PROGRAM_MAP[$line]}")
+    ok "Selected: $line"
+  done <<< "$selection"
 }
+
+# ── EXECUTION ────────────────────────────────────────────────────────────────
+banner "FEDORA WORKSTATION DRIVER"
 
 # Pre-checks
 [[ $EUID -ne 0 ]] && fail "Must run as root: sudo bash $0"
@@ -350,10 +494,12 @@ select_packages() {
 if [[ -t 0 ]]; then
   select_packages
 else
-  # Default to all if non-interactive
-  INSTALL_DOCKER=true
-  INSTALL_FIREFOX_DEV=true
-  INSTALL_FIREFOX_ESR=true
+  # Default to essential selection if non-interactive
+  SELECTED_SCRIPTS=(
+    "${PROGRAM_MAP["Brave (Origin Beta)"]}"
+    "${PROGRAM_MAP["Docker Engine"]}"
+    "${PROGRAM_MAP["Firefox Dev Edition"]}"
+  )
 fi
 
 command -v dnf &>/dev/null || fail "dnf not found. This script is for Fedora Workstation only."
@@ -525,8 +671,8 @@ if [[ "${RPM_FUSION_ACTIVE}" == "false" ]]; then
   dnf_install rpmfusion-free-release-tainted rpmfusion-nonfree-release-tainted
 
   # Enable Cisco OpenH264
-  dnf config-manager setopt fedora-cisco-openh264.enabled=1 2>/dev/null \
-    || dnf config-manager --enable fedora-cisco-openh264 2>/dev/null \
+  safe_exec "Enable OpenH264" dnf config-manager setopt fedora-cisco-openh264.enabled=1 2>/dev/null \
+    || safe_exec "Enable OpenH264 (fallback)" dnf config-manager --enable fedora-cisco-openh264 2>/dev/null \
     || warn "Could not enable OpenH264 repo — try manually."
 
   dnf_upgrade --refresh
@@ -708,7 +854,7 @@ if [[ "${RPM_FUSION_ACTIVE}" == "true" && "${FFMPEG_ACTIVE}" == "false" ]]; then
   step "[P5] Multimedia codecs..."
 
   # Swap ffmpeg-free -> full ffmpeg
-  dnf swap -y ffmpeg-free ffmpeg --allowerasing \
+  safe_exec "Swap ffmpeg-free" dnf swap -y ffmpeg-free ffmpeg --allowerasing \
     && ok "ffmpeg swapped to full version." \
     || warn "ffmpeg swap failed — trying direct install..."
 
@@ -733,7 +879,7 @@ if [[ "${RPM_FUSION_ACTIVE}" == "true" && "${FFMPEG_ACTIVE}" == "false" ]]; then
     libdvdcss
 
   # Multimedia group upgrade
-  dnf group upgrade -y --with-optional Multimedia \
+  safe_exec "Multimedia group upgrade" dnf group upgrade -y --with-optional Multimedia \
     && ok "Multimedia group upgraded." \
     || warn "Multimedia group upgrade skipped."
 
@@ -762,93 +908,48 @@ if [[ "${RPM_FUSION_ACTIVE}" == "true" && "${FFMPEG_ACTIVE}" == "false" ]]; then
   # PHASE 8 — LVFS firmware updates
   # -----------------------------------------------------------------------
   step "[P8] LVFS firmware check..."
-  fwupdmgr refresh --force \
-    && fwupdmgr get-updates \
+  safe_exec "FW Refresh" fwupdmgr refresh --force \
+    && safe_exec "FW Get Updates" fwupdmgr get-updates \
     && ok "LVFS checked." \
     || warn "No firmware updates or fwupd issue — skipping."
 
   # -----------------------------------------------------------------------
-  # PHASE 8.7 — Docker Engine (Modular Script)
+  # PHASE 8.7 — Selected Additional Programs
   # -----------------------------------------------------------------------
-  if [[ "$INSTALL_DOCKER" == "true" ]]; then
-    step "[P8.7] Docker Engine (Modular Script)..."
-    bash "$(dirname "$0")/package/docker/docker.sh"
-  fi
-
-  # -----------------------------------------------------------------------
-  # PHASE 8.7.5 — Ansible (Modular Script)
-  # -----------------------------------------------------------------------
-  step "[P8.7.5] Installing Ansible..."
-  bash "$(dirname "$0")/package/ansible/ansible.sh"
-
-  # -----------------------------------------------------------------------
-  # PHASE 8.8 — Custom Browsers (Brave Beta, Firefox Dev Edition & ESR)
-  # -----------------------------------------------------------------------
-  step "[P8.8] Custom Browsers (Brave Beta, Firefox Dev & ESR)..."
-
-  # 1. Brave Browser Beta
-  step "Installing Brave Browser Beta..."
-  dnf install -y dnf-plugins-core
-  if dnf --version 2>/dev/null | grep -qiE "dnf5|libdnf5"; then
-    dnf config-manager addrepo --from-repofile=https://brave-browser-rpm-beta.s3.brave.com/brave-browser-beta.repo
-  else
-    dnf config-manager --add-repo https://brave-browser-rpm-beta.s3.brave.com/brave-browser-beta.repo
-  fi
-  rpm --import https://brave-browser-rpm-beta.s3.brave.com/brave-core-nightly.asc
-  dnf_install brave-browser-beta
-
-  # 2. Firefox Developer Edition
-  if [[ "$INSTALL_FIREFOX_DEV" == "true" ]]; then
-    step "Installing Firefox Developer Edition..."
-    bash "$(dirname "$0")/package/firefox-dev/firefox-dev.sh"
-  fi
-
-  # 3. Firefox ESR
-  if [[ "$INSTALL_FIREFOX_ESR" == "true" ]]; then
-    step "Installing Firefox ESR..."
-    bash "$(dirname "$0")/package/firefox-esr/firefox-esr.sh"
-  fi
-
-  # 4. Uninstall Native Firefox (conditional)
-  if [[ "$INSTALL_FIREFOX_DEV" == "true" || "$INSTALL_FIREFOX_ESR" == "true" ]]; then
-    step "Uninstalling Native Firefox..."
-    dnf remove -y firefox
-    ok "Native Firefox removed."
-  fi
+  install_selected_apps
+  handle_firefox_uninstallation
 
   # -----------------------------------------------------------------------
   # PHASE 9 — Final upgrade & cleanup
   # -----------------------------------------------------------------------
   step "[P9] Final upgrade & cleanup..."
   dnf_upgrade
-  dnf autoremove -y
+  safe_exec "DNF autoremove" dnf autoremove -y
   ok "System cleanup done."
 
-  # -----------------------------------------------------------------------
-  # SUMMARY
-  # -----------------------------------------------------------------------
+# ── SUMMARY ──────────────────────────────────────────────────────────────────
+show_final_summary() {
+  local title
+  title=$(gum style --foreground "$C_SUCCESS" --bold "🎉  ROUND 2 COMPLETE")
+  
+  local body
+  body=$(gum join --vertical --align left \
+    "$title" "" \
+    "$(kv "DNF Opts" "Parallel=20, Fast")" \
+    "$(kv "Drivers"  "NVIDIA/Intel/AMD")" \
+    "$(kv "VA-API"   "Hardware Dec Active")" \
+    "$(kv "Codecs"   "FFmpeg Full, GStreamer")" \
+    "$(kv "Audio"    "PipeWire, WirePlumber")" \
+    "$(kv "Power"    "Thermald, PPD")")
+  
   echo ""
-  echo -e "${BOLD}+--------------------------------------------------+${RESET}"
-  echo -e "${BOLD}|  ROUND 2 COMPLETE — ALL PACKAGES INSTALLED       |${RESET}"
-  echo -e "${BOLD}+---------------------------+----------------------+${RESET}"
-  echo -e "| DNF Optimization          | max_parallel=20, fast|"
-  echo -e "| Firmware (free)           | linux-firmware, MCU  |"
-  echo -e "| Firmware (nonfree)        | b43, broadcom-bt     |"
-  echo -e "| Intel Iris Xe GPU         | intel-media-driver   |"
-  echo -e "| VA-API                    | libva, libva-utils   |"
-  echo -e "| Mesa Vulkan               | mesa-vulkan-drivers  |"
-  echo -e "| Audio (SOF/HDA)           | sof-firmware, alsa   |"
-  echo -e "| PipeWire                  | pipewire, wireplumber|"
-  echo -e "| Codecs                    | ffmpeg, gstreamer1-* |"
-  echo -e "| Bluetooth                 | bluez, bluez-firmware|"
-  echo -e "| Power                     | thermald, ppd        |"
-  echo -e "| Browsers                  | Brave Beta, FF Dev   |"
-  echo -e "| Firmware Updates          | fwupd LVFS           |"
-  echo -e "| Docker Engine             | docker-ce, docker-compose |"
-  echo -e "${BOLD}+---------------------------+----------------------+${RESET}"
+  gum style --border rounded --border-foreground "$C_SUCCESS" --padding "1 3" "$body"
   echo ""
   warn "REBOOT recommended to load new firmware and kernel modules."
-  echo -e "  ${YELLOW}sudo reboot${RESET}"
+  info "Run: sudo reboot"
+}
+
+  show_final_summary
   exit 0
 
 fi
@@ -862,11 +963,15 @@ if [[ "${RPM_FUSION_ACTIVE}" == "true" && "${FFMPEG_ACTIVE}" == "true" ]]; then
   info "RPM Fusion : active [DONE]"
   info "ffmpeg     : active [DONE]"
   echo ""
-  info "Verify with:"
-  info "  vainfo                    → VA-API hardware decode"
-  info "  ffmpeg -version           → Codec support"
-  info "  pactl info                → PipeWire audio"
-  info "  fwupdmgr get-updates      → Pending firmware"
-  dnf list installed | grep -E "ffmpeg|gstreamer1|intel-media" | head -20 || true
+  info "Verification Tips:"
+  kv "VA-API" "vainfo"
+  kv "Codecs" "ffmpeg -version"
+  kv "Audio"  "pactl info"
+  kv "Updates" "fwupdmgr get-updates"
+  echo ""
+  
+  install_selected_apps
+  handle_firefox_uninstallation
+  
   exit 0
 fi

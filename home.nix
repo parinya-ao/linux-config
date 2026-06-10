@@ -24,5 +24,10 @@
 
   programs.home-manager.enable = true;
 
+  # Move __pycache__ out of project directories
+  home.sessionVariables = {
+    PYTHONPYCACHEPREFIX = "$HOME/.cache/pycache";
+  };
+
   # Disable noisy news notifications
 }

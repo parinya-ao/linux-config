@@ -18,6 +18,15 @@ in
       enable = true;
 
       initExtra = ''
+        # Fix for uv/pip binary wheels requiring native C++ libraries on non-NixOS
+        export LD_LIBRARY_PATH="/usr/lib64:${
+          pkgs.lib.makeLibraryPath [
+            pkgs.stdenv.cc.cc.lib
+            pkgs.zlib
+            pkgs.zstd
+          ]
+        }:$LD_LIBRARY_PATH"
+
         # Add local binary path to PATH
         export PATH="$HOME/.nix-profile/bin:$PATH"
 

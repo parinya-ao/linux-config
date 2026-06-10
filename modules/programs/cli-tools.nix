@@ -50,6 +50,7 @@ in
           "--group-directories-first"
           "--header"
           "--classify"
+          "--ignore-glob=__pycache__" # hide __pycache__ from directory listings
         ];
       };
 

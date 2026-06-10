@@ -25,6 +25,18 @@ in
       shellcheck
       docker-compose
       distrobox
+      cmake
+      freetype
+      fontconfig
+      xorg.libxcb
+      libxkbcommon
+      scdoc
+      gzip
+      cargo
+      rustc
+      gnumake
+      pkg-config
+      openssl.dev
     ];
   };
 }

@@ -12,7 +12,8 @@ export GUM_SPIN_SPINNER="line"
 export GUM_LOG_LEVEL="info"
 export GUM_LOG_TIME="rfc822"
 
-LOG_FILE="/tmp/firefox_esr_install.log"
+TARGET_USER="${SUDO_USER:-$USER}"
+LOG_FILE="/tmp/firefox_esr_install_${TARGET_USER}.log"
 
 # ── LAYER 1: UI PRIMITIVES ──────────────────────────────────────────────────
 banner() {

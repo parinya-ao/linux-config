@@ -62,6 +62,20 @@
       # Code formatter triggered by 'nix fmt'.
       formatter.${pkgs.stdenv.hostPlatform.system} = pkgs.nixfmt-tree;
 
+      # ── Development Shell ──
+      devShells.${system}.default = pkgs.mkShell {
+        name = "python-dev-env";
+        buildInputs = with pkgs; [
+          python3
+          uv
+        ];
+        LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath (with pkgs; [
+          stdenv.cc.cc
+          zlib
+          glib
+        ]);
+      };
+
       # ── Flake checks — run with `nix flake check` ──
       checks.${system} = {
         # 1. Build the package (includes installCheckPhase)

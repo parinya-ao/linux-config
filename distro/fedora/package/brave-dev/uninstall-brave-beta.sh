@@ -56,7 +56,7 @@ uninstall_brave() {
 
     case "$distro" in
         fedora)
-            run_step monkey "Removing package" sudo dnf remove -y brave-browser-beta
+            run_step monkey "Removing package" sudo dnf remove -y brave-browser-beta brave-origin-beta
             run_step monkey "Removing repository" sudo rm -f /etc/yum.repos.d/brave-browser-beta*.repo
             ;;
         ubuntu|debian|pop|mint)
